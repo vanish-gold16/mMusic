@@ -25,7 +25,7 @@ struct RootView: View {
                 .tabItem { Label("Library", systemImage: "music.note.square.stack") }
                 .tag(Tab.library)
         }
-        .tint(.blue)
+        .tint(.orange)
         
     }
     
@@ -47,4 +47,8 @@ struct RootView: View {
         }
     }
     
+}
+
+#Preview {
+    RootView()
 }
