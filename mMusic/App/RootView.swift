@@ -12,6 +12,7 @@ struct RootView: View {
     @State private var homePath: NavigationPath = .init()
     @State private var downloadPath: NavigationPath = .init()
     @State private var libraryPath: NavigationPath = .init()
+    @State private var searchPath: NavigationPath = .init()
     
     var body: some View {
         TabView(selection: tabBinding) {
@@ -24,6 +25,10 @@ struct RootView: View {
             LibraryTab(path: $libraryPath)
                 .tabItem { Label("Library", systemImage: "music.note.square.stack") }
                 .tag(Tab.library)
+            Spacer()
+            SearchTab(path: $searchPath)
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                .tag(Tab.search)
         }
         .tint(.orange)
         
@@ -44,6 +49,7 @@ struct RootView: View {
         case .home: homePath = NavigationPath()
         case .download: downloadPath = NavigationPath()
         case .library: libraryPath = NavigationPath()
+        case .search: searchPath = NavigationPath()
         }
     }
     

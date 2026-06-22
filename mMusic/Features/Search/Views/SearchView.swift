@@ -1,7 +1,8 @@
-//
-//  SearchView.swift
-//  mMusic
-//
-//  Created by Vanya on 22.06.2026.
-//
+import SwiftUI
 
+struct SearchView: View {
+    var body: some View {
+        Text("Search")
+            .navigationTitle("Search")
+    }
+}

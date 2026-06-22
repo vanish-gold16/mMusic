@@ -9,4 +9,5 @@ enum Tab: Hashable {
     case home
     case download
     case library
+    case search
 }
