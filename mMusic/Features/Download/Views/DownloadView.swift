@@ -55,5 +55,20 @@ struct DownloadView: View {
 }
 
 private func handleFileLoading(_ result: Result<URL, Error>) {
-    print(result)
+    switch (result) {
+    case .success(let url):
+        let file = URL.documentsDirectory.appending(path: url.lastPathComponent)
+        
+        url.startAccessingSecurityScopedResource()
+        do {
+            try FileManager.default.copyItem(at: url, to: file)
+            print("File was successfully copied")
+        } catch {
+            print("Error \(error)")
+        }
+        
+        url.stopAccessingSecurityScopedResource()
+    case .failure(let erorr):
+        print(erorr)
+    }
 }
