@@ -16,19 +16,31 @@ struct RootView: View {
     
     var body: some View {
         TabView(selection: tabBinding) {
-            HomeTab(path: $homePath)
-                .tabItem { Label("Home", systemImage: "house") }
-                .tag(Tab.home)
-            DownloadTab(path: $downloadPath)
-                .tabItem { Label("Download", systemImage: "music.note")}
-                .tag(Tab.download)
-            LibraryTab(path: $libraryPath)
-                .tabItem { Label("Library", systemImage: "music.note.square.stack") }
-                .tag(Tab.library)
-            Spacer()
-            SearchTab(path: $searchPath)
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(Tab.search)
+            SwiftUI.Tab("Home", systemImage: "house", value: Tab.home) {
+                HomeTab(path: $homePath)
+            }
+            SwiftUI.Tab("Download", systemImage: "music.note", value: Tab.download) {
+                DownloadTab(path: $downloadPath)
+            }
+            SwiftUI.Tab("Library", systemImage: "music.note.square.stack", value: Tab.library) {
+                LibraryTab(path: $libraryPath)
+            }
+            SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) {
+                SearchTab(path: $searchPath)
+            }
+//            HomeTab(path: $homePath)
+//                .tabItem { Label("Home", systemImage: "house") }
+//                .tag(Tab.home)
+//            DownloadTab(path: $downloadPath)
+//                .tabItem { Label("Download", systemImage: "music.note")}
+//                .tag(Tab.download)
+//            LibraryTab(path: $libraryPath)
+//                .tabItem { Label("Library", systemImage: "music.note.square.stack") }
+//                .tag(Tab.library)
+//            Spacer()
+//            SearchTab(path: $searchPath)
+//                .tabItem { Label("Search", systemImage: "magnifyingglass", role: .search) }
+//                .tag(Tab.search)
         }
         .tint(.orange)
         
