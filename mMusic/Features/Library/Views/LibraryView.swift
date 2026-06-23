@@ -10,6 +10,12 @@ import SwiftUI
 struct LibraryView: View {
     @State private var selectedCategory: LibraryCategory = .playlists
     
+    let tracks = [
+        Track(name: "Rapp Snitch Knishes", artist: "MF Doom", filename: "..."),
+        Track(name: "Eyes without a face", artist: "Billy Idol", filename: "..."),
+        Track(name: "Спокойная ночь", artist: "КИНО", filename: "...")
+    ]
+    
     var body: some View {
         List {
             ForEach(LibraryCategory.allCases, id: \.self) { category in
@@ -19,6 +25,17 @@ struct LibraryView: View {
                         .font(.title2)
                 }
                 .animation(.easeOut, value: selectedCategory)
+            }
+
+            HStack {
+                ForEach(tracks) { track in
+                    VStack(alignment: .leading) {
+                        Text(track.name)
+                        Text(track.artist)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
         }
         .listStyle(.plain)
