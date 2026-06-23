@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct LibraryView: View {
+    let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    
     @State private var selectedCategory: LibraryCategory = .playlists
     
     let tracks = [
@@ -27,13 +29,25 @@ struct LibraryView: View {
                 .animation(.easeOut, value: selectedCategory)
             }
 
-            HStack {
-                ForEach(tracks) { track in
-                    VStack(alignment: .leading) {
-                        Text(track.name)
-                        Text(track.artist)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+            VStack(alignment: .leading) {
+                Text("Recently added")
+                    .font(.title)
+                    .bold()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(tracks) { track in
+                        VStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay {
+                                    Image(systemName: "music.note")
+                                }
+                            Text(track.name)
+                            Text(track.artist)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             }
