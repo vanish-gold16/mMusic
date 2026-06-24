@@ -56,6 +56,9 @@ struct LibraryView: View {
         .onAppear{
             trackStore.load()
         }
+        .safeAreaInset(edge: .bottom) {
+            MiniPlayerView(audioPlayer: audioPlayer)
+        }
         .navigationTitle("Library")
     }
     

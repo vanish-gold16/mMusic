@@ -6,6 +6,9 @@ import Observation
 class AudioPlayer {
     private var player: AVAudioPlayer?
     
+    var currentTrack: Track?
+    var isPlaying = false
+    
     init() {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback)
@@ -18,13 +21,12 @@ class AudioPlayer {
     func play(_ track: Track) {
         print("Play called for \(track.name)")
         let url = URL.documentsDirectory.appending(path: track.filename)
-        print("url: \(url)")
         
         do {
             player = try AVAudioPlayer(contentsOf: url)
-            print("player created with length: \(player?.duration ?? 0) sec")
             player?.play()
-            print("play() called")
+            currentTrack = track
+            isPlaying = true
         } catch {
             print(error)
         }
