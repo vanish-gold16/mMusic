@@ -9,15 +9,11 @@ import SwiftUI
 
 struct LibraryView: View {
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
-    
+
+    @State private var trackStore = TrackStore()
+
     @State private var selectedCategory: LibraryCategory = .playlists
-    
-    let tracks = [
-        Track(name: "Rapp Snitch Knishes", artist: "MF Doom", filename: "..."),
-        Track(name: "Eyes without a face", artist: "Billy Idol", filename: "..."),
-        Track(name: "Спокойная ночь", artist: "КИНО", filename: "...")
-    ]
-    
+
     var body: some View {
         List {
             ForEach(LibraryCategory.allCases, id: \.self) { category in
@@ -35,7 +31,7 @@ struct LibraryView: View {
                     .bold()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(tracks) { track in
+                    ForEach(trackStore.tracks) { track in
                         VStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.gray.opacity(0.2))
@@ -53,6 +49,9 @@ struct LibraryView: View {
             }
         }
         .listStyle(.plain)
+        .onAppear{
+            trackStore.load()
+        }
         .navigationTitle("Library")
     }
     
