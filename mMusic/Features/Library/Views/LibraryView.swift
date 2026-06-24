@@ -8,9 +8,10 @@
 import SwiftUI
 
 struct LibraryView: View {
-    let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    let columns = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
 
     @State private var trackStore = TrackStore()
+    @State private var audioPlayer = AudioPlayer()
 
     @State private var selectedCategory: LibraryCategory = .playlists
 
@@ -43,6 +44,9 @@ struct LibraryView: View {
                             Text(track.artist)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                        }
+                        .onTapGesture {
+                            audioPlayer.play(track)
                         }
                     }
                 }
