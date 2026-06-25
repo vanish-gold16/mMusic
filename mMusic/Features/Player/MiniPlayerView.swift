@@ -5,25 +5,46 @@ struct MiniPlayerView: View {
     
     var body: some View {
         if let track = audioPlayer.currentTrack {
-            HStack {
+            HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.gray.opacity(0.2))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 30, height: 30)
                     .overlay(Image(systemName: "music.note"))
                 VStack(alignment: .leading) {
                     Text(track.name)
-                    Text(track.artist)
+                        .lineLimit(1)
                         .font(.subheadline)
+                        .bold()
+                    Text(track.artist)
+                        .lineLimit(1)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                
                 Spacer()
-                Button {
-                    audioPlayer.togglePlayPause()
-                } label: {
-                    Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title2)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                
+                HStack {
+                    Spacer()
+                    
+                    Button {
+                        audioPlayer.togglePlayPause()
+                    } label: {
+                        Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.title2)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())
+                    }
+                    
+                    Spacer()
+                    
+                    Button {
+                        
+                    } label: {
+                        Image(systemName: "forward.fill")
+                            .font(.title2)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())
+                    }
                 }
                 .padding(.horizontal)
             }
