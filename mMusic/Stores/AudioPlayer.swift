@@ -31,4 +31,15 @@ class AudioPlayer {
             print(error)
         }
     }
+    
+    func togglePlayPause() {
+        print("toggle нажат! isPlaying было \(isPlaying)")
+        if isPlaying {
+            player?.pause()
+            isPlaying = false
+        } else {
+            player?.play()
+            isPlaying = true
+        }
+    }
 }

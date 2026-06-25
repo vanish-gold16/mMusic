@@ -41,6 +41,7 @@ struct LibraryView: View {
                                     Image(systemName: "music.note")
                                 }
                             Text(track.name)
+                                .lineLimit(1)
                             Text(track.artist)
                                 .font(.caption)
                                 .foregroundColor(.secondary)

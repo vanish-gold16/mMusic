@@ -17,12 +17,22 @@ struct MiniPlayerView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                Button {
+                    audioPlayer.togglePlayPause()
+                } label: {
+                    Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title2)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .padding(.horizontal)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .glassEffect()
+            .glassEffect(in: .rect(cornerRadius: 24))
             .padding(.horizontal)
+            .padding(.bottom, 8)
         }
     }
+    
 }
