@@ -64,24 +64,39 @@ struct LibraryView: View {
                                 audioPlayer.play(track)
                             }
                             .contextMenu() {
-                                Button {
+                                VStack {
+                                    ControlGroup {
+                                        Button {
+                                            
+                                        } label: {
+                                            Label("Favourite", systemImage: track.isFavourite ? "star.fill" : "star")
+                                        }
+                                        
+                                        Button {
+                                            
+                                        } label: {
+                                            Label("Share", systemImage: "square.and.arrow.up")
+                                        }
+                                    }
                                     
-                                } label: {
-                                    Label("Share", systemImage: "square.and.arrow.up")
-                                }
-                                
-                                Button {
+                                    Divider()
                                     
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
+                                    Button {
+                                        
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Button(role: .destructive) {
+                                        trackStore.delete(track)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    
+                                    .tint(.red)
                                 }
-                                
-                                Button(role: .destructive) {
-                                    trackStore.delete(track)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                .tint(.red)
                             }
                         }
                     }

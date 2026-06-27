@@ -5,4 +5,6 @@ struct Track: Identifiable, Codable {
     var name: String
     var artist: String
     let filename: String
+    
+    var isFavourite = false
 }
