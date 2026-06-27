@@ -77,10 +77,11 @@ struct LibraryView: View {
                                 }
                                 
                                 Button(role: .destructive) {
-                                    
+                                    trackStore.delete(track)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
+                                .tint(.red)
                             }
                         }
                     }

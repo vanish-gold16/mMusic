@@ -19,11 +19,23 @@ class TrackStore {
             print("Failed to load tracks: \(error)")
         }
     }
+    
+    func delete(_ track: Track) {
+        let url = URL.documentsDirectory.appending(path: track.filename)
+        
+        do {
+            try FileManager.default.removeItem(at: url)
+            tracks.removeAll { $0.id == track.id }
+        } catch {
+            print("\(error)")
+        }
+    }
 }
 
 extension URL {
     func parseMusic() -> Track {
         let base = deletingPathExtension().lastPathComponent
+            .replacingOccurrences(of: "_", with: " ")
 
         if let range = base.range(of: " — ")        // длинное тире
                     ?? base.range(of: " – ")         // среднее тире (en-dash) ← добавили
