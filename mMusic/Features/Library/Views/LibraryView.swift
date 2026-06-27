@@ -16,44 +16,78 @@ struct LibraryView: View {
     @State private var selectedCategory: LibraryCategory = .playlists
 
     var body: some View {
-        List {
-            ForEach(LibraryCategory.allCases, id: \.self) { category in
-                NavigationLink(destination: destinationView(for: category)) {
-                    Label(category.rawValue, systemImage: category.icon)
-                        .foregroundColor(.orange)
-                        .font(.title2)
-                }
-                .animation(.easeOut, value: selectedCategory)
-            }
-
-            VStack(alignment: .leading) {
-                Text("Recently added")
-                    .font(.title)
-                    .bold()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(trackStore.tracks) { track in
-                        VStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.2))
-                                .aspectRatio(1, contentMode: .fit)
-                                .overlay {
-                                    Image(systemName: "music.note")
-                                }
-                            Text(track.name)
-                                .lineLimit(1)
-                            Text(track.artist)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                Spacer()
+                
+                ForEach(LibraryCategory.allCases, id: \.self) { category in
+                    NavigationLink(destination: destinationView(for: category)) {
+                        HStack {
+                            Label(category.rawValue, systemImage: category.icon)
+                                .foregroundColor(.orange)
+                                .font(.title2)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
+                                .font(.subheadline)
                         }
-                        .onTapGesture {
-                            audioPlayer.play(track)
+                    }
+                    
+                    Divider()
+                    
+                    .animation(.easeOut, value: selectedCategory)
+                }
+                
+                VStack(alignment: .leading) {
+                    Text("Recently added")
+                        .font(.title)
+                        .bold()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(trackStore.tracks) { track in
+                            VStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.gray.opacity(0.2))
+                                    .aspectRatio(1, contentMode: .fit)
+                                    .overlay {
+                                        Image(systemName: "music.note")
+                                    }
+                                Text(track.name)
+                                    .lineLimit(1)
+                                Text(track.artist)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .onTapGesture {
+                                audioPlayer.play(track)
+                            }
+                            .contextMenu() {
+                                Button {
+                                    
+                                } label: {
+                                    Label("Share", systemImage: "square.and.arrow.up")
+                                }
+                                
+                                Button {
+                                    
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 }
             }
+            .padding(.horizontal)
         }
-        .listStyle(.plain)
         .onAppear{
             trackStore.load()
         }
