@@ -11,7 +11,7 @@ struct LibraryView: View {
     let columns = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
 
     @State private var trackStore = TrackStore()
-    @State private var audioPlayer = AudioPlayer()
+    @Environment(AudioPlayer.self) private var audioPlayer
 
     @State private var selectedCategory: LibraryCategory = .playlists
 
@@ -56,9 +56,6 @@ struct LibraryView: View {
         .listStyle(.plain)
         .onAppear{
             trackStore.load()
-        }
-        .safeAreaInset(edge: .bottom) {
-            MiniPlayerView(audioPlayer: audioPlayer)
         }
         .navigationTitle("Library")
     }

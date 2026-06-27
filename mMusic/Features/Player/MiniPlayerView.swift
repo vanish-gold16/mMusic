@@ -48,11 +48,8 @@ struct MiniPlayerView: View {
                 }
                 .padding(.horizontal)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .glassEffect(in: .rect(cornerRadius: 24))
+            .frame(maxHeight: .infinity)
             .padding(.horizontal)
-            .padding(.bottom, 8)
         }
     }
     

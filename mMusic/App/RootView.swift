@@ -14,6 +14,8 @@ struct RootView: View {
     @State private var libraryPath: NavigationPath = .init()
     @State private var searchPath: NavigationPath = .init()
     
+    @State private var audioPlayer = AudioPlayer()
+    
     var body: some View {
         TabView(selection: tabBinding) {
             SwiftUI.Tab("Home", systemImage: "house", value: Tab.home) {
@@ -42,8 +44,11 @@ struct RootView: View {
 //                .tabItem { Label("Search", systemImage: "magnifyingglass", role: .search) }
 //                .tag(Tab.search)
         }
+        .tabViewBottomAccessory {
+            MiniPlayerView(audioPlayer: audioPlayer)
+        }
+        .environment(audioPlayer)
         .tint(.orange)
-        
     }
     
     private var tabBinding: Binding<Tab> {
