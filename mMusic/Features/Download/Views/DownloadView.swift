@@ -1,16 +1,10 @@
-//
-//  DownloadView.swift
-//  mMusic
-//
-//  Created by Vanya on 22.06.2026.
-//
-
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct DownloadView: View {
     @State private var isImporting = false
     @State private var isLoading = false
+    @State private var pickedFile: PickedFile? = nil
     
     var body: some View {
         VStack {
@@ -51,24 +45,17 @@ struct DownloadView: View {
             }
         }
         .navigationTitle("Download")
-    }
-}
-
-private func handleFileLoading(_ result: Result<URL, Error>) {
-    switch (result) {
-    case .success(let url):
-        let file = URL.documentsDirectory.appending(path: url.lastPathComponent)
-        
-        url.startAccessingSecurityScopedResource()
-        do {
-            try FileManager.default.copyItem(at: url, to: file)
-            print("File was successfully copied")
-        } catch {
-            print("Error \(error)")
+        .sheet(item: $pickedFile) { file in
+            SettingView(file: file)
         }
-        
-        url.stopAccessingSecurityScopedResource()
-    case .failure(let erorr):
-        print(erorr)
+    }
+    
+    private func handleFileLoading(_ result: Result<URL, Error>) {
+        switch (result) {
+        case .success(let url):
+            pickedFile = PickedFile(url: url)
+        case .failure(let erorr):
+            print(erorr)
+        }
     }
 }
