@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     let parent: ImagePicker
     
     init(_ parent: ImagePicker) {
