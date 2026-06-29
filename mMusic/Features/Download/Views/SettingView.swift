@@ -11,28 +11,40 @@ struct SettingView: View {
     let file: PickedFile
     
     var body: some View {
+        
+        Spacer()
         Spacer()
         
-        Form {
+        VStack {
             
-            Section("cover") {
-                
-                Button {
-                    showImagePicker = true
-                } label: {
-                    Label("", systemImage: "photo")
-                }
-                .sheet(isPresented: $showImagePicker) {
-                    ImagePicker(imageData: $artworkData)
-                }
-                
-                if let artworkData, let uiImage = UIImage(data: artworkData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 150)
-                }
+            if let artworkData, let uiImage = UIImage(data: artworkData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 150)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.2))
+                    .overlay {
+                        Image(systemName: "music.note")
+                    }
+                    .scaledToFit()
+                    .frame(height: 150)
             }
+            
+            Button {
+                showImagePicker = true
+            } label: {
+                Label("Pick an image", systemImage: "photo")
+            }
+            .buttonStyle(.glassProminent)
+            .sheet(isPresented: $showImagePicker) {
+                ImagePicker(imageData: $artworkData)
+            }
+            
+        }
+        
+        Form {
             
             Section("name") {
                 TextField("", text: $name)
