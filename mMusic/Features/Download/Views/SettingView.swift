@@ -2,6 +2,8 @@ import SwiftUI
 import PhotosUI
 
 struct SettingView: View {
+    @Environment(\.dismiss) private var dismiss
+    
     @State private var name = ""
     @State private var artist = ""
     @State private var genre: Genre = .pop
@@ -12,57 +14,73 @@ struct SettingView: View {
     
     var body: some View {
         
-        Spacer()
-        Spacer()
-        
-        VStack {
+        NavigationStack {
             
-            if let artworkData, let uiImage = UIImage(data: artworkData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 150)
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                    .overlay {
-                        Image(systemName: "music.note")
+            VStack {
+                VStack {
+                    
+                    if let artworkData, let uiImage = UIImage(data: artworkData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 150)
+                    } else {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.gray.opacity(0.2))
+                            .overlay {
+                                Image(systemName: "music.note")
+                            }
+                            .scaledToFit()
+                            .frame(height: 150)
                     }
-                    .scaledToFit()
-                    .frame(height: 150)
+                    
+                    Button {
+                        showImagePicker = true
+                    } label: {
+                        Label("Pick an image", systemImage: "photo")
+                    }
+                    .buttonStyle(.glassProminent)
+                    .sheet(isPresented: $showImagePicker) {
+                        ImagePicker(imageData: $artworkData)
+                    }
+                    
+                }
+                
+                Form {
+                    
+                    Section("name") {
+                        TextField("", text: $name)
+                    }
+                    
+                    Section("artist") {
+                        TextField("", text: $artist)
+                    }
+                    
+                    Section {
+                        Picker("Genre", selection: $genre) {
+                            ForEach(Genre.allCases, id: \.self) { genre in
+                                Text(genre.rawValue).tag(genre)
+                            }
+                        }
+                    }
+                }
+                .padding(.top)
             }
-            
-            Button {
-                showImagePicker = true
-            } label: {
-                Label("Pick an image", systemImage: "photo")
-            }
-            .buttonStyle(.glassProminent)
-            .sheet(isPresented: $showImagePicker) {
-                ImagePicker(imageData: $artworkData)
-            }
-            
-        }
-        
-        Form {
-            
-            Section("name") {
-                TextField("", text: $name)
-            }
-            
-            Section("artist") {
-                TextField("", text: $artist)
-            }
-            
-            Section {
-                Picker("Genre", selection: $genre) {
-                    ForEach(Genre.allCases, id: \.self) { genre in
-                        Text(genre.rawValue).tag(genre)
+            .navigationTitle("Track settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("save") {
+                        
                     }
                 }
             }
         }
-        .padding(.top)
     }
     
     init(file: PickedFile) {
