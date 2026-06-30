@@ -5,13 +5,14 @@ import SwiftData
 class Track {
     var name: String
     var artist: String
-    let filename: String
+    var filename: String
     var isFavourite = false
-    
+
     init(name: String, artist: String, filename: String, isFavourite: Bool = false) {
         self.name = name
         self.artist = artist
         self.filename = filename
         self.isFavourite = isFavourite
     }
+
 }
