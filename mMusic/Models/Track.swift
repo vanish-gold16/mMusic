@@ -10,6 +10,8 @@ class Track {
     var filename: String
     var isFavourite = false
     
+    var addedAt: Date = Date.now
+    
     @Attribute(.externalStorage) var artwork: Data?
 
     init(name: String, artist: String, genre: Genre, filename: String, isFavourite: Bool = false, artwork: Data? = nil) {

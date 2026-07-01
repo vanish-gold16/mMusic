@@ -4,7 +4,7 @@ import SwiftData
 struct LibraryView: View {
     let columns = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
 
-    @Query private var tracks: [Track]
+    @Query(sort: \Track.addedAt, order: .reverse) private var tracks: [Track]
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) private var audioPlayer
 
