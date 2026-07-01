@@ -14,15 +14,11 @@ class AudioPlayer {
             try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
             
-            do {
-                if let data = UserDefaults.standard.data(forKey: "lastTrack") {
-                    let decoder = JSONDecoder()
-                    let track = try decoder.decode(Track.self, from: data)
-                    currentTrack = track
-                }
-            } catch {
-                print("Error restoring the track in init() : \(error)")
+            if let filename = UserDefaults.standard.string(forKey: "lastTrack") {
+                let url = URL.documentsDirectory.appending(path: filename)
+                currentTrack = url.parseMusic()
             }
+            
         } catch {
             print("Audio session error: \(error)")
         }
@@ -36,13 +32,7 @@ class AudioPlayer {
             player?.play()
             currentTrack = track
             
-            do {
-                let encoder = JSONEncoder()
-                let data = try encoder.encode(track)
-                UserDefaults.standard.set(data, forKey: "lastTrack")
-            } catch {
-                print("Error saving the last track: \(error)")
-            }
+            UserDefaults.standard.set(track.filename, forKey: "lastTrack")
             
             isPlaying = true
         } catch {
