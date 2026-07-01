@@ -61,7 +61,7 @@ struct SettingView: View {
                     }
                     
                     Section {
-                        Picker("Genre", selection: $genre) {
+                        Picker("genre", selection: $genre) {
                             ForEach(Genre.allCases, id: \.self) { genre in
                                 Text(genre.rawValue).tag(genre)
                             }
@@ -86,7 +86,7 @@ struct SettingView: View {
             }
         }
     }
-    
+
     init(file: PickedFile) {
         self.file = file
         let track = file.url.parseMusic()
@@ -111,7 +111,8 @@ struct SettingView: View {
         
         dismiss()
     }
-    
+        
+
 }
 
 extension URL {
@@ -120,8 +121,8 @@ extension URL {
             .replacingOccurrences(of: "_", with: " ")
 
         if let range = base.range(of: " — ")        // длинное тире
-                    ?? base.range(of: " – ")         // среднее тире (en-dash) ← добавили
-                    ?? base.range(of: " - ") {
+            ?? base.range(of: " – ")         // среднее тире (en-dash) ← добавили
+            ?? base.range(of: " - ") {
             let artist = String(base[..<range.lowerBound])
             let title = String(base[range.upperBound...])
             return Track(name: title, artist: artist, genre: .other, filename: lastPathComponent)

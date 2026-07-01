@@ -42,65 +42,7 @@ struct LibraryView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(tracks) { track in
-                            VStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.2))
-                                    .aspectRatio(1, contentMode: .fit)
-                                    .overlay {
-                                        if let data = track.artwork, let uiImage = UIImage(data: data) {
-                                            Image(uiImage: uiImage)
-                                                .resizable()
-                                                .scaledToFill()
-                                        } else {
-                                            Image(systemName: "music.note")
-                                        }
-                                    }
-                                Text(track.name)
-                                    .lineLimit(1)
-                                Text(track.artist)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .onTapGesture {
-                                audioPlayer.play(track)
-                            }
-                            .contextMenu() {
-                                VStack {
-                                    ControlGroup {
-                                        Button {
-                                            
-                                        } label: {
-                                            Label("Favourite", systemImage: track.isFavourite ? "star.fill" : "star")
-                                        }
-                                        
-                                        Button {
-                                            
-                                        } label: {
-                                            Label("Share", systemImage: "square.and.arrow.up")
-                                        }
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    Button {
-                                        
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    
-                                    Divider()
-                                    
-                                    Button(role: .destructive) {
-                                        let url = URL.documentsDirectory.appending(path: track.filename)
-                                        try? FileManager.default.removeItem(at: url)
-                                        modelContext.delete(track)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                    
-                                    .tint(.red)
-                                }
-                            }
+                            Track.TrackCell(track: track)
                         }
                     }
                 }
