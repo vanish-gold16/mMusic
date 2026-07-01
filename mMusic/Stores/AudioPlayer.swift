@@ -14,11 +14,6 @@ class AudioPlayer {
             try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
             
-            if let filename = UserDefaults.standard.string(forKey: "lastTrack") {
-                let url = URL.documentsDirectory.appending(path: filename)
-                currentTrack = url.parseMusic()
-            }
-            
         } catch {
             print("Audio session error: \(error)")
         }

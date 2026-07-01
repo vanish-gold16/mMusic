@@ -5,9 +5,12 @@
 //  Created by Vanya on 22.06.2026.
 //
 
+import SwiftData
 import SwiftUI
 
 struct RootView: View {
+    @Environment(\.modelContext) private var modelContext
+    
     @State private var selected: Tab = .home
     @State private var homePath: NavigationPath = .init()
     @State private var downloadPath: NavigationPath = .init()
@@ -48,6 +51,17 @@ struct RootView: View {
             MiniPlayerView(audioPlayer: audioPlayer)
         }
         .environment(audioPlayer)
+        .task {
+            guard let lastTrack = UserDefaults.standard.string(forKey: "lastTrack") else {
+                return
+            }
+            let descriptor = FetchDescriptor<Track>(
+                predicate: #Predicate { $0.filename == lastTrack }
+            )
+            let track = try? modelContext.fetch(descriptor).first
+            
+            audioPlayer.currentTrack = track
+        }
         .tint(.orange)
     }
     
