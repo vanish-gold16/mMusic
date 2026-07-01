@@ -1,4 +1,4 @@
-enum Genre: String, CaseIterable {
+enum Genre: String, CaseIterable, Codable {
     case pop = "Pop"
     case jpop = "J-Pop"
     case rock = "Rock"
