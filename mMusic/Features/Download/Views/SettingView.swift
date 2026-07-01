@@ -78,7 +78,7 @@ struct SettingView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("save") {
-                        
+                        save()
                     }
                 }
             }
