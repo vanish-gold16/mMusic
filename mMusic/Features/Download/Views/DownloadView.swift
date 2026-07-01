@@ -8,32 +8,48 @@ struct DownloadView: View {
     
     var body: some View {
         VStack {
-            HStack(spacing: 16) {
+            VStack {
+                HStack(spacing: 16) {
+                    Button {
+                        isImporting = true
+                    } label: {
+                        VStack {
+                            Text("Upload music")
+                            Image(systemName: "square.and.arrow.down")
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.roundedRectangle(radius: 15))
+                    .tint(.blue)
+                    
+                    Button {
+                        
+                    } label: {
+                        VStack {
+                            Text("From YouTube")
+                            Image(systemName: "video")
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.roundedRectangle(radius: 15))
+                    .tint(.red)
+                    
+                }
+                
                 Button {
-                    isImporting = true
+                    
                 } label: {
                     VStack {
-                        Text("Upload music")
-                        Image(systemName: "square.and.arrow.down")
+                        Text("Soundloud")
                     }
                     .frame(maxWidth: .infinity, minHeight: 120)
                 }
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.roundedRectangle(radius: 15))
+                .padding(.top)
                 .tint(.orange)
-
-                Button {
-
-                } label: {
-                    VStack {
-                        Text("From YouTube")
-                        Image(systemName: "video")
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 120)
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 15))
-                .tint(.red)
             }
             .fileImporter(isPresented: $isImporting, allowedContentTypes: [.audio], onCompletion: handleFileLoading)
             .padding()
