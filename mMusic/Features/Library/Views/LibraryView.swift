@@ -47,7 +47,13 @@ struct LibraryView: View {
                                     .fill(Color.gray.opacity(0.2))
                                     .aspectRatio(1, contentMode: .fit)
                                     .overlay {
-                                        Image(systemName: "music.note")
+                                        if let data = track.artwork, let uiImage = UIImage(data: data) {
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .scaledToFill()
+                                        } else {
+                                            Image(systemName: "music.note")
+                                        }
                                     }
                                 Text(track.name)
                                     .lineLimit(1)
