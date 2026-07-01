@@ -6,10 +6,11 @@ struct SettingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     
+    @State private var showImagePicker = false
+    
     @State private var name = ""
     @State private var artist = ""
     @State private var genre: Genre = .pop
-    @State private var showImagePicker = false
     @State private var artworkData: Data?
     
     let file: PickedFile
@@ -19,6 +20,7 @@ struct SettingView: View {
         NavigationStack {
             
             VStack {
+                
                 VStack {
                     
                     if let artworkData, let uiImage = UIImage(data: artworkData) {
@@ -104,7 +106,7 @@ struct SettingView: View {
         }
         source.stopAccessingSecurityScopedResource()
         
-        let track = Track(name: name, artist: artist, genre: genre, filename: source.lastPathComponent)
+        let track = Track(name: name, artist: artist, genre: genre, filename: source.lastPathComponent, artwork: artworkData)
         modelContext.insert(track)
         
         dismiss()
