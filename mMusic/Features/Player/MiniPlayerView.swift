@@ -7,9 +7,17 @@ struct MiniPlayerView: View {
         if let track = audioPlayer.currentTrack {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
+                    .overlay {
+                        if let data = track.artwork, let uiImage = UIImage(data: data) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Image(systemName: "music.note")
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                     .frame(width: 30, height: 30)
-                    .overlay(Image(systemName: "music.note"))
                 VStack(alignment: .leading) {
                     Text(track.name)
                         .lineLimit(1)
