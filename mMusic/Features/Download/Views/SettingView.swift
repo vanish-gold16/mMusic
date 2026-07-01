@@ -113,3 +113,20 @@ struct SettingView: View {
     }
     
 }
+
+extension URL {
+    func parseMusic() -> Track {
+        let base = deletingPathExtension().lastPathComponent
+            .replacingOccurrences(of: "_", with: " ")
+
+        if let range = base.range(of: " — ")        // длинное тире
+                    ?? base.range(of: " – ")         // среднее тире (en-dash) ← добавили
+                    ?? base.range(of: " - ") {
+            let artist = String(base[..<range.lowerBound])
+            let title = String(base[range.upperBound...])
+            return Track(name: title, artist: artist, genre: .other, filename: lastPathComponent)
+        } else {
+            return Track(name: base, artist: "Unknown", genre: .other, filename: lastPathComponent)
+        }
+    }
+}
