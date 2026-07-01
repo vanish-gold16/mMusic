@@ -1,16 +1,11 @@
-//
-//  LibraryView.swift
-//  mMusic
-//
-//  Created by Vanya on 22.06.2026.
-//
-
 import SwiftUI
+import SwiftData
 
 struct LibraryView: View {
     let columns = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
 
-    @State private var trackStore = TrackStore()
+    @Query private var tracks: [Track]
+    @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) private var audioPlayer
 
     @State private var selectedCategory: LibraryCategory = .playlists
@@ -46,7 +41,7 @@ struct LibraryView: View {
                         .bold()
                         .frame(maxWidth: .infinity, alignment: .leading)
                     LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(trackStore.tracks) { track in
+                        ForEach(tracks) { track in
                             VStack(alignment: .leading) {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.gray.opacity(0.2))
@@ -90,7 +85,9 @@ struct LibraryView: View {
                                     Divider()
                                     
                                     Button(role: .destructive) {
-                                        trackStore.delete(track)
+                                        let url = URL.documentsDirectory.appending(path: track.filename)
+                                        try? FileManager.default.removeItem(at: url)
+                                        modelContext.delete(track)
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
@@ -103,9 +100,6 @@ struct LibraryView: View {
                 }
             }
             .padding(.horizontal)
-        }
-        .onAppear{
-            trackStore.load()
         }
         .navigationTitle("Library")
     }
