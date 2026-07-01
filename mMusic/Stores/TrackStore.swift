@@ -42,9 +42,9 @@ extension URL {
                     ?? base.range(of: " - ") {
             let artist = String(base[..<range.lowerBound])
             let title = String(base[range.upperBound...])
-            return Track(name: title, artist: artist, filename: lastPathComponent)
+            return Track(name: title, artist: artist, genre: .other, filename: lastPathComponent)
         } else {
-            return Track(name: base, artist: "Unknown", filename: lastPathComponent)
+            return Track(name: base, artist: "Unknown", genre: .other, filename: lastPathComponent)
         }
     }
 }

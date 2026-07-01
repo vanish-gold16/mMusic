@@ -1,8 +1,10 @@
-import SwiftUI
 import PhotosUI
+import SwiftUI
+import SwiftData
 
 struct SettingView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     
     @State private var name = ""
     @State private var artist = ""
@@ -88,6 +90,24 @@ struct SettingView: View {
         let track = file.url.parseMusic()
         _name = State(initialValue: track.name)
         _artist = State(initialValue: track.artist)
+    }
+    
+    private func save() {
+        let source = file.url
+        let destination = URL.documentsDirectory.appending(path: source.lastPathComponent)
+        
+        source.startAccessingSecurityScopedResource()
+        do {
+            try FileManager.default.copyItem(at: source, to: destination)
+        } catch {
+            print("Copy error: \(error)")
+        }
+        source.stopAccessingSecurityScopedResource()
+        
+        let track = Track(name: name, artist: artist, genre: genre, filename: source.lastPathComponent)
+        modelContext.insert(track)
+        
+        dismiss()
     }
     
 }
