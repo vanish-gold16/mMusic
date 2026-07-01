@@ -2,6 +2,8 @@ enum Genre: String, CaseIterable, Codable {
     case pop = "Pop"
     case jpop = "J-Pop"
     case rock = "Rock"
+    case uarock = "Ukrainian Rock"
+    case rurock = "Russian Rock"
     case hipHop = "Hip-Hop"
     case rap = "Rap"
     case archievecore = "Arhievecore"
