@@ -6,6 +6,7 @@ enum Genre: String, CaseIterable, Codable {
     case rap = "Rap"
     case archievecore = "Arhievecore"
     case trap = "Trap"
+    case hardstyle = "Hardstyle"
     case rnb = "R&B"
     case electronic = "Electronic"
     case house = "House"
