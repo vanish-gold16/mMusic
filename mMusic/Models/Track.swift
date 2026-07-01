@@ -20,23 +20,5 @@ class Track {
         self.isFavourite = isFavourite
         self.artwork = artwork
     }
-    
-    func edit(name: String?, artist: String?, genre: Genre?, filename: String, artwork: Data?) {
-        if name != nil {
-            self.name = name!
-        }
-        if artist != nil {
-            self.artist = artist!
-        }
-        if genre != nil {
-            self.genre = genre!
-        }
-        
-        self.filename = filename
-        
-        if artwork != nil {
-            self.artwork = artwork
-        }
-    }
 
 }

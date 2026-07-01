@@ -3,7 +3,7 @@ import SwiftUI
 struct EditTrackView: View {
     @Environment(\.dismiss) private var dismiss
     
-    @Bindable private var track: Track
+    @Bindable var track: Track
     
     @State private var showImagePicker = false
     

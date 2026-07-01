@@ -2,7 +2,6 @@ import SwiftData
 import SwiftUI
 
 struct TrackCell: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(AudioPlayer.self) private var audioPlayer
     @Environment(\.modelContext) private var modelContext
     
@@ -12,7 +11,6 @@ struct TrackCell: View {
     let track: Track
     
     var body: some View {
-        @Bindable var track = track
         VStack(alignment: .leading) {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.gray.opacity(0.2))
@@ -73,7 +71,7 @@ struct TrackCell: View {
             }
         }
         .sheet(isPresented: $showEdit) {
-            
+            EditTrackView(track: track)
         }
     }
 }
