@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PlaylistCell: View {
     
-    @Binding var playlist: Playlist
+    let playlist: Playlist
     
     @State private var isCreating = false
     
@@ -28,7 +28,7 @@ struct PlaylistCell: View {
                     }
                 }
                 .onTapGesture {
-                    
+                    PlaylistView()
                 }
         }
     }

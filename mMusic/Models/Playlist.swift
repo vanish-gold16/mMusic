@@ -4,13 +4,15 @@ import SwiftData
 @Model
 class Playlist {
     var name: String
+    var playlistDescription: String
     var tracks: [Track]
     var isPinned = false
     
     @Attribute(.externalStorage) var artwork: Data?
     
-    init(name: String, tracks: [Track], isPinned: Bool = false, artwork: Data? = nil) {
+    init(name: String, playlistDescription: String, tracks: [Track], isPinned: Bool = false, artwork: Data? = nil) {
         self.name = name
+        self.playlistDescription = playlistDescription
         self.tracks = tracks
         self.isPinned = isPinned
         self.artwork = artwork

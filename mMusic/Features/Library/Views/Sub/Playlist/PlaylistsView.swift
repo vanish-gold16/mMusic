@@ -21,14 +21,14 @@ struct PlaylistsView: View {
                 .buttonStyle(.glassProminent)
                 .frame(maxWidth: .infinity)
                 .sheet(isPresented: $isCreating) {
-                    
+                    CreatePlaylistView()
                 }
                 
                 Spacer()
                 
                 LazyVGrid(columns: columns, spacing: 5) {
                     ForEach(playlists) { playlist in
-                        
+                        PlaylistCell(playlist: playlist)
                     }
                 }
             }
