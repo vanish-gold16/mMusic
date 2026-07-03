@@ -52,6 +52,29 @@ struct CreatePlaylistView: View {
                     }
                 }
             }
+            
+            LazyVStack(alignment: .leading, spacing: 16) {
+                Capsule()
+                    .fill(Color.gray.opacity(0.2))
+                    .aspectRatio(contentMode: .fit)
+                    .overlay {
+                        HStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .aspectRatio(contentMode: .fit)
+                                .overlay {
+                                    Image(systemName: "plus")
+                                }
+                            Divider()
+                            
+                            Text("Add a track")
+                        }
+                        .onTapGesture {
+                            
+                        }
+                    }
+                
+            }
         }
     }
 
