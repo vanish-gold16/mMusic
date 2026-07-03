@@ -9,6 +9,7 @@ struct CreatePlaylistView: View {
 
     @State private var name = ""
     @State private var description = ""
+    @State private var tracks: [Track]?
     @State private var artworkData: Data?
 
     var body: some View {
@@ -55,6 +56,14 @@ struct CreatePlaylistView: View {
                     }
                     .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
 
+                    if tracks != nil {
+                        VStack {
+                            ForEach(tracks!) { track in
+                                TrackCell(track: track)
+                            }
+                        }
+                    }
+                    
                     Button {
                         addTrack()
                     } label: {
