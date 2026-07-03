@@ -9,7 +9,7 @@ struct CreatePlaylistView: View {
 
     @State private var name = ""
     @State private var description = ""
-    @State private var tracks: [Track]?
+    @State private var tracks: [Track] = []
     @State private var artworkData: Data?
 
     var body: some View {
@@ -56,9 +56,9 @@ struct CreatePlaylistView: View {
                     }
                     .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
 
-                    if tracks != nil {
+                    if !tracks.isEmpty {
                         VStack {
-                            ForEach(tracks!) { track in
+                            ForEach(tracks) { track in
                                 PlaylistTrackCell(track: track)
                             }
                         }
@@ -83,6 +83,18 @@ struct CreatePlaylistView: View {
                 }
                 .padding()
             }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("save") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 
@@ -91,6 +103,8 @@ struct CreatePlaylistView: View {
     }
 
     private func create() {
-
+        var playlist = Playlist(name: name, playlistDescription: description, tracks: tracks, artwork: artworkData)
+        modelContext.insert(playlist)
+        dismiss()
     }
 }
