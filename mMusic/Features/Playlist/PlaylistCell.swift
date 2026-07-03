@@ -28,7 +28,7 @@ struct PlaylistCell: View {
                     }
                 }
                 .onTapGesture {
-                    PlaylistView()
+                    
                 }
         }
     }

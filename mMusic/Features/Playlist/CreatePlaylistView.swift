@@ -13,72 +13,75 @@ struct CreatePlaylistView: View {
 
     var body: some View {
         NavigationStack {
-            VStack {
-                VStack {
-                    if let artworkData, let uiImage = UIImage(data: artworkData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: 150)
-                    } else {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.gray.opacity(0.2))
-                            .overlay {
-                                Image(systemName: "music.note")
+            ScrollView {
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                        Group {
+                            if let artworkData, let uiImage = UIImage(data: artworkData) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFill()
+                            } else {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.gray.opacity(0.2))
+                                    .overlay {
+                                        Image(systemName: "music.note")
+                                            .font(.largeTitle)
+                                            .foregroundStyle(.secondary)
+                                    }
                             }
-                            .scaledToFit()
-                            .frame(maxWidth: 150)
+                        }
+                        .frame(width: 150, height: 150)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        Button {
+                            showImagePicker = true
+                        } label: {
+                            Label("Pick an image", systemImage: "photo")
+                        }
+                        .buttonStyle(.glassProminent)
+                        .sheet(isPresented: $showImagePicker) {
+                            ImagePicker(imageData: $artworkData)
+                        }
                     }
-                    
+                    .padding(.top)
+
+                    VStack(spacing: 0) {
+                        TextField("Playlist Name", text: $name)
+                            .padding()
+                        Divider()
+                        TextField("Description", text: $description)
+                            .padding()
+                    }
+                    .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+
                     Button {
-                        showImagePicker = true
+                        addTrack()
                     } label: {
-                        Label("Pick an image", systemImage: "photo")
-                    }
-                    .buttonStyle(.glassProminent)
-                    .sheet(isPresented: $showImagePicker) {
-                        ImagePicker(imageData: $artworkData)
-                    }
-                }
-                .padding(.top)
-                
-                Form {
-                    Section("name") {
-                        TextField("", text: $name)
-                    }
-                    
-                    Section("desctiption") {
-                        TextField("", text: $description)
-                    }
-                }
-            }
-            
-            LazyVStack(alignment: .leading, spacing: 16) {
-                Capsule()
-                    .fill(Color.gray.opacity(0.2))
-                    .aspectRatio(contentMode: .fit)
-                    .overlay {
-                        HStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.2))
-                                .aspectRatio(contentMode: .fit)
-                                .overlay {
-                                    Image(systemName: "plus")
-                                }
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus")
+                            
                             Divider()
                             
-                            Text("Add a track")
+                            Text("Add Music")
                         }
-                        .onTapGesture {
-                            
-                        }
+                        .font(.headline)
+                        .foregroundStyle(.tint)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color.gray.opacity(0.2), in: Capsule())
                     }
-                
+                }
+                .padding()
             }
         }
     }
 
+    private func addTrack() {
+
+    }
+
     private func create() {
-        
+
     }
 }
