@@ -59,7 +59,7 @@ struct CreatePlaylistView: View {
                     if tracks != nil {
                         VStack {
                             ForEach(tracks!) { track in
-                                TrackCell(track: track)
+                                PlaylistTrackCell(track: track)
                             }
                         }
                     }
@@ -87,7 +87,7 @@ struct CreatePlaylistView: View {
     }
 
     private func addTrack() {
-
+        
     }
 
     private func create() {
