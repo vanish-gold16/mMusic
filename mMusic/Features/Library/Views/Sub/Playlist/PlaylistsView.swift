@@ -26,7 +26,7 @@ struct PlaylistsView: View {
                 
                 Spacer()
                 
-                LazyVGrid(columns: columns, spacing: 5) {
+                LazyVStack(spacing: 5) {
                     ForEach(playlists) { playlist in
                         PlaylistCell(playlist: playlist)
                     }

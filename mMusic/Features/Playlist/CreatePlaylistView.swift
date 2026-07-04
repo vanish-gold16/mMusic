@@ -69,9 +69,6 @@ struct CreatePlaylistView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "plus")
-                            
-                            Divider()
-                            
                             Text("Add Music")
                         }
                         .font(.headline)
@@ -91,7 +88,7 @@ struct CreatePlaylistView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("save") {
-                        dismiss()
+                        create()
                     }
                 }
             }
@@ -103,7 +100,7 @@ struct CreatePlaylistView: View {
     }
 
     private func create() {
-        var playlist = Playlist(name: name, playlistDescription: description, tracks: tracks, artwork: artworkData)
+        let playlist = Playlist(name: name, playlistDescription: description, tracks: tracks, artwork: artworkData)
         modelContext.insert(playlist)
         dismiss()
     }

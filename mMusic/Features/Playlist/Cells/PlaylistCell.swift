@@ -7,29 +7,27 @@ struct PlaylistCell: View {
     @State private var isCreating = false
     
     var body: some View {
-        VStack {
-            Capsule()
+        Divider()
+        
+        HStack {
+            RoundedRectangle(cornerRadius: 8)
                 .fill(Color.gray.opacity(0.2))
-                .aspectRatio(contentMode: .fit)
                 .overlay {
-                    HStack {
-                        if let data = playlist.artwork, let uiImage = UIImage(data: data) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                        }
-                        else {
-                            Image(systemName: "music.note")
-                        }
-                        
-                        Divider()
-                        
-                        Text(playlist.name)
+                    if let data = playlist.artwork, let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                    } else {
+                        Image(systemName: "music.note")
                     }
                 }
-                .onTapGesture {
-                    PlaylistView()
-                }
+                .frame(width: 60, height: 60)
+            Text(playlist.name)
+            
+            Image(systemName: "chevron.right")
+        }
+        .onTapGesture {
+            PlaylistView()
         }
     }
     
