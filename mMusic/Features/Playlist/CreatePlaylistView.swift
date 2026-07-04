@@ -6,10 +6,9 @@ struct CreatePlaylistView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var showImagePicker = false
+    @State private var showTrackPicker = false
 
-    @State private var name = ""
-    @State private var description = ""
-    @State private var tracks: [Track] = []
+    @State private var playlist = Playlist(name: "", tracks: [])
     @State private var artworkData: Data?
 
     var body: some View {
@@ -48,24 +47,24 @@ struct CreatePlaylistView: View {
                     .padding(.top)
 
                     VStack(spacing: 0) {
-                        TextField("Playlist Name", text: $name)
+                        TextField("Playlist Name", text: $playlist.name)
                             .padding()
                         Divider()
-                        TextField("Description", text: $description)
+                        TextField("Description", text: $playlist.playlistDescription)
                             .padding()
                     }
                     .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
 
-                    if !tracks.isEmpty {
+                    if !playlist.tracks.isEmpty {
                         VStack {
-                            ForEach(tracks) { track in
+                            ForEach(playlist.tracks) { track in
                                 PlaylistTrackCell(track: track)
                             }
                         }
                     }
                     
                     Button {
-                        addTrack()
+                        showTrackPicker = true
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "plus")
@@ -76,6 +75,9 @@ struct CreatePlaylistView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
                         .background(Color.gray.opacity(0.2), in: Capsule())
+                    }
+                    .sheet(isPresented: $showTrackPicker) {
+                        TrackPickerView(playlist: playlist)
                     }
                 }
                 .padding()
@@ -100,7 +102,7 @@ struct CreatePlaylistView: View {
     }
 
     private func create() {
-        let playlist = Playlist(name: name, playlistDescription: description, tracks: tracks, artwork: artworkData)
+        playlist.artwork = artworkData
         modelContext.insert(playlist)
         dismiss()
     }

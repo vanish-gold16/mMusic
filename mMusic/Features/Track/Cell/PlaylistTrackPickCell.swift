@@ -13,7 +13,7 @@ struct PlaylistTrackPickCell: View {
         HStack {
             RoundedRectangle(cornerRadius: 2)
                 .fill(Color.gray.opacity(0.2))
-                .aspectRatio(1, contentMode: .fit)
+                .frame(width: 50, height: 50)
                 .overlay {
                     if let data = track.artwork, let uiImage = UIImage(data: data) {
                         Image(uiImage: uiImage)
@@ -23,14 +23,15 @@ struct PlaylistTrackPickCell: View {
                         Image(systemName: "music.note")
                     }
                 }
-            VStack {
+            VStack(alignment: .leading) {
                 Text(track.name)
                     .bold()
                 Text(track.artist)
                     .foregroundStyle(.secondary)
             }
+            Spacer()
             Button {
-                
+                swapIsPicked()
             } label: {
                 if isPicked {
                     Image(systemName: "checkmark.circle.dotted")
@@ -39,11 +40,14 @@ struct PlaylistTrackPickCell: View {
                 }
             }
         }
+        .padding(.horizontal)
     }
     
     func swapIsPicked() {
         if isPicked {
-            playlist.tracks.remove(at: track.id)
+            playlist.tracks.removeAll { $0 == track }
+        } else {
+            playlist.tracks.append(track)
         }
     }
 }

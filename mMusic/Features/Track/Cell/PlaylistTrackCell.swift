@@ -8,7 +8,7 @@ struct PlaylistTrackCell: View {
         HStack {
             RoundedRectangle(cornerRadius: 2)
                 .fill(Color.gray.opacity(0.2))
-                .aspectRatio(1, contentMode: .fit)
+                .frame(width: 50, height: 40)
                 .overlay {
                     if let data = track.artwork, let uiImage = UIImage(data: data) {
                         Image(uiImage: uiImage)
@@ -18,7 +18,7 @@ struct PlaylistTrackCell: View {
                         Image(systemName: "music.note")
                     }
                 }
-            VStack {
+            VStack(alignment: .leading) {
                 Text(track.name)
                     .bold()
                 Text(track.artist)

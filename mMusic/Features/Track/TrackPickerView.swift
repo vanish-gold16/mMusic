@@ -5,10 +5,12 @@ struct TrackPickerView: View {
     
     @Query private var tracks: [Track]
     
+    var playlist: Playlist
+    
     var body: some View {
-        HStack {
+        VStack {
             ForEach(tracks) { track in
-                PlaylistTrackCell(track: track)
+                PlaylistTrackPickCell(track: track, playlist: playlist)
             }
         }
     }
