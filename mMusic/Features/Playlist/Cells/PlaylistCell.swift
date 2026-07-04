@@ -24,6 +24,8 @@ struct PlaylistCell: View {
                 .frame(width: 60, height: 60)
             Text(playlist.name)
             
+            Spacer()
+            
             Image(systemName: "chevron.right")
         }
         .onTapGesture {

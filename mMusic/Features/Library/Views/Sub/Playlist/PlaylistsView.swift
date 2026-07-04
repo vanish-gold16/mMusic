@@ -23,12 +23,12 @@ struct PlaylistsView: View {
                 .sheet(isPresented: $isCreating) {
                     CreatePlaylistView()
                 }
-                
-                Spacer()
-                
-                LazyVStack(spacing: 5) {
-                    ForEach(playlists) { playlist in
-                        PlaylistCell(playlist: playlist)
+
+                ScrollView {
+                    LazyVStack(spacing: 5) {
+                        ForEach(playlists) { playlist in
+                            PlaylistCell(playlist: playlist)
+                        }
                     }
                 }
             }
