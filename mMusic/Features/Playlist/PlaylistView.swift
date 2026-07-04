@@ -18,7 +18,7 @@ struct PlaylistView: View {
                         } else {
                             Image(systemName: "music.note")
                                 .resizable()
-                                .scaledToFill()
+                                .frame(width: 200, height: 200)
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -39,7 +39,7 @@ struct PlaylistView: View {
                                     Image(systemName: "play.fill")
                                         .tint(.primary)
                                     Text("Play")
-                                        .foregroundStyle(.primary)
+                                        .tint(.primary)
                                         .bold()
                                 }
                             }
@@ -56,15 +56,42 @@ struct PlaylistView: View {
                                     Image(systemName: "shuffle")
                                         .tint(.primary)
                                     Text("Shuffle")
-                                        .foregroundStyle(.primary)
+                                        .tint(.primary)
                                         .bold()
                                 }
                             }
                     }
+                    
+                    Spacer()
                 }
+                
                 ForEach(playlist.tracks) { track in
+                    Divider()
                     PlaylistTrackCell(track: track)
                 }
+                
+                Divider()
+                
+                HStack {
+                    Color.clear
+                        .frame(width: 10)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 50, height: 50)
+                        .overlay {
+                            Image(systemName: "plus")
+                                .resizable()
+                                .frame(width: 30, height: 30)
+                                .tint(.orange)
+                        }
+                    Text("Add Music")
+                        .bold()
+                        .tint(.orange)
+                    Spacer()
+                }
+                
+                Divider()
+                
             }
         }
     }
