@@ -23,14 +23,17 @@ struct PlaylistCell: View {
                 }
                 .frame(width: 60, height: 60)
             Text(playlist.name)
+                .bold()
             
             Spacer()
             
             Image(systemName: "chevron.right")
+                .foregroundStyle(.secondary)
         }
-        .onTapGesture {
-            PlaylistView()
+        .contextMenu {
+            
         }
+        .foregroundStyle(.primary)
     }
     
 }

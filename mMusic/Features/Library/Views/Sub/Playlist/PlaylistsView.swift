@@ -10,23 +10,25 @@ struct PlaylistsView: View {
     @State private var isCreating = false
     
     var body: some View {
-        NavigationStack {
-            VStack {
-                Button {
-                    isCreating = true
-                } label: {
-                    Image(systemName: "plus")
-                    Text("New Playlist")
-                }
-                .buttonStyle(.glassProminent)
-                .frame(maxWidth: .infinity)
-                .sheet(isPresented: $isCreating) {
-                    CreatePlaylistView()
-                }
-
-                ScrollView {
-                    LazyVStack(spacing: 5) {
-                        ForEach(playlists) { playlist in
+        VStack {
+            Button {
+                isCreating = true
+            } label: {
+                Image(systemName: "plus")
+                Text("New Playlist")
+            }
+            .buttonStyle(.glassProminent)
+            .frame(maxWidth: .infinity)
+            .sheet(isPresented: $isCreating) {
+                CreatePlaylistView()
+            }
+            
+            ScrollView {
+                LazyVStack(spacing: 5) {
+                    ForEach(playlists) { playlist in
+                        NavigationLink {
+                            PlaylistView(playlist: playlist)
+                        } label: {
                             PlaylistCell(playlist: playlist)
                         }
                     }
