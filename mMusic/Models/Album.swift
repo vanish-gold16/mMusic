@@ -9,7 +9,7 @@ class Album {
     
     @Attribute(.externalStorage) var artwork: Data?
     
-    init(name: String, tracks: [Track], artwork: Data? = nil) {
+    init(name: String, tracks: [Track] = [], artwork: Data? = nil) {
         self.name = name
         self.tracks = tracks
         self.artwork = artwork
