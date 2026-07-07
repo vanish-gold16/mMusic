@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PlaylistView: View {
     
+    @State private var isShowingTrackPicker = false
+
     let playlist: Playlist
     
     var body: some View {
@@ -73,27 +75,34 @@ struct PlaylistView: View {
                 
                 Divider()
                 
-                HStack {
-                    Color.clear
-                        .frame(width: 10)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 50, height: 50)
-                        .overlay {
-                            Image(systemName: "plus")
-                                .resizable()
-                                .bold()
-                                .frame(width: 20, height: 20)
-                                .tint(.orange)
-                                .tint(.orange)
-                        }
-                    Text("Add Music")
-                    Spacer()
+                Button {
+                    isShowingTrackPicker = true
+                } label: {
+                    HStack {
+                        Color.clear
+                            .frame(width: 10)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 50, height: 50)
+                            .overlay {
+                                Image(systemName: "plus")
+                                    .resizable()
+                                    .bold()
+                                    .frame(width: 20, height: 20)
+                                    .tint(.orange)
+                                    .tint(.orange)
+                            }
+                        Text("Add Music")
+                        Spacer()
+                    }
                 }
                 
                 Divider()
-                
+
             }
+        }
+        .sheet(isPresented: $isShowingTrackPicker) {
+            TrackPickerView(playlist: playlist)
         }
     }
 }
