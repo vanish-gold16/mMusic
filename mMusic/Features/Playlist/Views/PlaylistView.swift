@@ -1,8 +1,12 @@
 import SwiftUI
+import SwiftData
 
 struct PlaylistView: View {
+
+    @Environment(\.modelContext) private var modelContext
     
     @State private var isShowingTrackPicker = false
+    @State private var editingPlaylist = false
 
     let playlist: Playlist
     
@@ -29,6 +33,8 @@ struct PlaylistView: View {
                     .bold()
                 Text(playlist.playlistDescription)
                     .padding(.horizontal)
+                    .font(.subheadline)
+                    .tint(.secondary)
                 HStack {
                     Button {
                         
@@ -101,8 +107,75 @@ struct PlaylistView: View {
 
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    VStack {
+                        ControlGroup {
+                            Button {
+                                
+                            } label: {
+                                Label("Favourite", systemImage: "star")
+                            }
+                            Button {
+                                
+                            } label: {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                        Divider()
+                        
+                        Button {
+                            
+                        } label: {
+                            Label("Play", systemImage: "play")
+                        }
+                        Button {
+                            
+                        } label: {
+                            Label("Shuffle", systemImage: "shuffle")
+                        }
+                        
+                        Divider()
+                        
+                        Button {
+                            editingPlaylist = true
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        
+                        Divider()
+                        
+                        Button {
+                            
+                        } label: {
+                            Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                        }
+                        Button {
+                            
+                        } label: {
+                            Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
+                        }
+                        
+                        Divider()
+                        
+                        Button(role: .destructive) {
+                            modelContext.delete(playlist)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .tint(.red)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+            }
+        }
         .sheet(isPresented: $isShowingTrackPicker) {
             TrackPickerView(playlist: playlist)
+        }
+        .sheet(isPresented: $editingPlaylist) {
+            EditPlaylistView(playlist: playlist)
         }
     }
 }
