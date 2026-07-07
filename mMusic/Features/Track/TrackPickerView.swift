@@ -8,13 +8,14 @@ struct TrackPickerView: View {
     @Query private var tracks: [Track]
     
     @State private var selectedTab: TrackPickerTab = .recent
-    private var sortedTracks: [Track] {
-        switch selectedTab {
-        case .recent:
-            return tracks.sorted { $0.addedAt > $1.addedAt }
-        case .genre:
-            return tracks
-        }
+    
+    private var recentTracks: [Track] {
+        tracks.sorted { $0.addedAt > $1.addedAt }
+    }
+    private var genreGroups: [(genre: Genre, tracks: [Track])] {
+        Dictionary(grouping: tracks, by: { $0.genre })
+            .map { (genre: $0.key, tracks: $0.value)}
+            .sorted { $0.genre.rawValue < $1.genre.rawValue }
     }
     
     var playlist: Playlist
@@ -32,8 +33,19 @@ struct TrackPickerView: View {
                 
                 ScrollView {
                     LazyVStack(alignment: .leading) {
-                        ForEach(sortedTracks) { track in
-                            PlaylistTrackPickCell(track: track, playlist: playlist)
+                        switch selectedTab {
+                        case .recent:
+                            ForEach(recentTracks) { track in
+                                PlaylistTrackPickCell(track: track, playlist: playlist)
+                            }
+                        case .genre:
+                            ForEach(genreGroups, id: \.genre) { group in
+                                Text(group.genre.rawValue)
+                                    .font(.headline)
+                                ForEach(group.tracks) { track in
+                                    PlaylistTrackPickCell(track: track, playlist: playlist)
+                                }
+                            }
                         }
                     }
                 }
