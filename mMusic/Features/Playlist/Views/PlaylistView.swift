@@ -26,6 +26,7 @@ struct PlaylistView: View {
                     .font(.largeTitle)
                     .bold()
                 Text(playlist.playlistDescription)
+                    .padding(.horizontal)
                 HStack {
                     Button {
                         

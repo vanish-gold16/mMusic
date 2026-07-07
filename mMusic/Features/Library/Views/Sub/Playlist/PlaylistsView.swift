@@ -8,7 +8,7 @@ struct PlaylistsView: View {
     @Environment(\.modelContext) private var modelContext
     
     @State private var isCreating = false
-    @State private var showEdit = false
+    @State private var editedPlaylist: Playlist?
     
     var body: some View {
         VStack {
@@ -63,7 +63,7 @@ struct PlaylistsView: View {
                                 Divider()
                                 
                                 Button {
-                                    showEdit = true
+                                    editedPlaylist = playlist
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
@@ -91,7 +91,7 @@ struct PlaylistsView: View {
                                 .tint(.red)
                             }
                         }
-                        .sheet(isPresented: $showEdit) {
+                        .sheet(item: $editedPlaylist) { playlist in
                             EditPlaylistView(playlist: playlist)
                         }
                     }
