@@ -66,7 +66,6 @@ struct TrackCell: View {
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
-
                 .tint(.red)
             }
         }

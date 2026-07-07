@@ -30,9 +30,6 @@ struct PlaylistCell: View {
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
         }
-        .contextMenu {
-            
-        }
         .foregroundStyle(.primary)
     }
     
