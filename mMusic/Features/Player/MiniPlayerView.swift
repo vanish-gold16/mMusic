@@ -42,6 +42,8 @@ struct MiniPlayerView: View {
                             .frame(width: 30, height: 30)
                             .contentShape(Rectangle())
                     }
+                    .foregroundStyle(.orange)
+                    .buttonStyle(PressableButtonStyle())
                     
                     Spacer()
                     
