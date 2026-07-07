@@ -89,16 +89,16 @@ struct PlaylistView: View {
                             .frame(width: 16)
                         RoundedRectangle(cornerRadius: 2)
                             .fill(Color.gray.opacity(0.2))
-                            .frame(width: 50, height: 50)
+                            .frame(width: 40, height: 40)
                             .overlay {
                                 Image(systemName: "plus")
                                     .resizable()
                                     .bold()
-                                    .frame(width: 20, height: 20)
-                                    .tint(.orange)
+                                    .frame(width: 15, height: 15)
                                     .tint(.orange)
                             }
                         Text("Add Music")
+                            .tint(.primary)
                         Spacer()
                     }
                 }

@@ -12,7 +12,7 @@ struct PlaylistTrackCell: View {
                 .frame(width: 16)
             RoundedRectangle(cornerRadius: 2)
                 .fill(Color.gray.opacity(0.2))
-                .frame(width: 50, height: 50)
+                .frame(width: 40, height: 40)
                 .overlay {
                     if let data = track.artwork, let uiImage = UIImage(data: data) {
                         Image(uiImage: uiImage)
@@ -83,8 +83,9 @@ struct PlaylistTrackCell: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal)
         }
     }
 }
