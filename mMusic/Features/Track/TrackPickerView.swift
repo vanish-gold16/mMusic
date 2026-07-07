@@ -3,6 +3,8 @@ import SwiftUI
 
 struct TrackPickerView: View {
     
+    @Environment(\.dismiss) private var dismiss
+    
     @Query private var tracks: [Track]
     
     @State private var selectedTab: TrackPickerTab = .recent
@@ -28,10 +30,20 @@ struct TrackPickerView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
                 
-                List(sortedTracks) { track in
-                    PlaylistTrackPickCell(track: track, playlist: playlist)
+                ScrollView {
+                    LazyVStack(alignment: .leading) {
+                        ForEach(sortedTracks) { track in
+                            PlaylistTrackPickCell(track: track, playlist: playlist)
+                        }
+                    }
                 }
-                .listStyle(.plain)
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("done") {
+                        dismiss()
+                    }
+                }
             }
         }
     }
