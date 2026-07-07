@@ -49,6 +49,19 @@ struct LibraryView: View {
             }
             .padding(.horizontal)
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        
+                    } label: {
+                        Label("New album", systemImage: "music.note.square.stack")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
         .navigationTitle("Library")
     }
     
