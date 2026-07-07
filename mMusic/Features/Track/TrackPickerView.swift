@@ -9,9 +9,9 @@ struct TrackPickerView: View {
     private var sortedTracks: [Track] {
         switch selectedTab {
         case .recent:
-            tracks.sorted { $0.addedAt > $1.addedAt }
+            return tracks.sorted { $0.addedAt > $1.addedAt }
         case .genre:
-            
+            return tracks
         }
     }
     
@@ -26,9 +26,12 @@ struct TrackPickerView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                ForEach(sortedTracks) { track in
+                .padding(.horizontal)
+                
+                List(sortedTracks) { track in
                     PlaylistTrackPickCell(track: track, playlist: playlist)
                 }
+                .listStyle(.plain)
             }
         }
     }
