@@ -5,9 +5,9 @@ import SwiftUI
 @Model
 class Track {
     var name: String
-    @Relationship(deleteRule: .nullify, inverse: \Artist.tracks)
-    var artists: [Artist]
     var album: Album
+    @Relationship(deleteRule: .cascade, inverse: \Credit.track)
+    var credits: [Credit]
     var genre: Genre
     var filename: String
     var isFavourite = false
@@ -16,10 +16,10 @@ class Track {
     
     @Attribute(.externalStorage) var artwork: Data?
 
-    init(name: String, artists: [Artist], album: Album, genre: Genre, filename: String, isFavourite: Bool = false, artwork: Data? = nil) {
+    init(name: String, album: Album, credits: [Credit], genre: Genre, filename: String, isFavourite: Bool = false, artwork: Data? = nil) {
         self.name = name
-        self.artists = artists
         self.album = album
+        self.credits = credits
         self.genre = genre
         self.filename = filename
         self.isFavourite = isFavourite
