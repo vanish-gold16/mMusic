@@ -8,14 +8,22 @@ struct TrackPickerView: View {
     @Query private var tracks: [Track]
     
     @State private var selectedTab: TrackPickerTab = .recent
+    @State private var searchText = ""
     
     private var recentTracks: [Track] {
-        tracks.sorted { $0.addedAt > $1.addedAt }
+        filteredTracks.sorted { $0.addedAt > $1.addedAt }
     }
     private var genreGroups: [(genre: Genre, tracks: [Track])] {
-        Dictionary(grouping: tracks, by: { $0.genre })
+        Dictionary(grouping: filteredTracks, by: { $0.genre })
             .map { (genre: $0.key, tracks: $0.value)}
             .sorted { $0.genre.rawValue < $1.genre.rawValue }
+    }
+    private var filteredTracks: [Track] {
+        guard !searchText.isEmpty else { return tracks }
+        return tracks.filter { track in
+            track.name.localizedCaseInsensitiveContains(searchText)
+            || track.artist.localizedCaseInsensitiveContains(searchText)
+        }
     }
     
     var playlist: Playlist
@@ -59,6 +67,7 @@ struct TrackPickerView: View {
                     }
                 }
             }
+            .searchable(text: $searchText)
         }
     }
 }
