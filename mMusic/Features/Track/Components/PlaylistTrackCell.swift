@@ -2,8 +2,6 @@ import SwiftUI
 
 struct PlaylistTrackCell: View {
 
-    @State private var showTrackEllipsis = false
-    
     var track: Track
 
     var body: some View {
@@ -33,19 +31,60 @@ struct PlaylistTrackCell: View {
                     .lineLimit(1)
             }
             Spacer()
-            Button {
-                showTrackEllipsis = true
+            Menu {
+                ControlGroup {
+                    Button {
+
+                    } label: {
+                        Label("Favourite", systemImage: track.isFavourite ? "star.fill" : "star")
+                    }
+                    Button {
+
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                }
+
+                Divider()
+                
+                Button {
+                    
+                } label: {
+                    Label("Add to a Playlist", systemImage: "text.badge.plus")
+                }
+                
+                Divider()
+
+                Button {
+
+                } label: {
+                    Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                }
+                Button {
+
+                } label: {
+                    Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
+                }
+
+                Divider()
+                
+                Button {
+                    
+                } label: {
+                    Label("Go to Album", systemImage: "music.note.square.stack")
+                }
+                
+                Divider()
+
+                Button(role: .destructive) {
+
+                } label: {
+                    Label("Remove", systemImage: "trash")
+                }
             } label: {
                 Image(systemName: "ellipsis")
             }
             .padding(.horizontal)
-        }
-        .sheet(isPresented: $showTrackEllipsis) {
-            Menu {
-                
-            } label: {
-                
-            }
         }
     }
 }
