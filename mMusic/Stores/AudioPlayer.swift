@@ -3,13 +3,14 @@ import AVFoundation
 import Observation
 
 @Observable
-class AudioPlayer {
+class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private var player: AVAudioPlayer?
-    
+
     var currentTrack: Track?
     var isPlaying = false
-    
-    init() {
+
+    override init() {
+        super.init()
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
@@ -24,6 +25,7 @@ class AudioPlayer {
         
         do {
             player = try AVAudioPlayer(contentsOf: url)
+            player?.delegate = self
             player?.play()
             currentTrack = track
             
@@ -47,5 +49,9 @@ class AudioPlayer {
                 isPlaying = true
             }
         }
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        isPlaying = false
     }
 }
