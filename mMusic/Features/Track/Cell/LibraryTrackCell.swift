@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-struct TrackCell: View {
+struct LibraryTrackCell: View {
     @Environment(AudioPlayer.self) private var audioPlayer
     @Environment(\.modelContext) private var modelContext
     

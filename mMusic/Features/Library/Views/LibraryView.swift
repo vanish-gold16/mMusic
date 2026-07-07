@@ -42,7 +42,7 @@ struct LibraryView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(tracks) { track in
-                            TrackCell(track: track)
+                            LibraryTrackCell(track: track)
                         }
                     }
                 }
