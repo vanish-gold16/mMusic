@@ -32,7 +32,7 @@ struct TrackPickerView: View {
                 .padding(.horizontal)
                 
                 ScrollView {
-                    LazyVStack(alignment: .leading) {
+                    LazyVStack(alignment: .leading, spacing: 8) {
                         switch selectedTab {
                         case .recent:
                             ForEach(recentTracks) { track in
@@ -42,6 +42,8 @@ struct TrackPickerView: View {
                             ForEach(genreGroups, id: \.genre) { group in
                                 Text(group.genre.rawValue)
                                     .font(.headline)
+                                    .padding(.horizontal)
+                                    .padding(.top, 12)
                                 ForEach(group.tracks) { track in
                                     PlaylistTrackPickCell(track: track, playlist: playlist)
                                 }
