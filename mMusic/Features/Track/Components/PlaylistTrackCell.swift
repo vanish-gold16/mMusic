@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PlaylistTrackCell: View {
 
+    @State private var showTrackEllipsis = false
+    
     var track: Track
 
     var body: some View {
@@ -31,6 +33,19 @@ struct PlaylistTrackCell: View {
                     .lineLimit(1)
             }
             Spacer()
+            Button {
+                showTrackEllipsis = true
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .padding(.horizontal)
+        }
+        .sheet(isPresented: $showTrackEllipsis) {
+            Menu {
+                
+            } label: {
+                
+            }
         }
     }
 }
