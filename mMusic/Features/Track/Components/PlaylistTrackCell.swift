@@ -6,15 +6,10 @@ struct PlaylistTrackCell: View {
 
     var body: some View {
         HStack {
-            Group {
-                if track.isFavourite {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(.orange)
-                } else {
-                    Image(systemName: "")
-                }
-            }
-            .frame(width: 10)
+            Image(systemName: "star.fill")
+                .foregroundStyle(.orange)
+                .opacity(track.isFavourite ? 1 : 0)
+                .frame(width: 16)
             RoundedRectangle(cornerRadius: 2)
                 .fill(Color.gray.opacity(0.2))
                 .frame(width: 50, height: 50)
@@ -35,6 +30,7 @@ struct PlaylistTrackCell: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+            Spacer()
         }
     }
 }

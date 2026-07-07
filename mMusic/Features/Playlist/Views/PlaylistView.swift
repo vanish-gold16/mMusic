@@ -80,7 +80,7 @@ struct PlaylistView: View {
                 } label: {
                     HStack {
                         Color.clear
-                            .frame(width: 10)
+                            .frame(width: 16)
                         RoundedRectangle(cornerRadius: 2)
                             .fill(Color.gray.opacity(0.2))
                             .frame(width: 50, height: 50)
