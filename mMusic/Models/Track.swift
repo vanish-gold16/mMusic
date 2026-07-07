@@ -6,6 +6,7 @@ import SwiftUI
 class Track {
     var name: String
     var artist: String
+    var album: Album
     var genre: Genre
     var filename: String
     var isFavourite = false
