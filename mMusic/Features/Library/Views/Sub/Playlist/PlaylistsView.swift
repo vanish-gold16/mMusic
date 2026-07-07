@@ -90,9 +90,9 @@ struct PlaylistsView: View {
                                 }
                                 .tint(.red)
                             }
-                            .sheet(isPresented: $showEdit) {
-                                
-                            }
+                        }
+                        .sheet(isPresented: $showEdit) {
+                            EditPlaylistView(playlist: playlist)
                         }
                     }
                 }

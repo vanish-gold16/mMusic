@@ -46,14 +46,14 @@ struct CreatePlaylistView: View {
                     }
                     .padding(.top)
 
-                    VStack(spacing: 0) {
-                        TextField("Playlist Name", text: $playlist.name)
-                            .padding()
-                        Divider()
-                        TextField("Description", text: $playlist.playlistDescription)
-                            .padding()
+                    Form {
+                        Section("playlist name") {
+                            TextField("", text: $playlist.name)
+                        }
+                        Section("description") {
+                            TextField("", text: $playlist.playlistDescription)
+                        }
                     }
-                    .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
 
                     if !playlist.tracks.isEmpty {
                         VStack {
