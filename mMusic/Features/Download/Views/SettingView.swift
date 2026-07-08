@@ -13,6 +13,7 @@ struct SettingView: View {
     @State private var newArtistName = ""
     @State private var genre: Genre = .pop
     @State private var artworkData: Data?
+    @State private var capsuleHeight: CGFloat = 34
     
     let file: PickedFile
     
@@ -59,27 +60,47 @@ struct SettingView: View {
                     
                 }
                 
-                ForEach(artists) { draft in
-                    HStack {
-                        Image(systemName: "person.fill")
-                        Text(draft.name)
-                        Button(role: .destructive) {
-                            artists.removeAll { $0.id == draft.id }
-                        } label: {
-                            Image(systemName: "xmark")
+                FlowLayout(spacing: 8) {
+                    ForEach(artists) { draft in
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.fill")
+                            Text(draft.name)
+                            Button(role: .destructive) {
+                                artists.removeAll { $0.id == draft.id }
+                            } label: {
+                                Image(systemName: "xmark")
+                            }
+                            .buttonStyle(.borderless)
                         }
-                        .buttonStyle(.borderless)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.gray.opacity(0.2), in: Capsule())
+                        .background {
+                            GeometryReader { proxy in
+                                Color.clear.preference(key: CapsuleHeightKey.self, value: proxy.size.height)
+                            }
+                        }
+                        .fixedSize()
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.gray.opacity(0.2), in: Capsule())
+
+                    Menu {
+                        Form {
+                            Section("name") {
+                                TextField("", text: $newArtistName)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .frame(width: capsuleHeight, height: capsuleHeight)
+                            .background(Color.gray.opacity(0.2), in: Circle())
+                    }
+                    .buttonStyle(.borderless)
+                    .fixedSize()
                 }
-                
-                Button {
-                    
-                } label: {
-                    Image(systemName: "plus")
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                .onPreferenceChange(CapsuleHeightKey.self) { capsuleHeight = $0 }
+
                 TextField("", text: $newArtistName)
                 
                 Form {
@@ -149,6 +170,58 @@ struct SettingView: View {
     }
     
     
+}
+
+/// Хранит высоту капсулы артиста, чтобы кнопка «плюс» была кругом той же высоты.
+private struct CapsuleHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 34
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+/// Раскладывает капсулы в строку, перенося на следующую, когда не влезают по ширине.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX + size.width > maxWidth, currentX > 0 {
+                currentX = 0
+                currentY += rowHeight + spacing
+                rowHeight = 0
+            }
+            currentX += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            totalWidth = max(totalWidth, currentX - spacing)
+        }
+        return CGSize(width: totalWidth, height: currentY + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+        var currentX = bounds.minX
+        var currentY = bounds.minY
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX + size.width > bounds.maxX, currentX > bounds.minX {
+                currentX = bounds.minX
+                currentY += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: currentX, y: currentY), anchor: .topLeading, proposal: ProposedViewSize(size))
+            currentX += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+    }
 }
 
 extension URL {
