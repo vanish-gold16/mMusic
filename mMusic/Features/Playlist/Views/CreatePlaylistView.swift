@@ -13,8 +13,8 @@ struct CreatePlaylistView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
+            Form {
+                Section {
                     VStack(spacing: 12) {
                         Group {
                             if let artworkData, let uiImage = UIImage(data: artworkData) {
@@ -38,57 +38,52 @@ struct CreatePlaylistView: View {
                             showImagePicker = true
                         } label: {
                             Label("Pick an image", systemImage: "photo")
+                                .foregroundStyle(.primary)
                         }
                         .buttonStyle(.glassProminent)
                         .sheet(isPresented: $showImagePicker) {
                             ImagePicker(imageData: $artworkData)
                         }
                     }
-                    .padding(.top)
+                    .frame(maxWidth: .infinity)
+                }
+                .listRowBackground(Color.clear)
 
-                    VStack(alignment: .leading, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("playlist name")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            TextField("Enter name", text: $playlist.name)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("description")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            TextField("Enter description", text: $playlist.playlistDescription)
-                                .textFieldStyle(.roundedBorder)
+                Section("playlist name") {
+                    TextField("", text: $playlist.name)
+                }
+                Section("description") {
+                    TextField("", text: $playlist.playlistDescription)
+                }
+
+                if !playlist.tracks.isEmpty {
+                    Section {
+                        ForEach(playlist.tracks) { track in
+                            PlaylistTrackCell(track: track)
                         }
                     }
+                }
 
-                    if !playlist.tracks.isEmpty {
-                        VStack {
-                            ForEach(playlist.tracks) { track in
-                                PlaylistTrackCell(track: track)
-                            }
-                        }
-                    }
-                    
+                Section {
                     Button {
                         showTrackPicker = true
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "plus")
                             Text("Add Music")
+                                .tint(.primary)
                         }
                         .font(.headline)
                         .foregroundStyle(.tint)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(Color.gray.opacity(0.2), in: Capsule())
                     }
+                    .buttonStyle(.glassProminent)
                     .sheet(isPresented: $showTrackPicker) {
                         TrackPickerView(playlist: playlist)
                     }
                 }
-                .padding()
+                .listRowBackground(Color.clear)
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

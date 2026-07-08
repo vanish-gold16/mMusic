@@ -94,7 +94,7 @@ struct PlaylistsView: View {
                     Button {
                         isCreating = true
                     } label: {
-                        Image(systemName: "music.note.list")
+                        Label("Create a Playlist", systemImage: "music.note.list")
                     }
                 } label: {
                     Image(systemName: "plus")
