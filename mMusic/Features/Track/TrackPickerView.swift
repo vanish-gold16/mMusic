@@ -22,7 +22,7 @@ struct TrackPickerView: View {
         guard !searchText.isEmpty else { return tracks }
         return tracks.filter { track in
             track.name.localizedCaseInsensitiveContains(searchText)
-            || track.credits.contains { $0.artist.name.localizedCaseInsensitiveContains(searchText) }
+            || track.artists.contains { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
     }
     

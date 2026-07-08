@@ -13,7 +13,7 @@ class Track {
             .map { $0.artist }
     }
     var artistNames: [String] {
-        artists.map { $0.name }
+        artists.map(\.name)
     }
     var genre: Genre
     var filename: String
