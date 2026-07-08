@@ -14,7 +14,6 @@ struct SettingView: View {
     @State private var newArtistName = ""
     @State private var genre: Genre = .pop
     @State private var artworkData: Data?
-    @State private var capsuleHeight: CGFloat = 34
     
     let file: PickedFile
     
@@ -82,11 +81,6 @@ struct SettingView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(Color.gray.opacity(0.2), in: Capsule())
-                            .background {
-                                GeometryReader { proxy in
-                                    Color.clear.preference(key: CapsuleHeightKey.self, value: proxy.size.height)
-                                }
-                            }
                             .fixedSize()
                         }
 
@@ -95,7 +89,8 @@ struct SettingView: View {
                             showAddArtist = true
                         } label: {
                             Image(systemName: "plus")
-                                .frame(width: capsuleHeight, height: capsuleHeight)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 5)
                                 .background(Color.gray.opacity(0.2), in: Circle())
                         }
                         .buttonStyle(.borderless)
@@ -117,7 +112,6 @@ struct SettingView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .onPreferenceChange(CapsuleHeightKey.self) { capsuleHeight = $0 }
                 }
                 
                 // MARK: - Genre
@@ -188,13 +182,7 @@ struct SettingView: View {
     
 }
 
-/// Хранит высоту капсулы артиста, чтобы кнопка «плюс» была кругом той же высоты.
-private struct CapsuleHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 34
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
+
 
 /// Раскладывает капсулы в строку, перенося на следующую, когда не влезают по ширине.
 struct FlowLayout: Layout {
