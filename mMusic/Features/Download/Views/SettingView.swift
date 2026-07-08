@@ -22,9 +22,6 @@ struct SettingView: View {
         NavigationStack {
             
             Form {
-                
-                // MARK: - Artwork
-                
                 Section {
                     VStack {
                         if let artworkData, let uiImage = UIImage(data: artworkData) {
@@ -56,15 +53,9 @@ struct SettingView: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                 }
-                
-                // MARK: - Name
-                
                 Section("name") {
                     TextField("", text: $name)
                 }
-                
-                // MARK: - Artists (capsules + "+" button)
-                
                 Section("artists") {
                     FlowLayout(spacing: 8) {
                         ForEach(artists) { draft in
@@ -113,9 +104,6 @@ struct SettingView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                
-                // MARK: - Genre
-                
                 Section {
                     Picker("genre", selection: $genre) {
                         ForEach(Genre.allCases, id: \.self) { genre in
@@ -181,8 +169,6 @@ struct SettingView: View {
     
     
 }
-
-
 
 /// Раскладывает капсулы в строку, перенося на следующую, когда не влезают по ширине.
 struct FlowLayout: Layout {
