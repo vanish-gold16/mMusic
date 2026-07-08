@@ -89,9 +89,9 @@ struct SettingView: View {
 
     init(file: PickedFile) {
         self.file = file
-        let track = file.url.parseMusic()
-        _name = State(initialValue: track.name)
-        _artist = State(initialValue: track.artist)
+        let parsed = file.url.parseMusic()
+        _name = State(initialValue: parsed.name)
+        _artist = State(initialValue: parsed.artist)
     }
     
     private func save() {
@@ -106,11 +106,16 @@ struct SettingView: View {
         }
         source.stopAccessingSecurityScopedResource()
         
-        let artist = Artist(name: artist, credits: [])
+        let artistModel = Artist(name: artist, credits: [])
         let album = Album(name: name)
         let track = Track(name: name, album: album, credits: [], genre: genre, filename: source.lastPathComponent, artwork: artworkData)
-        let credit = Credit(artist: artist, role: .main, position: 0, track: track)
+        let credit = Credit(artist: artistModel, role: .main, position: 0, track: track)
+        
         track.credits.insert(credit, at: 0)
+        
+        modelContext.insert(artistModel)
+        modelContext.insert(album)
+        modelContext.insert(credit)
         modelContext.insert(track)
         
         dismiss()
@@ -120,7 +125,7 @@ struct SettingView: View {
 }
 
 extension URL {
-    func parseMusic() -> Track {
+    func parseMusic() -> (name: String, artist: String) {
         let base = deletingPathExtension().lastPathComponent
             .replacingOccurrences(of: "_", with: " ")
 
@@ -129,9 +134,9 @@ extension URL {
             ?? base.range(of: " - ") {
             let artist = String(base[..<range.lowerBound])
             let title = String(base[range.upperBound...])
-            return Track(name: title, artist: artist, genre: .other, filename: lastPathComponent)
+            return (name: title, artist: artist)
         } else {
-            return Track(name: base, artist: "Unknown", genre: .other, filename: lastPathComponent)
+            return (name: base, artist: "unknown")
         }
     }
 }
