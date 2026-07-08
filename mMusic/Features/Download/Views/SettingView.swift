@@ -95,24 +95,23 @@ struct SettingView: View {
                     .buttonStyle(.borderless)
                     .fixedSize()
                     .popover(isPresented: $showAddArtist) {
-                        HStack {
-                            TextField("", text: $newArtistName)
-                                .textFieldStyle(.roundedBorder)
+                        VStack(spacing: 16) {
+                            TextField("artist name", text: $newArtistName)
+                                .padding(10)
+                                .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
                             Button("add") {
                                 artists.append(ArtistDraft(name: newArtistName))
                             }
+                            .buttonStyle(.glassProminent)
                         }
                         .padding()
-                        .frame(maxWidth: 260)
+                        .frame(width: 260, height: 160)
                         .presentationCompactAdaptation(.popover)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
                 .onPreferenceChange(CapsuleHeightKey.self) { capsuleHeight = $0 }
-
-                TextField("", text: $newArtistName)
-                
                 Form {
                     Section {
                         Picker("genre", selection: $genre) {
