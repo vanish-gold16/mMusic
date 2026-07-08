@@ -24,9 +24,13 @@ struct PlaylistsView: View {
                             VStack {
                                 ControlGroup {
                                     Button {
-                                        
+                                        playlist.isPinned = !playlist.isPinned
                                     } label: {
-                                        Label("Favourite", systemImage: "star")
+                                        if playlist.isPinned {
+                                            Label("Unpin", systemImage: "pin.fill")
+                                        } else {
+                                            Label("Pin", systemImage: "pin")
+                                        }
                                     }
                                     Button {
                                         

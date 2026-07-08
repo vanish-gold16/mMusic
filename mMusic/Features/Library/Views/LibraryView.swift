@@ -3,8 +3,11 @@ import SwiftData
 
 struct LibraryView: View {
     let columns = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
+    
+    let columnsPinned = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
 
     @Query(sort: \Track.addedAt, order: .reverse) private var tracks: [Track]
+    @Query(filter: #Predicate<Playlist> { $0.isPinned }) private var pinnedPlaylists: [Playlist]
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) private var audioPlayer
 
@@ -33,6 +36,18 @@ struct LibraryView: View {
                     Divider()
                     
                     .animation(.easeOut, value: selectedCategory)
+                }
+                
+                VStack(alignment: .leading) {
+                    Text("Pinned")
+                        .font(.title)
+                        .bold()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    LazyVGrid(columns: columnsPinned, spacing: 16) {
+                        ForEach(pinnedPlaylists) { playlist in
+                            PinnedPlaylistCell(playlist: playlist)
+                        }
+                    }
                 }
                 
                 VStack(alignment: .leading) {
@@ -69,7 +84,6 @@ struct LibraryView: View {
     func destinationView (for category: LibraryCategory) -> some View {
         switch category {
         case .playlists: PlaylistsView()
-        case .songs: SongsView()
         case .albums: AlbumsView()
         case .artists: ArtistsView()
         }

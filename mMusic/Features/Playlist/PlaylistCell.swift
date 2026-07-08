@@ -10,6 +10,10 @@ struct PlaylistCell: View {
         Divider()
         
         HStack {
+            Image(systemName: "pin.fill")
+                .foregroundStyle(.orange)
+                .opacity(playlist.isPinned ? 1 : 0)
+                .frame(width: 16)
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.gray.opacity(0.2))
                 .overlay {
@@ -29,6 +33,7 @@ struct PlaylistCell: View {
             
             Image(systemName: "chevron.right")
                 .foregroundStyle(.secondary)
+                .padding()
         }
         .foregroundStyle(.primary)
     }
