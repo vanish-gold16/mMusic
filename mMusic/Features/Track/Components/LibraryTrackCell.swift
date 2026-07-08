@@ -65,7 +65,7 @@ struct LibraryTrackCell: View {
                     try? FileManager.default.removeItem(at: url)
                     modelContext.delete(track)
                 } label: {
-                    Label("Delete", systemImage: "trash")
+                    Label("Remove", systemImage: "trash")
                 }
                 .tint(.red)
             }

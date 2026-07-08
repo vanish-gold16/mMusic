@@ -7,8 +7,10 @@ struct ArtistsView: View {
     
     var body: some View {
         ScrollView {
-            ForEach(artists) {
-                
+            VStack(alignment: .leading) {
+                ForEach(artists) { artist in
+                    ArtistsTabArtistCell(artist: artist)
+                }
             }
         }
     }
