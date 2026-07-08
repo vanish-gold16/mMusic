@@ -14,6 +14,6 @@ struct mMusicApp: App {
         WindowGroup {
             RootView()
         }
-        .modelContainer(for: [Track.self, Playlist.self])
+        .modelContainer(for: [Track.self, Playlist.self, Album.self, Artist.self, Credit.self])
     }
 }

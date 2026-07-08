@@ -5,7 +5,7 @@ import SwiftUI
 @Model
 class Track {
     var name: String
-    var album: Album
+    var album: Album?
     @Relationship(deleteRule: .cascade, inverse: \Credit.track)
     var credits: [Credit]
     var artists: [Artist] {
@@ -23,7 +23,7 @@ class Track {
     
     @Attribute(.externalStorage) var artwork: Data?
 
-    init(name: String, album: Album, credits: [Credit], genre: Genre, filename: String, isFavourite: Bool = false, artwork: Data? = nil) {
+    init(name: String, album: Album? = nil, credits: [Credit], genre: Genre, filename: String, isFavourite: Bool = false, artwork: Data? = nil) {
         self.name = name
         self.album = album
         self.credits = credits
