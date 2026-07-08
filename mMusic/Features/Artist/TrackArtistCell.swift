@@ -2,8 +2,7 @@ import SwiftUI
 
 struct TrackArtistCell: View {
     
-    var draft: ArtistDraft?
-    var artist: Artist?
+    var name: String
     var showDelete: Bool
     var onTap: () -> Void = {}
     var onRemove: () -> Void = {}
@@ -11,12 +10,7 @@ struct TrackArtistCell: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "person.fill")
-            if let draft = draft {
-                Text(draft.name)
-            }
-            if let artist = artist {
-                Text(artist.name)
-            }
+            Text(name)
             if showDelete {
                 Button(role: .destructive, action: onRemove) {
                     Image(systemName: "xmark")

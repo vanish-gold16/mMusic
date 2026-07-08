@@ -68,7 +68,7 @@ struct SettingView: View {
                 Section("artists") {
                     FlowLayout(spacing: 8) {
                         ForEach(artists) { draft in
-                            TrackArtistCell(draft: draft, showDelete: true, onRemove: {
+                            TrackArtistCell(name: draft.name, showDelete: true, onRemove: {
                                 artists.removeAll { $0.id == draft.id }
                             })
                         }
@@ -92,7 +92,7 @@ struct SettingView: View {
                                 if suggestions != [] {
                                     ScrollView {
                                         ForEach(suggestions) { artist in
-                                            TrackArtistCell(artist: artist, showDelete: false, onTap: {
+                                            TrackArtistCell(name: artist.name, showDelete: false, onTap: {
                                                 artists.append(ArtistDraft(name: artist.name))
                                                 showAddArtist = false
                                             })
