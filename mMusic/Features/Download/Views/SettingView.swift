@@ -106,7 +106,7 @@ struct SettingView: View {
                                 .buttonStyle(.glassProminent)
                             }
                             .padding()
-                            .frame(width: 320, height: 160)
+                            .frame(width: 280, height: 220)
                             .presentationCompactAdaptation(.popover)
                         }
                     }
