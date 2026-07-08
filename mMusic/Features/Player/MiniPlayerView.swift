@@ -23,7 +23,11 @@ struct MiniPlayerView: View {
                         .lineLimit(1)
                         .font(.subheadline)
                         .bold()
-                    Text(track.artist)
+                    Text(track.credits
+                        .sorted { $0.position < $1.position }
+                        .map { $0.artist.name }
+                        .joined(separator: ", "))
+
                         .lineLimit(1)
                         .font(.caption)
                         .foregroundStyle(.secondary)

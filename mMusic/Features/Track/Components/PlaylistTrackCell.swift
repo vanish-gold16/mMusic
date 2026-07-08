@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct PlaylistTrackCell: View {
+    
+    @Environment(AudioPlayer.self) private var audioPlayer
 
     var track: Track
 
@@ -26,7 +28,10 @@ struct PlaylistTrackCell: View {
                 Text(track.name)
                     .bold()
                     .lineLimit(1)
-                Text(track.artist)
+                Text(track.credits
+                    .sorted { $0.position < $1.position }
+                    .map { $0.artist.name }
+                    .joined(separator: ", "))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -86,6 +91,9 @@ struct PlaylistTrackCell: View {
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
+        }
+        .onTapGesture {
+            audioPlayer.play(track)
         }
     }
 }

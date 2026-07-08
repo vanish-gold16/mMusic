@@ -26,9 +26,13 @@ struct LibraryTrackCell: View {
                 }
             Text(track.name)
                 .lineLimit(1)
-            Text(track.artist)
+            Text(track.credits
+                .sorted { $0.position < $1.position }
+                .map { $0.artist.name }
+                .joined(separator: ", "))
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .lineLimit(1)
         }
         .onTapGesture {
             audioPlayer.play(track)
