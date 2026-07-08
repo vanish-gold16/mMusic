@@ -22,118 +22,125 @@ struct SettingView: View {
         
         NavigationStack {
             
-            VStack {
+            Form {
                 
-                VStack {
-                    
-                    if let artworkData, let uiImage = UIImage(data: artworkData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 150)
-                    } else {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.gray.opacity(0.2))
-                            .overlay {
-                                Image(systemName: "music.note")
-                            }
-                            .scaledToFit()
-                            .frame(height: 150)
+                // MARK: - Artwork
+                
+                Section {
+                    VStack {
+                        if let artworkData, let uiImage = UIImage(data: artworkData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 150)
+                        } else {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .overlay {
+                                    Image(systemName: "music.note")
+                                }
+                                .scaledToFit()
+                                .frame(height: 150)
+                        }
+                        
+                        Button {
+                            showImagePicker = true
+                        } label: {
+                            Label("Pick an image", systemImage: "photo")
+                                .labelStyle(.titleAndIcon)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .sheet(isPresented: $showImagePicker) {
+                            ImagePicker(imageData: $artworkData)
+                        }
                     }
-                    
-                    Button {
-                        showImagePicker = true
-                    } label: {
-                        Label("Pick an image", systemImage: "photo")
-                    }
-                    .buttonStyle(.glassProminent)
-                    .sheet(isPresented: $showImagePicker) {
-                        ImagePicker(imageData: $artworkData)
-                    }
-                    
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
                 }
                 
-                Form {
-                    
-                    Section("name") {
-                        TextField("", text: $name)
-                    }
-                    
+                // MARK: - Name
+                
+                Section("name") {
+                    TextField("", text: $name)
                 }
                 
-                FlowLayout(spacing: 8) {
-                    ForEach(artists) { draft in
-                        HStack(spacing: 4) {
-                            Image(systemName: "person.fill")
-                            Text(draft.name)
-                            Button(role: .destructive) {
-                                artists.removeAll { $0.id == draft.id }
-                            } label: {
-                                Image(systemName: "xmark")
+                // MARK: - Artists (capsules + "+" button)
+                
+                Section("artists") {
+                    FlowLayout(spacing: 8) {
+                        ForEach(artists) { draft in
+                            HStack(spacing: 4) {
+                                Image(systemName: "person.fill")
+                                Text(draft.name)
+                                Button(role: .destructive) {
+                                    artists.removeAll { $0.id == draft.id }
+                                } label: {
+                                    Image(systemName: "xmark")
+                                }
+                                .buttonStyle(.borderless)
                             }
-                            .buttonStyle(.borderless)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.gray.opacity(0.2), in: Capsule())
-                        .background {
-                            GeometryReader { proxy in
-                                Color.clear.preference(key: CapsuleHeightKey.self, value: proxy.size.height)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.gray.opacity(0.2), in: Capsule())
+                            .background {
+                                GeometryReader { proxy in
+                                    Color.clear.preference(key: CapsuleHeightKey.self, value: proxy.size.height)
+                                }
                             }
+                            .fixedSize()
                         }
-                        .fixedSize()
-                    }
 
-                    Button {
-                        newArtistName = ""
-                        showAddArtist = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .frame(width: capsuleHeight, height: capsuleHeight)
-                            .background(Color.gray.opacity(0.2), in: Circle())
-                    }
-                    .buttonStyle(.borderless)
-                    .fixedSize()
-                    .popover(isPresented: $showAddArtist) {
-                        VStack(spacing: 16) {
-                            TextField("artist name", text: $newArtistName)
-                                .padding(10)
-                                .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
-                            Button("add") {
-                                artists.append(ArtistDraft(name: newArtistName))
-                            }
-                            .buttonStyle(.glassProminent)
+                        Button {
+                            newArtistName = ""
+                            showAddArtist = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .frame(width: capsuleHeight, height: capsuleHeight)
+                                .background(Color.gray.opacity(0.2), in: Circle())
                         }
-                        .padding()
-                        .frame(width: 260, height: 160)
-                        .presentationCompactAdaptation(.popover)
+                        .buttonStyle(.borderless)
+                        .fixedSize()
+                        .popover(isPresented: $showAddArtist) {
+                            VStack(spacing: 16) {
+                                TextField("artist name", text: $newArtistName)
+                                    .padding(10)
+                                    .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
+                                Button("add") {
+                                    artists.append(ArtistDraft(name: newArtistName))
+                                    showAddArtist = false
+                                }
+                                .buttonStyle(.glassProminent)
+                            }
+                            .padding()
+                            .frame(width: 260, height: 160)
+                            .presentationCompactAdaptation(.popover)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onPreferenceChange(CapsuleHeightKey.self) { capsuleHeight = $0 }
+                }
+                
+                // MARK: - Genre
+                
+                Section {
+                    Picker("genre", selection: $genre) {
+                        ForEach(Genre.allCases, id: \.self) { genre in
+                            Text(genre.rawValue).tag(genre)
+                        }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-                .onPreferenceChange(CapsuleHeightKey.self) { capsuleHeight = $0 }
-                Form {
-                    Section {
-                        Picker("genre", selection: $genre) {
-                            ForEach(Genre.allCases, id: \.self) { genre in
-                                Text(genre.rawValue).tag(genre)
-                            }
-                        }
+            }
+            .navigationTitle("Track settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("cancel") {
+                        dismiss()
                     }
-                    .padding(.top)
                 }
-                .navigationTitle("Track settings")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("cancel") {
-                            dismiss()
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("save") {
-                            save()
-                        }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("save") {
+                        save()
                     }
                 }
             }
