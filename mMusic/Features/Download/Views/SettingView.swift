@@ -74,7 +74,7 @@ struct SettingView: View {
                             .background(Color.gray.opacity(0.2), in: Capsule())
                             .fixedSize()
                         }
-
+                        
                         Button {
                             newArtistName = ""
                             showAddArtist = true
@@ -170,15 +170,12 @@ struct SettingView: View {
         let descriptor = FetchDescriptor<Artist>(
             predicate: #Predicate { $0.name == name }
         )
-        let existing = try? modelContext.fetch(descriptor).first
-        
-        if existing != nil {
-            return existing!
-        } else {
-            var newArtist = Artist(name: name, credits: [])
-            modelContext.insert(newArtist)
-            return newArtist
+        if let existing = try? modelContext.fetch(descriptor).first {
+            return existing
         }
+        let newArtist = Artist(name: name, credits: [])
+        modelContext.insert(newArtist)
+        return newArtist
     }
     
 }
@@ -186,14 +183,14 @@ struct SettingView: View {
 /// Раскладывает капсулы в строку, перенося на следующую, когда не влезают по ширине.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
-
+    
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
         var currentX: CGFloat = 0
         var currentY: CGFloat = 0
         var rowHeight: CGFloat = 0
         var totalWidth: CGFloat = 0
-
+        
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
             if currentX + size.width > maxWidth, currentX > 0 {
@@ -207,12 +204,12 @@ struct FlowLayout: Layout {
         }
         return CGSize(width: totalWidth, height: currentY + rowHeight)
     }
-
+    
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
         var currentX = bounds.minX
         var currentY = bounds.minY
         var rowHeight: CGFloat = 0
-
+        
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
             if currentX + size.width > bounds.maxX, currentX > bounds.minX {
