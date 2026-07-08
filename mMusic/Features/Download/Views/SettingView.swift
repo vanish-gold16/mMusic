@@ -57,34 +57,36 @@ struct SettingView: View {
                         TextField("", text: $name)
                     }
                     
-                    Section("artist") {
-                        ForEach(artists) { draft in
-                            HStack {
-                                Image(systemName: "person.fill")
-                                Text(draft.name)
-                                Button(role: .destructive) {
-                                    artists.removeAll { $0.id == draft.id }
-                                } label: {
-                                    Image(systemName: "xmark")
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.gray.opacity(0.2), in: Capsule())
-                            Button {
-                                
-                            } label: {
-                                Image(systemName: "plus")
-                            }
-                            TextField("", text: $newArtistName)
+                }
+                
+                ForEach(artists) { draft in
+                    HStack {
+                        Image(systemName: "person.fill")
+                        Text(draft.name)
+                        Button(role: .destructive) {
+                            artists.removeAll { $0.id == draft.id }
+                        } label: {
+                            Image(systemName: "xmark")
                         }
-                        
-                        Section {
-                            Picker("genre", selection: $genre) {
-                                ForEach(Genre.allCases, id: \.self) { genre in
-                                    Text(genre.rawValue).tag(genre)
-                                }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.gray.opacity(0.2), in: Capsule())
+                }
+                
+                Button {
+                    
+                } label: {
+                    Image(systemName: "plus")
+                }
+                TextField("", text: $newArtistName)
+                
+                Form {
+                    Section {
+                        Picker("genre", selection: $genre) {
+                            ForEach(Genre.allCases, id: \.self) { genre in
+                                Text(genre.rawValue).tag(genre)
                             }
                         }
                     }
@@ -107,61 +109,61 @@ struct SettingView: View {
             }
         }
     }
-
+    
     init(file: PickedFile) {
         self.file = file
         let parsed = file.url.parseMusic()
         _name = State(initialValue: parsed.name)
         _artists = State(initialValue: [ArtistDraft(name: parsed.artist)])
     }
-
+    
     private func save() {
-            let source = file.url
-            let destination = URL.documentsDirectory.appending(path: source.lastPathComponent)
+        let source = file.url
+        let destination = URL.documentsDirectory.appending(path: source.lastPathComponent)
+        
+        source.startAccessingSecurityScopedResource()
+        do {
+            try FileManager.default.copyItem(at: source, to: destination)
+        } catch {
+            print("Copy error: \(error)")
+        }
+        source.stopAccessingSecurityScopedResource()
+        
+        let album = Album(name: name)
+        let track = Track(name: name, album: album, credits: [], genre: genre, filename: source.lastPathComponent, artwork: artworkData)
+        
+        modelContext.insert(album)
+        modelContext.insert(track)
+        
+        for (position, draft) in artists.enumerated() {
+            let artistModel = Artist(name: draft.name, credits: [])
+            let credit = Credit(artist: artistModel, role: .main, position: position, track: track)
             
-            source.startAccessingSecurityScopedResource()
-            do {
-                try FileManager.default.copyItem(at: source, to: destination)
-            } catch {
-                print("Copy error: \(error)")
-            }
-            source.stopAccessingSecurityScopedResource()
+            track.credits.append(credit)
             
-            let album = Album(name: name)
-            let track = Track(name: name, album: album, credits: [], genre: genre, filename: source.lastPathComponent, artwork: artworkData)
-
-            modelContext.insert(album)
-            modelContext.insert(track)
-
-            for (position, draft) in artists.enumerated() {
-                let artistModel = Artist(name: draft.name, credits: [])
-                let credit = Credit(artist: artistModel, role: .main, position: position, track: track)
-
-                track.credits.append(credit)
-
-                modelContext.insert(artistModel)
-                modelContext.insert(credit)
-            }
-
-            dismiss()
+            modelContext.insert(artistModel)
+            modelContext.insert(credit)
         }
         
-        
+        dismiss()
     }
     
-    extension URL {
-        func parseMusic() -> (name: String, artist: String) {
-            let base = deletingPathExtension().lastPathComponent
-                .replacingOccurrences(of: "_", with: " ")
-            
-            if let range = base.range(of: " — ")        // длинное тире
-                ?? base.range(of: " – ")         // среднее тире (en-dash) ← добавили
-                ?? base.range(of: " - ") {
-                let artist = String(base[..<range.lowerBound])
-                let title = String(base[range.upperBound...])
-                return (name: title, artist: artist)
-            } else {
-                return (name: base, artist: "unknown")
-            }
+    
+}
+
+extension URL {
+    func parseMusic() -> (name: String, artist: String) {
+        let base = deletingPathExtension().lastPathComponent
+            .replacingOccurrences(of: "_", with: " ")
+        
+        if let range = base.range(of: " — ")        // длинное тире
+            ?? base.range(of: " – ")         // среднее тире (en-dash) ← добавили
+            ?? base.range(of: " - ") {
+            let artist = String(base[..<range.lowerBound])
+            let title = String(base[range.upperBound...])
+            return (name: title, artist: artist)
+        } else {
+            return (name: base, artist: "unknown")
         }
     }
+}
