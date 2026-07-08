@@ -12,18 +12,6 @@ struct PlaylistsView: View {
     
     var body: some View {
         VStack {
-            Button {
-                isCreating = true
-            } label: {
-                Image(systemName: "plus")
-                Text("New Playlist")
-            }
-            .buttonStyle(.glassProminent)
-            .frame(maxWidth: .infinity)
-            .sheet(isPresented: $isCreating) {
-                CreatePlaylistView()
-            }
-            
             ScrollView {
                 LazyVStack(spacing: 5) {
                     ForEach(playlists) { playlist in
@@ -100,5 +88,21 @@ struct PlaylistsView: View {
         }
         .navigationTitle("Playlists")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        isCreating = true
+                    } label: {
+                        Image(systemName: "music.note.list")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $isCreating) {
+            CreatePlaylistView()
+        }
     }
 }

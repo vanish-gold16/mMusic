@@ -46,12 +46,20 @@ struct CreatePlaylistView: View {
                     }
                     .padding(.top)
 
-                    Form {
-                        Section("playlist name") {
-                            TextField("", text: $playlist.name)
+                    VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("playlist name")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            TextField("Enter name", text: $playlist.name)
+                                .textFieldStyle(.roundedBorder)
                         }
-                        Section("description") {
-                            TextField("", text: $playlist.playlistDescription)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("description")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            TextField("Enter description", text: $playlist.playlistDescription)
+                                .textFieldStyle(.roundedBorder)
                         }
                     }
 
