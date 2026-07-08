@@ -29,10 +29,17 @@ struct MiniPlayerView: View {
                         .foregroundStyle(.secondary)
                 }
                 
-                Spacer()
-                
                 HStack {
-                    Spacer()
+                    Button {
+                        
+                    } label: {
+                        Image(systemName: "backward.end.fill")
+                            .font(.title2)
+                            .frame(width: 30, height: 30)
+                            .contentShape(Rectangle())
+                    }
+                    .foregroundStyle(.orange)
+                    .buttonStyle(PressableButtonStyle())
                     
                     Button {
                         audioPlayer.togglePlayPause()
