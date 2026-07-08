@@ -8,6 +8,13 @@ class Track {
     var album: Album
     @Relationship(deleteRule: .cascade, inverse: \Credit.track)
     var credits: [Credit]
+    var artists: [Artist] {
+        credits.sorted { $0.position < $1.position }
+            .map { $0.artist }
+    }
+    var artistNames: [String] {
+        artists.map { $0.name }
+    }
     var genre: Genre
     var filename: String
     var isFavourite = false

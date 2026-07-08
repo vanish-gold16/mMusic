@@ -26,10 +26,7 @@ struct PlaylistTrackPickCell: View {
             VStack(alignment: .leading) {
                 Text(track.name)
                     .bold()
-                Text(track.credits
-                    .sorted { $0.position < $1.position }
-                    .map { $0.artist.name }
-                    .joined(separator: ", "))
+                Text(track.artistNames.joined(separator: ", "))
                     .foregroundStyle(.secondary)
             }
             Spacer()

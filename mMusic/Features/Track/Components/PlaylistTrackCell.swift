@@ -28,10 +28,7 @@ struct PlaylistTrackCell: View {
                 Text(track.name)
                     .bold()
                     .lineLimit(1)
-                Text(track.credits
-                    .sorted { $0.position < $1.position }
-                    .map { $0.artist.name }
-                    .joined(separator: ", "))
+                Text(track.artistNames.joined(separator: ", "))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
