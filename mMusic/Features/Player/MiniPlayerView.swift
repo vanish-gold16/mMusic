@@ -29,6 +29,8 @@ struct MiniPlayerView: View {
                         .foregroundStyle(.secondary)
                 }
                 
+                Spacer()
+                
                 HStack {
                     Button {
                         
@@ -51,8 +53,6 @@ struct MiniPlayerView: View {
                     }
                     .foregroundStyle(.orange)
                     .buttonStyle(PressableButtonStyle())
-                    
-                    Spacer()
                     
                     Button {
                         
