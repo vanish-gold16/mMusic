@@ -89,7 +89,7 @@ struct SettingView: View {
                                 TextField("artist name", text: $newArtistName)
                                     .padding(10)
                                     .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
-                                if suggestions != [] {
+                                if !suggestions.isEmpty {
                                     ScrollView {
                                         ForEach(suggestions) { artist in
                                             TrackArtistCell(name: artist.name, showDelete: false, onTap: {
@@ -104,6 +104,7 @@ struct SettingView: View {
                                     showAddArtist = false
                                 }
                                 .buttonStyle(.glassProminent)
+                                .disabled(newArtistName.isEmpty)
                             }
                             .padding()
                             .frame(width: 280, height: 220)
