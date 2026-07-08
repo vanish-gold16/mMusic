@@ -5,6 +5,7 @@ import SwiftData
 struct SettingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Artist.name) private var allArtists: [Artist]
     
     @State private var showImagePicker = false
     @State private var showAddArtist = false
@@ -14,6 +15,14 @@ struct SettingView: View {
     @State private var newArtistName = ""
     @State private var genre: Genre = .pop
     @State private var artworkData: Data?
+    
+    private var suggestions: [Artist] {
+        if newArtistName.isEmpty {
+            return []
+        } else {
+            return allArtists.filter { $0.name.localizedCaseInsensitiveContains(newArtistName) }
+        }
+    }
     
     let file: PickedFile
     
@@ -59,20 +68,9 @@ struct SettingView: View {
                 Section("artists") {
                     FlowLayout(spacing: 8) {
                         ForEach(artists) { draft in
-                            HStack(spacing: 4) {
-                                Image(systemName: "person.fill")
-                                Text(draft.name)
-                                Button(role: .destructive) {
-                                    artists.removeAll { $0.id == draft.id }
-                                } label: {
-                                    Image(systemName: "xmark")
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.gray.opacity(0.2), in: Capsule())
-                            .fixedSize()
+                            TrackArtistCell(draft: draft, showDelete: true, onRemove: {
+                                artists.removeAll { $0.id == draft.id }
+                            })
                         }
                         
                         Button {
@@ -91,6 +89,16 @@ struct SettingView: View {
                                 TextField("artist name", text: $newArtistName)
                                     .padding(10)
                                     .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
+                                if suggestions != [] {
+                                    ScrollView {
+                                        ForEach(suggestions) { artist in
+                                            TrackArtistCell(artist: artist, showDelete: false, onTap: {
+                                                artists.append(ArtistDraft(name: artist.name))
+                                                showAddArtist = false
+                                            })
+                                        }
+                                    }
+                                }
                                 Button("add") {
                                     artists.append(ArtistDraft(name: newArtistName))
                                     showAddArtist = false
@@ -98,7 +106,7 @@ struct SettingView: View {
                                 .buttonStyle(.glassProminent)
                             }
                             .padding()
-                            .frame(width: 260, height: 160)
+                            .frame(width: 320, height: 160)
                             .presentationCompactAdaptation(.popover)
                         }
                     }
