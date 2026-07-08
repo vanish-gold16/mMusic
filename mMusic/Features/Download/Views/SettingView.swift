@@ -7,6 +7,7 @@ struct SettingView: View {
     @Environment(\.modelContext) private var modelContext
     
     @State private var showImagePicker = false
+    @State private var showAddArtist = false
     
     @State private var name = ""
     @State private var artists: [ArtistDraft] = []
@@ -83,12 +84,9 @@ struct SettingView: View {
                         .fixedSize()
                     }
 
-                    Menu {
-                        Form {
-                            Section("name") {
-                                TextField("", text: $newArtistName)
-                            }
-                        }
+                    Button {
+                        newArtistName = ""
+                        showAddArtist = true
                     } label: {
                         Image(systemName: "plus")
                             .frame(width: capsuleHeight, height: capsuleHeight)
@@ -96,6 +94,18 @@ struct SettingView: View {
                     }
                     .buttonStyle(.borderless)
                     .fixedSize()
+                    .popover(isPresented: $showAddArtist) {
+                        HStack {
+                            TextField("", text: $newArtistName)
+                                .textFieldStyle(.roundedBorder)
+                            Button("add") {
+                                artists.append(ArtistDraft(name: newArtistName))
+                            }
+                        }
+                        .padding()
+                        .frame(maxWidth: 260)
+                        .presentationCompactAdaptation(.popover)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
