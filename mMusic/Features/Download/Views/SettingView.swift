@@ -142,7 +142,12 @@ struct SettingView: View {
         self.file = file
         let parsed = file.url.parseMusic()
         _name = State(initialValue: parsed.name)
-        _artists = State(initialValue: [ArtistDraft(name: parsed.artist)])
+        let names = parsed.artist
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        let drafts = names.isEmpty ? [ArtistDraft(name: parsed.artist)] : names.map { ArtistDraft(name: $0) }
+        _artists = State(initialValue: drafts)
     }
     
     private func save() {
