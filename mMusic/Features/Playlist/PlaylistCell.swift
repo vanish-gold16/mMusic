@@ -21,7 +21,7 @@ struct PlaylistCell: View {
                         Image(systemName: "music.note")
                     }
                 }
-                .frame(width: 60, height: 60)
+                .frame(width: 100, height: 100)
             Text(playlist.name)
                 .bold()
             
