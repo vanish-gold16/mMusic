@@ -12,11 +12,12 @@ struct ArtistsTabArtistCell: View {
             ArtistView(artist: artist)
         } label: {
             HStack {
-                Image(systemName: "pencil")
+                Image(systemName: "music.note")
                     .resizable()
                     .scaledToFit()
-                    .background(Color.gray.opacity(0.2), in: Circle())
+                    .frame(width: 30, height: 30)
                     .frame(width: 70, height: 70)
+                    .background(Color.gray.opacity(0.2), in: Circle())
                 Text(artist.name)
                 Spacer()
             }

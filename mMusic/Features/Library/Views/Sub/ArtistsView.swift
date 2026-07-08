@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ArtistsView: View {
     
-    @Query private var artists: [Artist]
+    @Query(sort: \Artist.name) private var artists: [Artist]
     
     var body: some View {
         ScrollView {
