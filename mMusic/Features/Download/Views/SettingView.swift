@@ -113,7 +113,7 @@ struct SettingView: View {
         modelContext.insert(track)
         
         for (position, draft) in artists.enumerated() {
-            let artistModel = findOrCreateArtist(named: draft.name)
+            let artistModel = modelContext.findOrCreateArtist(named: draft.name)
             let credit = Credit(artist: artistModel, role: .main, position: position, track: track)
             
             track.credits.append(credit)
@@ -122,18 +122,6 @@ struct SettingView: View {
         }
         
         dismiss()
-    }
-    
-    private func findOrCreateArtist(named name: String) -> Artist {
-        let descriptor = FetchDescriptor<Artist>(
-            predicate: #Predicate { $0.name == name }
-        )
-        if let existing = try? modelContext.fetch(descriptor).first {
-            return existing
-        }
-        let newArtist = Artist(name: name, credits: [])
-        modelContext.insert(newArtist)
-        return newArtist
     }
     
 }
@@ -152,5 +140,15 @@ extension URL {
         } else {
             return (name: base, artist: "unknown")
         }
+    }
+}
+
+extension ModelContext {
+    func findOrCreateArtist(named name: String) -> Artist {
+        let descriptor = FetchDescriptor<Artist>(predicate: #Predicate { $0.name == name })
+        if let existing = try? fetch(descriptor).first { return existing }
+        let new = Artist(name: name, credits: [])
+        insert(new)
+        return new
     }
 }
