@@ -68,9 +68,7 @@ struct SettingView: View {
                 Section("artists") {
                     FlowLayout(spacing: 8) {
                         ForEach(artists) { draft in
-                            TrackArtistCell(name: draft.name, showDelete: true, onRemove: {
-                                artists.removeAll { $0.id == draft.id }
-                            })
+                            artistCell(for: draft)
                         }
                         
                         Button {
@@ -138,6 +136,30 @@ struct SettingView: View {
         }
     }
     
+    @ViewBuilder
+    private func artistCell(for draft: ArtistDraft) -> some View {
+        TrackArtistCell(name: draft.name, showDelete: true, onRemove: {
+            artists.removeAll { $0.id == draft.id }
+        })
+        .draggable(draft.id.uuidString)
+        .dropDestination(for: String.self) { dropperIDs, _ in
+            return reorderArtists(draggedID: dropperIDs.first, targetID: draft.id)
+        }
+    }
+
+    private func reorderArtists(draggedID: String?, targetID: UUID) -> Bool {
+        guard let draggedID,
+              let from = artists.firstIndex(where: { $0.id.uuidString == draggedID }),
+              let to = artists.firstIndex(where: { $0.id == targetID })
+        else {
+            return false
+        }
+
+        let moved = artists.remove(at: from)
+        artists.insert(moved, at: to)
+        return true
+    }
+
     init(file: PickedFile) {
         self.file = file
         let parsed = file.url.parseMusic()
