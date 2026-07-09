@@ -1,11 +1,15 @@
+import SwiftData
 import SwiftUI
 
 struct EditTrackView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     
     @Bindable var track: Track
     
     @State private var showImagePicker = false
+    
+    @State private var drafts: [ArtistDraft] = []
     
     var body: some View {
         NavigationStack {
@@ -42,7 +46,7 @@ struct EditTrackView: View {
                         TextField(track.name, text: $track.name)
                     }
                     Section("artist") {
-                        Text(track.artistNames.joined(separator: ", "))
+                        ArtistsEditor(artists: $drafts)
                     }
                     Section() {
                         Picker("genre", selection: $track.genre) {
@@ -55,12 +59,30 @@ struct EditTrackView: View {
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("done") {
+                            syncArtists()
                             dismiss()
                         }
                     }
+                }
+                .onAppear {
+                    drafts = track.credits
+                        .sorted { $0.position < $1.position }
+                        .map { ArtistDraft(name: $0.artist.name) }
                 }
                 .padding(.top)
             }
         }
     }
+    
+    private func syncArtists() {
+        for credit in Array(track.credits) {
+            modelContext.delete(credit)
+        }
+        for(position, draft) in drafts.enumerated() {
+            let artist = modelContext.findOrCreateArtist(named: draft.name)
+            let credit = Credit(artist: artist, role: .main, position: position, track: track)
+            modelContext.insert(credit)
+        }
+    }
+    
 }
