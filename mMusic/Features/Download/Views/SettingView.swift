@@ -12,6 +12,9 @@ struct SettingView: View {
     
     @State private var name = ""
     @State private var artists: [ArtistDraft] = []
+    @State private var draggingArtist: ArtistDraft?
+    @State private var dragOffset: CGSize = .zero
+    @State private var cellFrames: [UUID: CGRect] = [:]
     @State private var newArtistName = ""
     @State private var genre: Genre = .pop
     @State private var artworkData: Data?
@@ -110,6 +113,10 @@ struct SettingView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .coordinateSpace(name: "artistsFlow")
+                    .onPreferenceChange(CellFramePreferenceKey.self) { frames in
+                        cellFrames = frames
+                    }
                 }
                 Section {
                     Picker("genre", selection: $genre) {
@@ -138,26 +145,47 @@ struct SettingView: View {
     
     @ViewBuilder
     private func artistCell(for draft: ArtistDraft) -> some View {
+        let isDragging = draggingArtist?.id == draft.id
         TrackArtistCell(name: draft.name, showDelete: true, onRemove: {
             artists.removeAll { $0.id == draft.id }
         })
-        .draggable(draft.id.uuidString)
-        .dropDestination(for: String.self) { dropperIDs, _ in
-            return reorderArtists(draggedID: dropperIDs.first, targetID: draft.id)
-        }
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: CellFramePreferenceKey.self,
+                    value: [draft.id: geo.frame(in: .named("artistsFlow"))]
+                )
+            }
+        )
+        .opacity(isDragging ? 0.6 : 1)
+        .offset(isDragging ? dragOffset : .zero)
+        .zIndex(isDragging ? 1 : 0)
+        .gesture(dragGesture(for: draft))
     }
 
-    private func reorderArtists(draggedID: String?, targetID: UUID) -> Bool {
-        guard let draggedID,
-              let from = artists.firstIndex(where: { $0.id.uuidString == draggedID }),
-              let to = artists.firstIndex(where: { $0.id == targetID })
-        else {
-            return false
-        }
-
-        let moved = artists.remove(at: from)
-        artists.insert(moved, at: to)
-        return true
+    private func dragGesture(for draft: ArtistDraft) -> some Gesture {
+        DragGesture(coordinateSpace: .named("artistsFlow"))
+            .onChanged { value in
+                if draggingArtist?.id != draft.id {
+                    draggingArtist = draft
+                }
+                dragOffset = value.translation
+            }
+            .onEnded { value in
+                if let targetID = cellFrames.first(where: { $0.value.contains(value.location) })?.key,
+                   targetID != draft.id,
+                   let from = artists.firstIndex(where: { $0.id == draft.id }),
+                   let to = artists.firstIndex(where: { $0.id == targetID }) {
+                    withAnimation {
+                        artists.move(
+                            fromOffsets: IndexSet(integer: from),
+                            toOffset: to > from ? to + 1 : to
+                        )
+                    }
+                }
+                draggingArtist = nil
+                dragOffset = .zero
+            }
     }
 
     init(file: PickedFile) {
@@ -214,6 +242,15 @@ struct SettingView: View {
         return newArtist
     }
     
+}
+
+/// Сохраняет фреймы капсул артистов в общей системе координат для попадания при перетаскивании.
+struct CellFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [UUID: CGRect] = [:]
+
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
 }
 
 /// Раскладывает капсулы в строку, перенося на следующую, когда не влезают по ширине.
