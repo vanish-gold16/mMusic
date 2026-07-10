@@ -15,6 +15,12 @@ class Album {
     var artistNames: [String] {
         artists.map(\.name)
     }
+    var genres: [Genre] {
+        let counts = tracks.reduce(into: [Genre: Int]()) { counts, track in
+            counts[track.genre, default: 0] += 1
+        }
+        return counts.keys.sorted { counts[$0]! > counts[$1]! }
+    }
     
     var addedAt: Date = Date.now
     
