@@ -46,7 +46,7 @@ struct ArtistsEditor: View {
                     if !suggestions.isEmpty {
                         ScrollView {
                             ForEach(suggestions) { artist in
-                                TrackArtistCell(name: artist.name, showDelete: false, onTap: {
+                                TrackArtistCell(name: artist.name, showDelete: false, showRole: false, onTap: {
                                     artists.append(ArtistDraft(name: artist.name))
                                     showAddArtist = false
                                 })
@@ -75,7 +75,9 @@ struct ArtistsEditor: View {
     @ViewBuilder
     private func artistCell(for draft: ArtistDraft) -> some View {
         let isDragging = draggingArtist?.id == draft.id
-        TrackArtistCell(name: draft.name, showDelete: true, onRemove: {
+        TrackArtistCell(name: draft.name, role: draft.role, showDelete: true, showRole: true, onTap: {
+            toggleRole(for: draft)
+        }, onRemove: {
             artists.removeAll { $0.id == draft.id }
         })
         .background(
@@ -115,6 +117,11 @@ struct ArtistsEditor: View {
                 draggingArtist = nil
                 dragOffset = .zero
             }
+    }
+    
+    private func toggleRole(for draft: ArtistDraft) {
+        guard let index = artists.firstIndex(where: { $0.id == draft.id }) else { return }
+        artists[index].role = artists[index].role == .main ? .featured : .main
     }
     
 }

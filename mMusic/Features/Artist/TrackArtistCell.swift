@@ -3,7 +3,11 @@ import SwiftUI
 struct TrackArtistCell: View {
     
     var name: String
+    var role: CreditRole = .main
+    
     var showDelete: Bool
+    var showRole: Bool
+    
     var onTap: () -> Void = {}
     var onRemove: () -> Void = {}
 
@@ -11,6 +15,9 @@ struct TrackArtistCell: View {
         HStack(spacing: 4) {
             Image(systemName: "person.fill")
             Text(name)
+            if showRole {
+                Image(systemName: role == .main ? "star.fill" : "star")
+            }
             if showDelete {
                 Button(role: .destructive, action: onRemove) {
                     Image(systemName: "xmark")

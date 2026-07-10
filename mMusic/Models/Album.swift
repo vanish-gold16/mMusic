@@ -19,7 +19,12 @@ class Album {
         let counts = tracks.reduce(into: [Genre: Int]()) { counts, track in
             counts[track.genre, default: 0] += 1
         }
-        return counts.keys.sorted { counts[$0]! > counts[$1]! }
+        return counts.keys.sorted {
+            if counts[$0]! != counts[$1]! {
+                return counts[$0]! > counts[$1]!
+            }
+            return $0.rawValue < $1.rawValue
+        }
     }
     
     var addedAt: Date = Date.now
