@@ -9,6 +9,8 @@ class Album {
     @Relationship(deleteRule: .cascade, inverse: \Credit.album)
     var credits: [Credit]
     
+    var addedAt: Date = Date.now
+    
     @Attribute(.externalStorage) var artwork: Data?
     
     init(name: String, tracks: [Track] = [], credits: [Credit] = [], artwork: Data? = nil) {

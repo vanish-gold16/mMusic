@@ -22,6 +22,9 @@ class Track {
     var addedAt: Date = Date.now
     
     @Attribute(.externalStorage) var artwork: Data?
+    var displayArtwork: Data? {
+        artwork ?? album?.artwork
+    }
 
     init(name: String, album: Album? = nil, credits: [Credit], genre: Genre, filename: String, isFavourite: Bool = false, artwork: Data? = nil) {
         self.name = name
