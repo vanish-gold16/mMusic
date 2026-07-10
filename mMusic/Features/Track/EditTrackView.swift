@@ -15,7 +15,7 @@ struct EditTrackView: View {
         NavigationStack {
             VStack {
                 VStack {
-                    if let artworkData = track.artwork, let uiImage = UIImage(data: artworkData) {
+                    if let artworkData = track.displayArtwork, let uiImage = UIImage(data: artworkData) {
                         Image(uiImage: uiImage)
                             .resizable()
                             .scaledToFit()

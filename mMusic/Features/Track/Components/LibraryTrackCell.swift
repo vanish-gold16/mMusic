@@ -16,7 +16,7 @@ struct LibraryTrackCell: View {
                 .fill(Color.gray.opacity(0.2))
                 .aspectRatio(1, contentMode: .fit)
                 .overlay {
-                    if let data = track.artwork, let uiImage = UIImage(data: data) {
+                    if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
                         Image(uiImage: uiImage)
                             .resizable()
                             .scaledToFill()

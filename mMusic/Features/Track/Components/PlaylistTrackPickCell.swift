@@ -15,7 +15,7 @@ struct PlaylistTrackPickCell: View {
                 .fill(Color.gray.opacity(0.2))
                 .frame(width: 50, height: 50)
                 .overlay {
-                    if let data = track.artwork, let uiImage = UIImage(data: data) {
+                    if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
                         Image(uiImage: uiImage)
                             .resizable()
                             .scaledToFit()

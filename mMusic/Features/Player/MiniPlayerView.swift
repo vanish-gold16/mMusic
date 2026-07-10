@@ -8,7 +8,7 @@ struct MiniPlayerView: View {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 8)
                     .overlay {
-                        if let data = track.artwork, let uiImage = UIImage(data: data) {
+                        if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
