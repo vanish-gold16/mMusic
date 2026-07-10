@@ -9,8 +9,12 @@ class Track {
     @Relationship(deleteRule: .cascade, inverse: \Credit.track)
     var credits: [Credit]
     var artists: [Artist] {
-        credits.sorted { $0.position < $1.position }
+        let inhirited = album?.artists ?? []
+        let own = credits.sorted { $0.position < $1.position }
             .map { $0.artist }
+        
+        var seen = Set<String>()
+        return (inhirited + own).filter { seen.insert($0.name).inserted }
     }
     var artistNames: [String] {
         artists.map(\.name)
