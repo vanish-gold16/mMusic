@@ -114,9 +114,8 @@ struct SettingView: View {
         
         for (position, draft) in artists.enumerated() {
             let artistModel = modelContext.findOrCreateArtist(named: draft.name)
-            let credit = Credit(artist: artistModel, role: .main, position: position, track: track)
-            
-            track.credits.append(credit)
+            let credit = Credit(artist: artistModel, role: draft.role, position: position, track: track)
+            album.credits.append(credit)
             
             modelContext.insert(credit)
         }
