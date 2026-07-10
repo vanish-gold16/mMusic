@@ -67,7 +67,7 @@ struct EditTrackView: View {
                 .onAppear {
                     drafts = track.credits
                         .sorted { $0.position < $1.position }
-                        .map { ArtistDraft(name: $0.artist.name) }
+                        .map { ArtistDraft(name: $0.artist.name, role: $0.role) }
                 }
                 .padding(.top)
             }
@@ -80,7 +80,7 @@ struct EditTrackView: View {
         }
         for(position, draft) in drafts.enumerated() {
             let artist = modelContext.findOrCreateArtist(named: draft.name)
-            let credit = Credit(artist: artist, role: .main, position: position, track: track)
+            let credit = Credit(artist: artist, role: draft.role, position: position, track: track)
             modelContext.insert(credit)
         }
     }
