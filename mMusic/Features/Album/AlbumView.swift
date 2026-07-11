@@ -37,6 +37,43 @@ struct AlbumView: View {
                     .foregroundStyle(.secondary)
             }
             
+            HStack {
+                Button {
+                    
+                } label: {
+                    Capsule()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .padding(.horizontal)
+                        .overlay {
+                            HStack {
+                                Image(systemName: "play.fill")
+                                    .tint(.primary)
+                                Text("Play")
+                                    .tint(.primary)
+                                    .bold()
+                            }
+                        }
+                }
+                Button {
+                    
+                } label: {
+                    Capsule()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .padding(.horizontal)
+                        .overlay {
+                            HStack {
+                                Image(systemName: "shuffle")
+                                    .tint(.primary)
+                                Text("Shuffle")
+                                    .tint(.primary)
+                                    .bold()
+                            }
+                        }
+                }
+            }
+            
             Divider()
             
             ForEach(album.tracks) { track in
