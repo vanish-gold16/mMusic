@@ -6,10 +6,8 @@ struct LibraryView: View {
     
     let columnsPinned = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
 
-    @Query(sort: \Track.addedAt, order: .reverse) private var tracks: [Track]
+    @Query(sort: \Album.addedAt, order: .reverse) private var albums: [Album]
     @Query(filter: #Predicate<Playlist> { $0.isPinned }) private var pinnedPlaylists: [Playlist]
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AudioPlayer.self) private var audioPlayer
 
     @State private var selectedCategory: LibraryCategory = .playlists
 
@@ -38,14 +36,16 @@ struct LibraryView: View {
                     .animation(.easeOut, value: selectedCategory)
                 }
                 
-                VStack(alignment: .leading) {
-                    Text("Pinned")
-                        .font(.title)
-                        .bold()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    LazyVGrid(columns: columnsPinned, spacing: 16) {
-                        ForEach(pinnedPlaylists) { playlist in
-                            PinnedPlaylistCell(playlist: playlist)
+                if !pinnedPlaylists.isEmpty {
+                    VStack(alignment: .leading) {
+                        Text("Pinned")
+                            .font(.title)
+                            .bold()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        LazyVGrid(columns: columnsPinned, spacing: 16) {
+                            ForEach(pinnedPlaylists) { playlist in
+                                PinnedPlaylistCell(playlist: playlist)
+                            }
                         }
                     }
                 }
@@ -56,8 +56,8 @@ struct LibraryView: View {
                         .bold()
                         .frame(maxWidth: .infinity, alignment: .leading)
                     LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(tracks) { track in
-                            LibraryTrackCell(track: track)
+                        ForEach(albums) { album in
+                            AlbumCell(album: album)
                         }
                     }
                 }
