@@ -46,6 +46,11 @@ struct EditTrackView: View {
                         TextField(track.name, text: $track.name)
                     }
                     Section("artist") {
+                        if let albumArtists = track.album?.artists, !albumArtists.isEmpty {
+                            ForEach(albumArtists, id: \.persistentModelID) { artist in
+                                TrackArtistCell(name: artist.name, showDelete: false, showRole: false, editable: false)
+                            }
+                        }
                         ArtistsEditor(artists: $drafts)
                     }
                     Section() {
