@@ -14,6 +14,8 @@ struct AlbumCell: View {
                     .overlay {
                         if let data = album.artwork, let uiImage = UIImage(data: data) {
                             Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
                         } else {
                             Image(systemName: "music.note")
                         }
