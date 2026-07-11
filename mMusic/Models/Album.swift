@@ -36,6 +36,7 @@ class Album {
         self.name = name
         self.tracks = tracks
         self.credits = credits
+        self.release = release
         self.artwork = artwork
     }
 }

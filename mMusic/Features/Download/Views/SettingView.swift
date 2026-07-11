@@ -110,7 +110,7 @@ struct SettingView: View {
         }
         source.stopAccessingSecurityScopedResource()
         
-        let album = Album(name: name, artwork: artworkData)
+        let album = Album(name: name, release: release, artwork: artworkData)
         let track = Track(name: name, album: album, credits: [], genre: genre, filename: source.lastPathComponent)
         
         modelContext.insert(album)

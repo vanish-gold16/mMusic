@@ -10,7 +10,21 @@ struct EditTrackView: View {
     @State private var showImagePicker = false
     
     @State private var drafts: [ArtistDraft] = []
-    
+
+    private var hasRelease: Binding<Bool> {
+        Binding(
+            get: { track.album?.release != nil },
+            set: { track.album?.release = $0 ? .now : nil }
+        )
+    }
+
+    private var releaseDate: Binding<Date> {
+        Binding(
+            get: { track.album?.release ?? .now },
+            set: { track.album?.release = $0 }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             VStack {
@@ -56,6 +70,12 @@ struct EditTrackView: View {
                             ForEach(Genre.allCases, id: \.self) { genre in
                                 Text(genre.rawValue).tag(genre)
                             }
+                        }
+                    }
+                    Section("release") {
+                        Toggle("has release date", isOn: hasRelease)
+                        if track.album?.release != nil {
+                            DatePicker("release date", selection: releaseDate, displayedComponents: .date)
                         }
                     }
                 }
