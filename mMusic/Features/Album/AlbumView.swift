@@ -32,6 +32,10 @@ struct AlbumView: View {
             }
             
             Divider()
+            
+            ForEach(album.tracks) { track in
+                TrackCell(track: track)
+            }
         }
     }
 }

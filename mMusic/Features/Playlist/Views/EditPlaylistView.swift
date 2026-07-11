@@ -52,7 +52,7 @@ struct EditPlaylistView: View {
                 
                 if !playlist.tracks.isEmpty {
                     ForEach(playlist.tracks) { track in
-                        PlaylistTrackCell(track: track)
+                        TrackCell(track: track)
                     }
                 }
             }

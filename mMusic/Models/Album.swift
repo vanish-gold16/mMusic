@@ -26,12 +26,13 @@ class Album {
             return $0.rawValue < $1.rawValue
         }
     }
+    var release: Date?
     
     var addedAt: Date = Date.now
     
     @Attribute(.externalStorage) var artwork: Data?
     
-    init(name: String, tracks: [Track] = [], credits: [Credit] = [], artwork: Data? = nil) {
+    init(name: String, tracks: [Track] = [], credits: [Credit] = [], release: Date? = nil, artwork: Data? = nil) {
         self.name = name
         self.tracks = tracks
         self.credits = credits

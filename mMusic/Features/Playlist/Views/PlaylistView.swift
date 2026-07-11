@@ -76,7 +76,7 @@ struct PlaylistView: View {
                 
                 ForEach(playlist.tracks) { track in
                     Divider()
-                    PlaylistTrackCell(track: track)
+                    TrackCell(track: track)
                 }
                 
                 Divider()
