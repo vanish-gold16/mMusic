@@ -15,6 +15,7 @@ struct AlbumView: View {
                                 Image(uiImage: uiImage)
                                     .resizable()
                                     .scaledToFit()
+                                    .cornerRadius(8)
                             } else {
                                 Image(systemName: "music.note")
                             }
@@ -67,10 +68,10 @@ struct AlbumView: View {
                                 }
                             }
                     }
-
-                    Spacer()
                 }
                 .padding(.horizontal)
+                
+                Spacer()
 
                 ForEach(album.tracks) { track in
                     Divider()
@@ -79,6 +80,7 @@ struct AlbumView: View {
 
                 Divider()
                 
+                Spacer()
                 
                 if let release = album.release {
                     Text(release.formatted(date: .abbreviated, time: .omitted))

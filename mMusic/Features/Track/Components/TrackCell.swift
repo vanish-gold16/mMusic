@@ -25,6 +25,7 @@ struct TrackCell: View {
                         Image(uiImage: uiImage)
                             .resizable()
                             .scaledToFit()
+                            .cornerRadius(4)
                     } else {
                         Image(systemName: "music.note")
                     }
