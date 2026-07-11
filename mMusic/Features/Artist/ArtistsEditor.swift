@@ -5,7 +5,10 @@ import Foundation
 struct ArtistsEditor: View {
     
     @Binding var artists: [ArtistDraft]
-    
+
+    /// Артисты альбома, показываются перед редактируемыми капсулами в общем потоке (только для чтения).
+    var readOnlyArtists: [String] = []
+
     @Query(sort: \Artist.name) private var allArtists: [Artist]
     @State private var newArtistName = ""
     @State private var showAddArtist = false
@@ -23,6 +26,10 @@ struct ArtistsEditor: View {
     
     var body: some View {
         FlowLayout(spacing: 8) {
+            ForEach(readOnlyArtists, id: \.self) { name in
+                TrackArtistCell(name: name, showDelete: false, showRole: false, editable: false)
+            }
+
             ForEach(artists) { draft in
                 artistCell(for: draft)
             }
