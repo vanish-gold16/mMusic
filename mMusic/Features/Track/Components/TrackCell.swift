@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct PlaylistTrackCell: View {
+struct TrackCell: View {
     
     @Environment(AudioPlayer.self) private var audioPlayer
 

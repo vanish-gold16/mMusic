@@ -31,6 +31,12 @@ struct AlbumView: View {
                 }
             }
             
+            if let release = album.release {
+                Text(release.formatted(date: .abbreviated, time: .omitted))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            
             Divider()
             
             ForEach(album.tracks) { track in
