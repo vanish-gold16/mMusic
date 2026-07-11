@@ -32,12 +32,6 @@ struct AlbumView: View {
                     }
                 }
 
-                if let release = album.release {
-                    Text(release.formatted(date: .abbreviated, time: .omitted))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
                 HStack {
                     Button {
 
@@ -84,6 +78,15 @@ struct AlbumView: View {
                 }
 
                 Divider()
+                
+                
+                if let release = album.release {
+                    Text(release.formatted(date: .abbreviated, time: .omitted))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                }
             }
         }
     }

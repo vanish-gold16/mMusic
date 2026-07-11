@@ -13,6 +13,7 @@ struct SettingView: View {
     @State private var genre: Genre = .pop
     @State private var artworkData: Data?
     @State private var release = Date()
+    @State private var hasReleaseOn = false
     
     let file: PickedFile
     
@@ -66,6 +67,7 @@ struct SettingView: View {
                     }
                 }
                 Section("release") {
+                    Toggle("has release date", isOn: $hasReleaseOn)
                     DatePicker("release date", selection: $release, displayedComponents: .date)
                 }
             }
