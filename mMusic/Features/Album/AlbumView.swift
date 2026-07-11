@@ -72,13 +72,16 @@ struct AlbumView: View {
                             }
                         }
                 }
+                
+                Spacer()
+            }
+            
+            ForEach(album.tracks) { track in
+                Divider()
+                TrackCell(track: track)
             }
             
             Divider()
-            
-            ForEach(album.tracks) { track in
-                TrackCell(track: track)
-            }
         }
     }
 }
