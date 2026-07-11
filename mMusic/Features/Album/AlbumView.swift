@@ -75,6 +75,7 @@ struct AlbumView: View {
                 
                 Spacer()
             }
+            .padding(.horizontal)
             
             ForEach(album.tracks) { track in
                 Divider()

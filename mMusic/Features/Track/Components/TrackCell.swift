@@ -3,6 +3,8 @@ import SwiftUI
 struct TrackCell: View {
     
     @Environment(AudioPlayer.self) private var audioPlayer
+    
+    @State private var showEditTrack: Bool = false
 
     var track: Track
 
@@ -50,6 +52,12 @@ struct TrackCell: View {
                 Divider()
                 
                 Button {
+                    showEditTrack = true
+                } label: {
+                    Label("Edit track", systemImage: "pencil")
+                }
+                
+                Button {
                     
                 } label: {
                     Label("Add to a Playlist", systemImage: "text.badge.plus")
@@ -91,6 +99,9 @@ struct TrackCell: View {
         }
         .onTapGesture {
             audioPlayer.play(track)
+        }
+        .sheet(isPresented: $showEditTrack) {
+            EditTrackView(track: track)
         }
     }
 }
