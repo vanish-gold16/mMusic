@@ -12,6 +12,7 @@ struct SettingView: View {
     @State private var artists: [ArtistDraft] = []
     @State private var genre: Genre = .pop
     @State private var artworkData: Data?
+    @State private var release = Date()
     
     let file: PickedFile
     
@@ -63,6 +64,9 @@ struct SettingView: View {
                             Text(genre.rawValue).tag(genre)
                         }
                     }
+                }
+                Section("release") {
+                    DatePicker("release date", selection: $release, displayedComponents: .date)
                 }
             }
             .navigationTitle("Track settings")
