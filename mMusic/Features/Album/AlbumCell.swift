@@ -1,6 +1,10 @@
+import SwiftData
 import SwiftUI
 
 struct AlbumCell: View {
+    
+    @Environment(\.modelContext) private var modelContext
+    
     let album: Album
     
     var body: some View {
@@ -28,6 +32,24 @@ struct AlbumCell: View {
                     .lineLimit(1)
             }
         }
+        .contextMenu {
+            VStack {
+                Button(role: .destructive) {
+                    deleteAlbum()
+                } label: {
+                    Label("Delete album", systemImage: "trash")
+                }
+            }
+        }
         .buttonStyle(.plain)
     }
+    
+    private func deleteAlbum() {
+        for track in album.tracks {
+            let url = URL.documentsDirectory.appending(path: track.filename)
+            try? FileManager.default.removeItem(at: url)
+        }
+        modelContext.delete(album)
+    }
+    
 }
