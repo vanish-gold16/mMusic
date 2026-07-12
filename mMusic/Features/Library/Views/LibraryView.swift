@@ -9,6 +9,8 @@ struct LibraryView: View {
     @Query(sort: \Album.addedAt, order: .reverse) private var albums: [Album]
     @Query(filter: #Predicate<Playlist> { $0.isPinned }) private var pinnedPlaylists: [Playlist]
 
+    @State private var showCreateAlbum = false
+    
     @State private var selectedCategory: LibraryCategory = .playlists
 
     var body: some View {
@@ -68,7 +70,7 @@ struct LibraryView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
-                        
+                        showCreateAlbum = true
                     } label: {
                         Label("New album", systemImage: "music.note.square.stack")
                     }
@@ -94,6 +96,9 @@ struct LibraryView: View {
                     Image(systemName: "line.3.horizontal")
                 }
             }
+        }
+        .sheet(isPresented: $showCreateAlbum) {
+            CreateAlbumView()
         }
         .navigationTitle("Library")
     }
