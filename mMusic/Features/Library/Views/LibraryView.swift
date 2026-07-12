@@ -76,6 +76,24 @@ struct LibraryView: View {
                     Image(systemName: "plus")
                 }
             }
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    NavigationLink(destination: PlaylistsView()) {
+                        Label("Playlists", systemImage: "music.note.list")
+                    }
+                    .animation(.easeOut, value: selectedCategory)
+                    NavigationLink(destination: AlbumsView()) {
+                        Label("Albums", systemImage: "square.stack")
+                    }
+                    .animation(.easeOut, value: selectedCategory)
+                    NavigationLink(destination: ArtistsView()) {
+                        Label("Artists", systemImage: "music.note")
+                    }
+                    .animation(.easeOut, value: selectedCategory)
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                }
+            }
         }
         .navigationTitle("Library")
     }

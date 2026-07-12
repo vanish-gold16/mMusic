@@ -39,9 +39,9 @@ struct ArtistsEditor: View {
                 showAddArtist = true
             } label: {
                 Image(systemName: "plus")
-                    .padding(.horizontal, 5)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(Color.gray.opacity(0.2), in: Circle())
+                    .background(Color.gray.opacity(0.2), in: Capsule())
             }
             .buttonStyle(.borderless)
             .fixedSize()

@@ -101,6 +101,7 @@ struct TrackCell: View {
                     .contentShape(Rectangle())
             }
         }
+        .contentShape(Rectangle())
         .onTapGesture {
             audioPlayer.play(track)
         }

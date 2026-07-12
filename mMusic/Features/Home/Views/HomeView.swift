@@ -15,6 +15,15 @@ struct HomeView: View {
                         Image(systemName: "gear")
                     }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        NavigationLink(destination: PlaylistsView()) {
+                            Label("Playlists", systemImage: "music.note.list")
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal")
+                    }
+                }
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
