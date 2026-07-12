@@ -76,7 +76,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: track.name,
-            MPMediaItemPropertyArtist: track.artistNames,
+            MPMediaItemPropertyArtist: track.artistNames.joined(separator: ", "),
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
             MPMediaItemPropertyPlaybackDuration: player?.duration ?? 0,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: player?.currentTime ?? 0
