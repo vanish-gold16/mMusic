@@ -9,7 +9,7 @@ struct AlbumView: View {
                 HStack {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.gray.opacity(0.2))
-                        .frame(width: 150, height: 150)
+                        .frame(width: 175, height: 175)
                         .overlay {
                             if let data = album.artwork, let uiImage = UIImage(data: data) {
                                 Image(uiImage: uiImage)
