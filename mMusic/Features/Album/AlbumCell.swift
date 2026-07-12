@@ -4,7 +4,9 @@ import SwiftUI
 struct AlbumCell: View {
     
     @Environment(\.modelContext) private var modelContext
-    
+
+    @State private var showDeleteConfirmation = false
+
     let album: Album
     
     var body: some View {
@@ -35,13 +37,25 @@ struct AlbumCell: View {
         .contextMenu {
             VStack {
                 Button(role: .destructive) {
-                    deleteAlbum()
+                    showDeleteConfirmation = true
                 } label: {
                     Label("Delete album", systemImage: "trash")
                 }
             }
         }
         .buttonStyle(.plain)
+        .confirmationDialog(
+            "Delete \"\(album.name)\"?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteAlbum()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This album and all its tracks will be permanently deleted.")
+        }
     }
     
     private func deleteAlbum() {

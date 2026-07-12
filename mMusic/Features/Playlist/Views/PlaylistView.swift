@@ -7,6 +7,7 @@ struct PlaylistView: View {
     
     @State private var isShowingTrackPicker = false
     @State private var editingPlaylist = false
+    @State private var showDeleteConfirmation = false
 
     let playlist: Playlist
     
@@ -160,7 +161,7 @@ struct PlaylistView: View {
                         Divider()
                         
                         Button(role: .destructive) {
-                            modelContext.delete(playlist)
+                            showDeleteConfirmation = true
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -176,6 +177,18 @@ struct PlaylistView: View {
         }
         .sheet(isPresented: $editingPlaylist) {
             EditPlaylistView(playlist: playlist)
+        }
+        .confirmationDialog(
+            "Delete \"\(playlist.name)\"?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(playlist)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This playlist will be permanently deleted.")
         }
     }
 }

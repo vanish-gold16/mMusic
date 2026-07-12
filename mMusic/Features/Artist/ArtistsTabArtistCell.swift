@@ -4,7 +4,9 @@ import SwiftUI
 struct ArtistsTabArtistCell: View {
     
     @Environment(\.modelContext) private var modelContext
-    
+
+    @State private var showDeleteConfirmation = false
+
     var artist: Artist
     
     var body: some View {
@@ -33,11 +35,23 @@ struct ArtistsTabArtistCell: View {
                 Divider()
                 
                 Button(role: .destructive) {
-                    modelContext.delete(artist)
+                    showDeleteConfirmation = true
                 } label: {
                     Label("Remove", systemImage: "trash")
                 }
             }
+        }
+        .confirmationDialog(
+            "Remove \"\(artist.name)\"?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                modelContext.delete(artist)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This artist will be permanently deleted.")
         }
     }
 }

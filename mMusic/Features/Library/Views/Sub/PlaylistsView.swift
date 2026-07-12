@@ -9,6 +9,7 @@ struct PlaylistsView: View {
     
     @State private var isCreating = false
     @State private var editedPlaylist: Playlist?
+    @State private var playlistToDelete: Playlist?
     
     var body: some View {
         VStack {
@@ -76,7 +77,7 @@ struct PlaylistsView: View {
                                 Divider()
                                 
                                 Button(role: .destructive) {
-                                    modelContext.delete(playlist)
+                                    playlistToDelete = playlist
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -89,6 +90,22 @@ struct PlaylistsView: View {
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            "Delete \"\(playlistToDelete?.name ?? "")\"?",
+            isPresented: Binding(
+                get: { playlistToDelete != nil },
+                set: { if !$0 { playlistToDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: playlistToDelete
+        ) { playlist in
+            Button("Delete", role: .destructive) {
+                modelContext.delete(playlist)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("This playlist will be permanently deleted.")
         }
         .navigationTitle("Playlists")
         .navigationBarTitleDisplayMode(.inline)

@@ -7,6 +7,7 @@ struct LibraryTrackCell: View {
     
     @State private var showImagePicker = false
     @State private var showEdit = false
+    @State private var showDeleteConfirmation = false
     
     let track: Track
     
@@ -61,9 +62,7 @@ struct LibraryTrackCell: View {
                 Divider()
 
                 Button(role: .destructive) {
-                    let url = URL.documentsDirectory.appending(path: track.filename)
-                    try? FileManager.default.removeItem(at: url)
-                    modelContext.delete(track)
+                    showDeleteConfirmation = true
                 } label: {
                     Label("Remove", systemImage: "trash")
                 }
@@ -72,6 +71,20 @@ struct LibraryTrackCell: View {
         }
         .sheet(isPresented: $showEdit) {
             EditTrackView(track: track)
+        }
+        .confirmationDialog(
+            "Remove \"\(track.name)\"?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                let url = URL.documentsDirectory.appending(path: track.filename)
+                try? FileManager.default.removeItem(at: url)
+                modelContext.delete(track)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This track will be permanently deleted.")
         }
     }
 }
