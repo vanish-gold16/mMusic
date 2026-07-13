@@ -7,11 +7,14 @@ struct CreateAlbumView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var name = ""
+    @State private var tracks: [Track] = []
     @State private var artworkData: Data?
     @State private var artists: [ArtistDraft] = []
     @State private var release: Date?
+    @State private var pickedFile: PickedFile? = nil
     
     @State private var showImagePicker = false
+    @State private var showTrackPicker = false
     
     private var hasRelease: Binding<Bool> {
         Binding (
@@ -75,6 +78,51 @@ struct CreateAlbumView: View {
                         DatePicker("release date", selection: releaseDate, displayedComponents: .date)
                     }
                 }
+                VStack {
+                    HStack(spacing: 16) {
+                        Button {
+                            
+                        } label: {
+                            VStack {
+                                Text("Upload music")
+                                Image(systemName: "square.and.arrow.down")
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 120)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: 15))
+                        .tint(.blue)
+                        Button {
+                            
+                        } label: {
+                            VStack {
+                                Text("From YouTube")
+                                Image(systemName: "video")
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 120)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: 15))
+                        .tint(.red)
+                    }
+                    Button {
+                        
+                    } label: {
+                        VStack {
+                            Text("Soundloud")
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                    }
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 15))
+                .padding(.top)
+                .tint(.orange)
+                if !tracks.isEmpty {
+                    ForEach(tracks) { track in
+                        AlbumTrackCell(track: track)
+                    }
+                }
             }
             .navigationTitle("New album")
             .navigationBarTitleDisplayMode(.inline)
@@ -89,6 +137,9 @@ struct CreateAlbumView: View {
                         dismiss()
                     }
                 }
+            }
+            .sheet(item: $pickedFile) { file in
+                
             }
         }
     }
