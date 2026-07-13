@@ -15,7 +15,7 @@ struct TrackPickerView: View {
     }
     private var genreGroups: [(genre: Genre, tracks: [Track])] {
         Dictionary(grouping: filteredTracks, by: { $0.genre })
-            .map { (genre: $0.key, tracks: $0.value)}
+            .map { (genre: $0.key, tracks: $0.value) }
             .sorted { $0.genre.rawValue < $1.genre.rawValue }
     }
     private var filteredTracks: [Track] {
@@ -38,7 +38,6 @@ struct TrackPickerView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
-                
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
                         switch selectedTab {

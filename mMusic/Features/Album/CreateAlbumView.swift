@@ -8,6 +8,7 @@ struct CreateAlbumView: View {
     
     @State private var name = ""
     @State private var tracks: [Track] = []
+    @State private var trackDrafts: [TrackDraft] = []
     @State private var artworkData: Data?
     @State private var artists: [ArtistDraft] = []
     @State private var release: Date?
@@ -15,6 +16,7 @@ struct CreateAlbumView: View {
     
     @State private var showImagePicker = false
     @State private var showTrackPicker = false
+    @State private var isImporting = false
     
     private var hasRelease: Binding<Bool> {
         Binding (
@@ -123,6 +125,25 @@ struct CreateAlbumView: View {
                         AlbumTrackCell(track: track)
                     }
                 }
+                Section {
+                    Button {
+                        showTrackPicker = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus")
+                            Text("Add Music")
+                                .tint(.primary)
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.tint)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .sheet(isPresented: $showTrackPicker) {
+                        TrackPickerView(playlist: playlist)
+                    }
+                }
             }
             .navigationTitle("New album")
             .navigationBarTitleDisplayMode(.inline)
@@ -138,7 +159,7 @@ struct CreateAlbumView: View {
                     }
                 }
             }
-            .sheet(item: $pickedFile) { file in
+            .sheet(isPresented: $showTrackPicker) {
                 
             }
         }
