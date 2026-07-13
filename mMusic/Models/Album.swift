@@ -6,6 +6,7 @@ class Album {
     var name: String
     @Relationship(deleteRule: .cascade, inverse: \Track.album)
     var tracks: [Track]
+    var type: AlbumType
     @Relationship(deleteRule: .cascade, inverse: \Credit.album)
     var credits: [Credit]
     var artists: [Artist] {
@@ -32,11 +33,19 @@ class Album {
     
     @Attribute(.externalStorage) var artwork: Data?
     
-    init(name: String, tracks: [Track] = [], credits: [Credit] = [], release: Date? = nil, artwork: Data? = nil) {
+    init(name: String, tracks: [Track] = [], type: AlbumType = .single, credits: [Credit] = [], release: Date? = nil, artwork: Data? = nil) {
         self.name = name
         self.tracks = tracks
+        self.type = type
         self.credits = credits
         self.release = release
         self.artwork = artwork
     }
+    
+    enum AlbumType: String, Codable {
+        case single = "single"
+        case EP = "EP"
+        case LP = "LP"
+    }
+    
 }
