@@ -117,5 +117,20 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             self?.playPrevious()
             return .success
         }
+        
+        commandsCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let self,
+                  let positionEvent = event as? MPChangePlaybackPositionCommandEvent else {
+                return .commandFailed
+            }
+            self.seek(to: positionEvent.positionTime)
+            return .success
+        }
     }
+    
+    func seek(to time: TimeInterval) {
+        player?.currentTime = time
+        updateNowPlayingInfo()
+    }
+    
 }
