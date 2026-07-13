@@ -20,7 +20,13 @@ struct HomeView: View {
                         NavigationLink(destination: PlaylistsView()) {
                             Label("Playlists", systemImage: "music.note.list")
                         }
-                    } label: {
+                        NavigationLink(destination: AlbumsView()) {
+                            Label("ALbums", systemImage: "square.stack")
+                        }
+                        NavigationLink(destination: ArtistsView()) {
+                            Label("Artists", systemImage: "music.note")
+                        }
+                     } label: {
                         Image(systemName: "line.3.horizontal")
                     }
                 }

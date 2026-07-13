@@ -10,33 +10,11 @@ struct LibraryView: View {
     @Query(filter: #Predicate<Playlist> { $0.isPinned }) private var pinnedPlaylists: [Playlist]
 
     @State private var showCreateAlbum = false
-    
-    @State private var selectedCategory: LibraryCategory = .playlists
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
                 Spacer()
-                
-                ForEach(LibraryCategory.allCases, id: \.self) { category in
-                    NavigationLink(destination: destinationView(for: category)) {
-                        HStack {
-                            Label(category.rawValue, systemImage: category.icon)
-                                .foregroundColor(.orange)
-                                .font(.title2)
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.secondary)
-                                .font(.subheadline)
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    .animation(.easeOut, value: selectedCategory)
-                }
                 
                 if !pinnedPlaylists.isEmpty {
                     VStack(alignment: .leading) {
@@ -51,7 +29,6 @@ struct LibraryView: View {
                         }
                     }
                 }
-                
                 VStack(alignment: .leading) {
                     Text("Recently added")
                         .font(.title)
@@ -83,15 +60,12 @@ struct LibraryView: View {
                     NavigationLink(destination: PlaylistsView()) {
                         Label("Playlists", systemImage: "music.note.list")
                     }
-                    .animation(.easeOut, value: selectedCategory)
                     NavigationLink(destination: AlbumsView()) {
                         Label("Albums", systemImage: "square.stack")
                     }
-                    .animation(.easeOut, value: selectedCategory)
                     NavigationLink(destination: ArtistsView()) {
                         Label("Artists", systemImage: "music.note")
                     }
-                    .animation(.easeOut, value: selectedCategory)
                 } label: {
                     Image(systemName: "line.3.horizontal")
                 }
@@ -102,13 +76,5 @@ struct LibraryView: View {
         }
         .navigationTitle("Library")
     }
-    
-    @ViewBuilder
-    func destinationView (for category: LibraryCategory) -> some View {
-        switch category {
-        case .playlists: PlaylistsView()
-        case .albums: AlbumsView()
-        case .artists: ArtistsView()
-        }
-    }
+
 }
