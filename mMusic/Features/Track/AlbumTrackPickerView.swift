@@ -27,6 +27,7 @@ struct AlbumTrackPickerView: View {
     }
     
     var album: [Album]
+    @Binding var addedTracks: [TrackDraft]
     
     var body: some View {
         NavigationStack {
@@ -43,10 +44,18 @@ struct AlbumTrackPickerView: View {
                         switch selectedTab {
                         case .recent:
                             ForEach(recentTracks) { track in
-                                PlaylistTrackPickCell(track: track, playlist: <#T##Playlist#>)
+                                AlbumTrackPickCell(track: track, addedTracks: $addedTracks)
                             }
                         case .genre:
-                            <#code#>
+                            ForEach(genreGroups, id: \.genre) { group in
+                                Text(group.genre.rawValue)
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                    .padding(.top, 12)
+                                ForEach(group.tracks) { track in
+                                    AlbumTrackPickCell(track: track, addedTracks: $addedTracks)
+                                }
+                            }
                         }
                     }
                 }
