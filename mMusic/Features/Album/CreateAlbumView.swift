@@ -141,7 +141,7 @@ struct CreateAlbumView: View {
                     }
                     .buttonStyle(.glassProminent)
                     .sheet(isPresented: $showTrackPicker) {
-                        AlbumTrackPickCell(track: , addedTracks: trackDrafts)
+                        AlbumTrackPickerView(album: [], addedTracks: $trackDrafts)
                     }
                 }
             }
@@ -158,9 +158,6 @@ struct CreateAlbumView: View {
                         dismiss()
                     }
                 }
-            }
-            .sheet(isPresented: $showTrackPicker) {
-                
             }
         }
     }
