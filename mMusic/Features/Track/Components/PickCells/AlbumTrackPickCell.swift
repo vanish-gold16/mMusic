@@ -63,6 +63,8 @@ struct AlbumTrackPickCell: View {
                 artists: draftArtists,
                 stagedURL: URL.documentsDirectory.appending(path: track.filename)
             )
+            
+            addedTracks.append(draft)
         }
     }
     
