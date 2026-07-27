@@ -4,7 +4,7 @@ import SwiftData
 struct LibraryView: View {
     let columns = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
     
-    let columnsPinned = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
+    let columnsPinned = Array(repeating: GridItem(.flexible(), spacing: 16, alignment: .top), count: 3)
 
     @Query(sort: \Album.addedAt, order: .reverse) private var albums: [Album]
     @Query(filter: #Predicate<Playlist> { $0.isPinned }) private var pinnedPlaylists: [Playlist]

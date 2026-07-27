@@ -155,10 +155,26 @@ struct CreateAlbumView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("save") {
-                        dismiss()
+                        save()
                     }
                 }
             }
         }
     }
+    
+    private func save() {
+        var album = Album(name: name, tracks: tracks, release: release, artwork: artworkData)
+        
+        modelContext.insert(album)
+        
+        for(position, draft) in artists.enumerated() {
+            var artistModel = modelContext.findOrCreateArtist(named: draft.name)
+            var credit = Credit(artist: artistModel, role: draft.role, position: position, album: album)
+            
+            modelContext.insert(credit)
+        }
+        
+        dismiss()
+    }
+    
 }

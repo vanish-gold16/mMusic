@@ -51,6 +51,18 @@ struct AlbumTrackPickCell: View {
     func swapIsPicked() {
         if isPicked {
             addedTracks.removeAll { matches($0) }
+        } else {
+            var draftArtists: [ArtistDraft] = []
+                for name in track.artistNames {
+                    draftArtists.append(ArtistDraft(name: name))
+            }
+            
+            let draft = TrackDraft(
+                name: track.name,
+                genre: track.genre,
+                artists: draftArtists,
+                stagedURL: URL.documentsDirectory.appending(path: track.filename)
+            )
         }
     }
     
