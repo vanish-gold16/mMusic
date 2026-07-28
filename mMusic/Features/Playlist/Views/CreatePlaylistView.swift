@@ -59,7 +59,7 @@ struct CreatePlaylistView: View {
                 if !playlist.tracks.isEmpty {
                     Section {
                         ForEach(playlist.tracks) { track in
-                            TrackCell(track: track)
+                            TrackCell(track: track, leadingStyle: .artwork)
                         }
                     }
                 }

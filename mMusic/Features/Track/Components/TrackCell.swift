@@ -9,8 +9,14 @@ struct TrackCell: View {
     @State private var showEditTrack: Bool = false
     @State private var showDeleteConfirmation: Bool = false
 
+    enum LeadingStyle {
+        case number
+        case artwork
+    }
+
     var track: Track
     var queue: [Track] = []
+    var leadingStyle: LeadingStyle = .number
 
     var body: some View {
         HStack {
@@ -22,8 +28,21 @@ struct TrackCell: View {
                 .fill(Color.gray.opacity(0.2))
                 .frame(width: 40, height: 40)
                 .overlay {
-                    Text("\(track.position + 1)")
+                    switch leadingStyle {
+                    case .number:
+                        Text("\(track.position + 1)")
+                    case .artwork:
+                        if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            Image(systemName: "music.note")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 2))
             VStack(alignment: .leading) {
                 Text(track.name)
                     .bold()

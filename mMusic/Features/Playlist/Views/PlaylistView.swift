@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AVFoundation
 
 struct PlaylistView: View {
 
@@ -9,6 +10,7 @@ struct PlaylistView: View {
     @State private var isShowingTrackPicker = false
     @State private var editingPlaylist = false
     @State private var showDeleteConfirmation = false
+    @State private var totalDuration: TimeInterval = 0
 
     let playlist: Playlist
     
@@ -77,7 +79,7 @@ struct PlaylistView: View {
                 }
                 
                 ForEach(playlist.tracks) { track in
-                    TrackCell(track: track, queue: playlist.tracks)
+                    TrackCell(track: track, queue: playlist.tracks, leadingStyle: .artwork)
                 }
 
                 Button {
@@ -100,6 +102,11 @@ struct PlaylistView: View {
                             .tint(.primary)
                         Spacer()
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                    .glassEffect()
+                    .padding(.horizontal)
                 }
             }
         }
