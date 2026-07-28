@@ -120,7 +120,7 @@ struct CreateAlbumView: View {
                 .padding(.top)
                 .tint(.orange)
                 if !trackDrafts.isEmpty {
-                    Section("tracks") {
+                    Section {
                         ForEach(Array(trackDrafts.enumerated()), id: \.element.id) { index, draft in
                             NavigationLink {
                                 TrackDraftEditView(draft: $trackDrafts[index], albumArtists: artists.map(\.name))
@@ -131,8 +131,13 @@ struct CreateAlbumView: View {
                         .onMove { from, to in
                             trackDrafts.move(fromOffsets: from, toOffset: to)
                         }
+                    } header: {
+                        HStack {
+                            Text("tracks")
+                            Spacer()
+                            EditButton()
+                        }
                     }
-                    .environment(\.editMode, .constant(.active))
                 }
                 Button {
                     showTrackPicker = true
