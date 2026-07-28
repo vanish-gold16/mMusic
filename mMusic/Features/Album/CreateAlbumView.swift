@@ -122,7 +122,11 @@ struct CreateAlbumView: View {
                 if !trackDrafts.isEmpty {
                     Section("tracks") {
                         ForEach(Array(trackDrafts.enumerated()), id: \.element.id) { index, draft in
-                            AlbumTrackDraftCell(draft: draft, position: index + 1)
+                            NavigationLink {
+                                TrackDraftEditView(draft: $trackDrafts[index], albumArtists: artists.map(\.name))
+                            } label: {
+                                AlbumTrackDraftCell(draft: draft, position: index + 1)
+                            }
                         }
                         .onMove { from, to in
                             trackDrafts.move(fromOffsets: from, toOffset: to)
