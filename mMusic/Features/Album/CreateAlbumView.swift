@@ -119,29 +119,33 @@ struct CreateAlbumView: View {
                 .buttonBorderShape(.roundedRectangle(radius: 15))
                 .padding(.top)
                 .tint(.orange)
-                Section {
-                    if !trackDrafts.isEmpty {
-                        ForEach(trackDrafts.indices, id: \.self) { index in
-                            AlbumTrackDraftCell(draft: trackDrafts[index], position: index + 1)
+                if !trackDrafts.isEmpty {
+                    Section("tracks") {
+                        ForEach(Array(trackDrafts.enumerated()), id: \.element.id) { index, draft in
+                            AlbumTrackDraftCell(draft: draft, position: index + 1)
+                        }
+                        .onMove { from, to in
+                            trackDrafts.move(fromOffsets: from, toOffset: to)
                         }
                     }
-                    Button {
-                        showTrackPicker = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus")
-                            Text("Add Music")
-                                .tint(.primary)
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.tint)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
+                    .environment(\.editMode, .constant(.active))
+                }
+                Button {
+                    showTrackPicker = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                        Text("Add Music")
+                            .tint(.primary)
                     }
-                    .buttonStyle(.glassProminent)
-                    .sheet(isPresented: $showTrackPicker) {
-                        AlbumTrackPickerView(album: [], addedTracks: $trackDrafts)
-                    }
+                    .font(.headline)
+                    .foregroundStyle(.tint)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                }
+                .buttonStyle(.glassProminent)
+                .sheet(isPresented: $showTrackPicker) {
+                    AlbumTrackPickerView(album: [], addedTracks: $trackDrafts)
                 }
             }
             .navigationTitle("New album")
