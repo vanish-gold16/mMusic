@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 struct TrackDraft: Identifiable {
     let id = UUID()
@@ -6,4 +7,5 @@ struct TrackDraft: Identifiable {
     var genre: Genre = .pop
     var artists: [ArtistDraft] = []
     var stagedURL: URL
+    var sourceTrack: PersistentIdentifier?
 }

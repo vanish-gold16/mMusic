@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 struct AlbumTrackPickCell: View {
@@ -10,7 +11,7 @@ struct AlbumTrackPickCell: View {
     }
 
     private func matches(_ draft: TrackDraft) -> Bool {
-        draft.name == track.name && draft.artists.map(\.name) == track.artistNames
+        draft.sourceTrack == track.persistentModelID
     }
     
     var body: some View {
@@ -61,7 +62,8 @@ struct AlbumTrackPickCell: View {
                 name: track.name,
                 genre: track.genre,
                 artists: draftArtists,
-                stagedURL: URL.documentsDirectory.appending(path: track.filename)
+                stagedURL: URL.documentsDirectory.appending(path: track.filename),
+                sourceTrack: track.persistentModelID
             )
             
             addedTracks.append(draft)

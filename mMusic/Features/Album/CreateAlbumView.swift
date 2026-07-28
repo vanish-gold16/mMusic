@@ -7,7 +7,6 @@ struct CreateAlbumView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var name = ""
-    @State private var tracks: [Track] = []
     @State private var trackDrafts: [TrackDraft] = []
     @State private var artworkData: Data?
     @State private var artists: [ArtistDraft] = []
@@ -163,13 +162,19 @@ struct CreateAlbumView: View {
     }
     
     private func save() {
-        var album = Album(name: name, tracks: tracks, release: release, artwork: artworkData)
+        let album = Album(name: name, release: release, artwork: artworkData)
         
         modelContext.insert(album)
         
+        for draft in trackDrafts {
+            guard let id = draft.sourceTrack,
+                  let track = modelContext.model(for: id) as? Track else { continue }
+            track.album = album
+        }
+        
         for(position, draft) in artists.enumerated() {
-            var artistModel = modelContext.findOrCreateArtist(named: draft.name)
-            var credit = Credit(artist: artistModel, role: draft.role, position: position, album: album)
+            let artistModel = modelContext.findOrCreateArtist(named: draft.name)
+            let credit = Credit(artist: artistModel, role: draft.role, position: position, album: album)
             
             modelContext.insert(credit)
         }
