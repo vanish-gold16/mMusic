@@ -76,12 +76,9 @@ struct PlaylistView: View {
                 }
                 
                 ForEach(playlist.tracks) { track in
-                    Divider()
                     TrackCell(track: track)
                 }
-                
-                Divider()
-                
+
                 Button {
                     isShowingTrackPicker = true
                 } label: {
@@ -103,9 +100,6 @@ struct PlaylistView: View {
                         Spacer()
                     }
                 }
-                
-                Divider()
-
             }
         }
         .toolbar {

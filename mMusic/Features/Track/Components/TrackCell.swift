@@ -94,7 +94,11 @@ struct TrackCell: View {
                     .contentShape(Rectangle())
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .contentShape(Rectangle())
+        .glassEffect()
+        .padding(.horizontal)
         .onTapGesture {
             audioPlayer.play(track)
         }

@@ -3,6 +3,8 @@ import SwiftUI
 struct AlbumView: View {
     var album: Album
 
+    @State private var backgroundArtwork: UIImage?
+
     var body: some View {
         ScrollView {
             VStack {
@@ -32,10 +34,10 @@ struct AlbumView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-
+                
                 HStack {
                     Button {
-
+                        
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)
@@ -52,7 +54,7 @@ struct AlbumView: View {
                             }
                     }
                     Button {
-
+                        
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)
@@ -72,14 +74,13 @@ struct AlbumView: View {
                 .padding(.horizontal)
                 
                 Spacer()
-
-                ForEach(album.tracks.sorted { $0.position < $1.position }) { track in
-                    Divider()
-                    TrackCell(track: track)
+                
+                VStack {
+                    ForEach(album.tracks.sorted { $0.position < $1.position }) { track in
+                        TrackCell(track: track)
+                    }
                 }
 
-                Divider()
-                
                 Spacer()
                 
                 if let release = album.release {
@@ -91,5 +92,44 @@ struct AlbumView: View {
                 }
             }
         }
+        .background {
+            artworkBackground
+        }
+        .task {
+            backgroundArtwork = await Self.makeBackgroundArtwork(from: album.artwork)
+        }
+    }
+
+    /// Заливка из цветов обложки. Миниатюра 12×12 растягивается на весь экран, поэтому
+    /// от картинки остаются только цветовые пятна — деталей, дающих резкие светлые и тёмные
+    /// половины, в ней уже нет. Все слои лежат в одном ZStack, чтобы под safe area
+    /// не оставалось полос: `ignoresSafeArea` применяется сразу ко всей стопке.
+    private var artworkBackground: some View {
+        ZStack {
+            Color(.systemBackground)
+
+            if let backgroundArtwork {
+                Image(uiImage: backgroundArtwork)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .blur(radius: 40, opaque: true)
+                    .saturation(0.45)
+                    .opacity(0.7)
+            }
+
+            Rectangle()
+                .fill(.ultraThinMaterial)
+        }
+        .ignoresSafeArea()
+    }
+
+    /// Уменьшение картинки — не самая дешёвая операция, поэтому уводим её с главного потока.
+    private static func makeBackgroundArtwork(from data: Data?) async -> UIImage? {
+        guard let data else { return nil }
+
+        return await Task.detached(priority: .utility) {
+            UIImage(data: data)?.preparingThumbnail(of: CGSize(width: 12, height: 12))
+        }.value
     }
 }
