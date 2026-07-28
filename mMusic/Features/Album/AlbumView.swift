@@ -9,7 +9,7 @@ struct AlbumView: View {
         ScrollView {
             VStack {
                 HStack {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(Color.gray.opacity(0.2))
                         .frame(width: 175, height: 175)
                         .overlay {
@@ -17,7 +17,7 @@ struct AlbumView: View {
                                 Image(uiImage: uiImage)
                                     .resizable()
                                     .scaledToFit()
-                                    .cornerRadius(8)
+                                    .cornerRadius(12)
                             } else {
                                 Image(systemName: "music.note")
                             }
@@ -76,8 +76,9 @@ struct AlbumView: View {
                 Spacer()
                 
                 VStack {
-                    ForEach(album.tracks.sorted { $0.position < $1.position }) { track in
-                        TrackCell(track: track)
+                    let sortedTracks = album.tracks.sorted { $0.position < $1.position }
+                    ForEach(sortedTracks) { track in
+                        TrackCell(track: track, queue: sortedTracks)
                     }
                 }
 

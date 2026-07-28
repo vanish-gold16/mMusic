@@ -14,7 +14,7 @@ struct PlaylistView: View {
     var body: some View {
         ScrollView {
             VStack {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(Color.gray.opacity(0.2))
                     .frame(width: 250, height: 250)
                     .overlay {
@@ -28,7 +28,7 @@ struct PlaylistView: View {
                                 .frame(width: 200, height: 200)
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 Text(playlist.name)
                     .font(.largeTitle)
                     .bold()
@@ -76,7 +76,7 @@ struct PlaylistView: View {
                 }
                 
                 ForEach(playlist.tracks) { track in
-                    TrackCell(track: track)
+                    TrackCell(track: track, queue: playlist.tracks)
                 }
 
                 Button {

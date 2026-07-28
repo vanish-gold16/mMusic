@@ -33,7 +33,7 @@ struct MiniPlayerView: View {
                 
                 HStack {
                     Button {
-                        
+                        audioPlayer.playPrevious()
                     } label: {
                         Image(systemName: "backward.end.fill")
                             .font(.title2)
@@ -55,7 +55,7 @@ struct MiniPlayerView: View {
                     .buttonStyle(PressableButtonStyle())
                     
                     Button {
-                        
+                        audioPlayer.playNext()
                     } label: {
                         Image(systemName: "forward.fill")
                             .font(.title2)

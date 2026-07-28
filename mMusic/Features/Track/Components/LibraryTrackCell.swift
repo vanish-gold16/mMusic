@@ -33,7 +33,7 @@ struct LibraryTrackCell: View {
                 .lineLimit(1)
         }
         .onTapGesture {
-            audioPlayer.play(track)
+            audioPlayer.play([track])
         }
         .contextMenu() {
             VStack {

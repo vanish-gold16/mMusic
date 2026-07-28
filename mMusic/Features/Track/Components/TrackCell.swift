@@ -10,6 +10,7 @@ struct TrackCell: View {
     @State private var showDeleteConfirmation: Bool = false
 
     var track: Track
+    var queue: [Track] = []
 
     var body: some View {
         HStack {
@@ -100,7 +101,11 @@ struct TrackCell: View {
         .glassEffect()
         .padding(.horizontal)
         .onTapGesture {
-            audioPlayer.play([track])
+            if let index = queue.firstIndex(where: { $0.id == track.id }) {
+                audioPlayer.play(queue, startingAt: index)
+            } else {
+                audioPlayer.play([track])
+            }
         }
         .sheet(isPresented: $showEditTrack) {
             EditTrackView(track: track)
