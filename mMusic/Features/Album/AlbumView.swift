@@ -85,7 +85,6 @@ struct AlbumView: View {
                 Spacer()
                 
                 VStack {
-                    let sortedTracks = album.tracks.sorted { $0.position < $1.position }
                     ForEach(sortedTracks) { track in
                         TrackCell(track: track, queue: sortedTracks)
                     }

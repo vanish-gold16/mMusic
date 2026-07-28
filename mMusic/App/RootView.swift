@@ -55,14 +55,18 @@ struct RootView: View {
             guard let lastTrack = UserDefaults.standard.string(forKey: "lastTrack") else {
                 return
             }
+            let queueFilenames = UserDefaults.standard.stringArray(forKey: "queue") ?? [lastTrack]
             let descriptor = FetchDescriptor<Track>(
-                predicate: #Predicate { $0.filename == lastTrack }
+                predicate: #Predicate { queueFilenames.contains($0.filename) }
             )
-            guard let track = try? modelContext.fetch(descriptor).first else {
+            guard let tracks = try? modelContext.fetch(descriptor), !tracks.isEmpty else {
                 return
             }
+            let orderedTracks = queueFilenames.compactMap { filename in
+                tracks.first { $0.filename == filename }
+            }
 
-            audioPlayer.restore(track)
+            audioPlayer.restore(orderedTracks, current: lastTrack)
         }
         .tint(.orange)
     }

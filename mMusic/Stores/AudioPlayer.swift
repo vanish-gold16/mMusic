@@ -44,6 +44,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             player?.play()
             
             UserDefaults.standard.set(track.filename, forKey: "lastTrack")
+            UserDefaults.standard.set(queue.map(\.filename), forKey: "queue")
             
             isPlaying = true
             updateNowPlayingInfo()
@@ -58,7 +59,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             isPlaying = false
         } else {
             if (player == nil && currentTrack != nil) {
-                play([currentTrack!])
+                playCurrent()
             } else {
                 player?.play()
                 isPlaying = true
@@ -158,9 +159,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         updateNowPlayingInfo()
     }
     
-    func restore(_ track: Track) {
-        queue = [track]
-        currentIndex = 0
+    func restore(_ tracks: [Track], current filename: String) {
+        queue = tracks
+        currentIndex = tracks.firstIndex { $0.filename == filename } ?? 0
     }
     
 }
