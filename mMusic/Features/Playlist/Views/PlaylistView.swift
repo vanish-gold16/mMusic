@@ -88,16 +88,12 @@ struct PlaylistView: View {
                     HStack {
                         Color.clear
                             .frame(width: 16)
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.gray.opacity(0.2))
+                        Image(systemName: "plus")
+                            .resizable()
+                            .bold()
+                            .frame(width: 15, height: 15)
+                            .tint(.orange)
                             .frame(width: 40, height: 40)
-                            .overlay {
-                                Image(systemName: "plus")
-                                    .resizable()
-                                    .bold()
-                                    .frame(width: 15, height: 15)
-                                    .tint(.orange)
-                            }
                         Text("Add Music")
                             .tint(.primary)
                         Spacer()
@@ -108,7 +104,17 @@ struct PlaylistView: View {
                     .glassEffect()
                     .padding(.horizontal)
                 }
+
+                if !playlist.tracks.isEmpty {
+                    Text("\(playlist.tracks.count) songs • \(Duration.seconds(totalDuration).formatted(.units(allowed: [.hours, .minutes], width: .wide)))")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top)
+                }
             }
+        }
+        .task(id: playlist.tracks.map(\.filename)) {
+            await calculateTotalDuration()
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -192,5 +198,17 @@ struct PlaylistView: View {
         } message: {
             Text("This playlist will be permanently deleted.")
         }
+    }
+
+    private func calculateTotalDuration() async {
+        var total: TimeInterval = 0
+        for track in playlist.tracks {
+            let url = URL.documentsDirectory.appending(path: track.filename)
+            let asset = AVURLAsset(url: url)
+            if let duration = try? await asset.load(.duration) {
+                total += CMTimeGetSeconds(duration)
+            }
+        }
+        totalDuration = total
     }
 }
