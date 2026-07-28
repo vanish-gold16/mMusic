@@ -20,8 +20,24 @@ struct ArtistsEditor: View {
         if newArtistName.isEmpty {
             return []
         } else {
-            return allArtists.filter { $0.name.localizedCaseInsensitiveContains(newArtistName) }
+            return allArtists
+                .filter { $0.name.localizedCaseInsensitiveContains(newArtistName) }
+                .filter { !isAlbumArtist($0.name) }
         }
+    }
+
+    /// Артисты трека без тех, кто уже указан у альбома: они наследуются и показываются read-only.
+    private var editableArtists: [ArtistDraft] {
+        artists.filter { !isAlbumArtist($0.name) }
+    }
+
+    private func isAlbumArtist(_ name: String) -> Bool {
+        readOnlyArtists.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// Убирает из списка трека артистов, которые уже есть у альбома.
+    private func dropInheritedArtists() {
+        artists.removeAll { isAlbumArtist($0.name) }
     }
     
     var body: some View {
@@ -30,7 +46,7 @@ struct ArtistsEditor: View {
                 TrackArtistCell(name: name, showDelete: false, showRole: false, editable: false)
             }
 
-            ForEach(artists) { draft in
+            ForEach(editableArtists) { draft in
                 artistCell(for: draft)
             }
             
@@ -50,6 +66,11 @@ struct ArtistsEditor: View {
                     TextField("artist name", text: $newArtistName)
                         .padding(10)
                         .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
+                    if isAlbumArtist(newArtistName) {
+                        Text("already an album artist")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     if !suggestions.isEmpty {
                         ScrollView {
                             ForEach(suggestions) { artist in
@@ -65,7 +86,7 @@ struct ArtistsEditor: View {
                         showAddArtist = false
                     }
                     .buttonStyle(.glassProminent)
-                    .disabled(newArtistName.isEmpty)
+                    .disabled(newArtistName.isEmpty || isAlbumArtist(newArtistName))
                 }
                 .padding()
                 .frame(width: 280, height: 220)
@@ -76,6 +97,12 @@ struct ArtistsEditor: View {
         .coordinateSpace(name: "artistsFlow")
         .onPreferenceChange(CellFramePreferenceKey.self) {
             cellFrames = $0
+        }
+        .onAppear {
+            dropInheritedArtists()
+        }
+        .onChange(of: readOnlyArtists) {
+            dropInheritedArtists()
         }
     }
     

@@ -90,13 +90,9 @@ struct SettingView: View {
 
     init(file: PickedFile) {
         self.file = file
-        let parsed = file.url.parseMusic()
-        _name = State(initialValue: parsed.name)
-        let names = parsed.artist
-            .components(separatedBy: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        let drafts = names.isEmpty ? [ArtistDraft(name: parsed.artist)] : names.map { ArtistDraft(name: $0) }
+        _name = State(initialValue: file.url.parseMusic().name)
+        let names = file.url.parsedArtistNames()
+        let drafts = names.isEmpty ? [ArtistDraft(name: "unknown")] : names.map { ArtistDraft(name: $0) }
         _artists = State(initialValue: drafts)
     }
     
@@ -131,10 +127,11 @@ struct SettingView: View {
 }
 
 extension URL {
-    func parseMusic() -> (name: String, artist: String) {
+    /// `artist` == nil, если в имени файла не нашлось разделителя «артист — трек».
+    func parseMusic() -> (name: String, artist: String?) {
         let base = deletingPathExtension().lastPathComponent
             .replacingOccurrences(of: "_", with: " ")
-        
+
         if let range = base.range(of: " — ")        // длинное тире
             ?? base.range(of: " – ")         // среднее тире (en-dash) ← добавили
             ?? base.range(of: " - ") {
@@ -142,8 +139,17 @@ extension URL {
             let title = String(base[range.upperBound...])
             return (name: title, artist: artist)
         } else {
-            return (name: base, artist: "unknown")
+            return (name: base, artist: nil)
         }
+    }
+
+    /// Разбивает распознанного артиста по запятым: «A, B» → ["A", "B"].
+    func parsedArtistNames() -> [String] {
+        guard let artist = parseMusic().artist else { return [] }
+        return artist
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 }
 

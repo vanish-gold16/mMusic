@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct CreateAlbumView: View {
     
@@ -89,7 +90,7 @@ struct CreateAlbumView: View {
                 VStack {
                     HStack(spacing: 16) {
                         Button {
-                            
+                            isImporting = true
                         } label: {
                             VStack {
                                 Text("Upload music")
@@ -126,6 +127,12 @@ struct CreateAlbumView: View {
                 .buttonBorderShape(.roundedRectangle(radius: 15))
                 .padding(.top)
                 .tint(.orange)
+                .fileImporter(
+                    isPresented: $isImporting,
+                    allowedContentTypes: [.audio],
+                    allowsMultipleSelection: true,
+                    onCompletion: handleFileLoading
+                )
                 if !trackDrafts.isEmpty {
                     Section {
                         ForEach(Array(trackDrafts.enumerated()), id: \.element.id) { index, draft in
@@ -137,6 +144,12 @@ struct CreateAlbumView: View {
                         }
                         .onMove { from, to in
                             trackDrafts.move(fromOffsets: from, toOffset: to)
+                        }
+                        .onDelete { offsets in
+                            for index in offsets {
+                                discardStagedFile(of: trackDrafts[index])
+                            }
+                            trackDrafts.remove(atOffsets: offsets)
                         }
                     } header: {
                         HStack {
@@ -169,6 +182,7 @@ struct CreateAlbumView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("cancel") {
+                        trackDrafts.forEach(discardStagedFile)
                         dismiss()
                     }
                 }
@@ -181,24 +195,116 @@ struct CreateAlbumView: View {
         }
     }
     
+    private func handleFileLoading(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            for url in urls {
+                guard let stagedURL = stage(url) else { continue }
+
+                let names = url.parsedArtistNames().filter { !isAlbumArtist($0) }
+
+                trackDrafts.append(
+                    TrackDraft(
+                        name: url.parseMusic().name,
+                        artists: names.map { ArtistDraft(name: $0) },
+                        stagedURL: stagedURL
+                    )
+                )
+            }
+        case .failure(let error):
+            print(error)
+        }
+    }
+
+    /// Копирует выбранный файл во временную папку: доступ к URL из fileImporter короткоживущий,
+    /// а сохранить альбом пользователь может сильно позже. Своя папка на файл сохраняет исходное имя.
+    private func stage(_ source: URL) -> URL? {
+        let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        let destination = folder.appending(path: source.lastPathComponent)
+
+        let didAccess = source.startAccessingSecurityScopedResource()
+        defer { if didAccess { source.stopAccessingSecurityScopedResource() } }
+
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: destination)
+            return destination
+        } catch {
+            print("Staging error: \(error)")
+            return nil
+        }
+    }
+
+    /// Переносит подготовленный файл в документы и возвращает имя, под которым он там лежит.
+    private func importStagedFile(_ stagedURL: URL) -> String? {
+        let fileManager = FileManager.default
+        var destination = URL.documentsDirectory.appending(path: stagedURL.lastPathComponent)
+
+        if fileManager.fileExists(atPath: destination.path) {
+            let unique = stagedURL.deletingPathExtension().lastPathComponent + "-" + UUID().uuidString
+            destination = URL.documentsDirectory
+                .appending(path: unique)
+                .appendingPathExtension(stagedURL.pathExtension)
+        }
+
+        do {
+            try fileManager.moveItem(at: stagedURL, to: destination)
+            return destination.lastPathComponent
+        } catch {
+            print("Import error: \(error)")
+            return nil
+        }
+    }
+
+    /// Удаляет временную папку черновика. Черновики из уже существующих треков не трогаем:
+    /// их stagedURL ведёт в документы, а не во временную папку.
+    private func discardStagedFile(of draft: TrackDraft) {
+        guard draft.sourceTrack == nil else { return }
+
+        let folder = draft.stagedURL.deletingLastPathComponent()
+        guard folder.deletingLastPathComponent().standardizedFileURL.path
+                == URL.temporaryDirectory.standardizedFileURL.path else { return }
+
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    private func isAlbumArtist(_ name: String) -> Bool {
+        artists.contains { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
     private func save() {
         let album = Album(name: name, release: release, artwork: artworkData)
-        
+
         modelContext.insert(album)
-        
+
         var previousAlbums = Set<Album>()
 
         for (index, draft) in trackDrafts.enumerated() {
-            guard let id = draft.sourceTrack,
-                  let track = modelContext.model(for: id) as? Track else { continue }
+            if let id = draft.sourceTrack {
+                guard let track = modelContext.model(for: id) as? Track else { continue }
 
-            if let previous = track.album {
-                previousAlbums.insert(previous)
-                previous.tracks.removeAll { $0.persistentModelID == id }
+                if let previous = track.album {
+                    previousAlbums.insert(previous)
+                    previous.tracks.removeAll { $0.persistentModelID == id }
+                }
+
+                track.album = album
+                track.position = index
+            } else {
+                guard let filename = importStagedFile(draft.stagedURL) else { continue }
+
+                let track = Track(name: draft.name, album: album, credits: [], genre: draft.genre, filename: filename)
+                track.position = index
+
+                modelContext.insert(track)
+
+                for (position, artistDraft) in draft.artists.enumerated() where !isAlbumArtist(artistDraft.name) {
+                    let artistModel = modelContext.findOrCreateArtist(named: artistDraft.name)
+                    let credit = Credit(artist: artistModel, role: artistDraft.role, position: position, track: track)
+
+                    modelContext.insert(credit)
+                }
             }
-
-            track.album = album
-            track.position = index
         }
 
         for(position, draft) in artists.enumerated() {
@@ -212,7 +318,9 @@ struct CreateAlbumView: View {
             modelContext.delete(previous)
         }
 
+        trackDrafts.forEach(discardStagedFile)
+
         dismiss()
     }
-    
+
 }
