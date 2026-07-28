@@ -101,11 +101,9 @@ struct TrackCell: View {
         .glassEffect()
         .padding(.horizontal)
         .onTapGesture {
-            if let index = queue.firstIndex(where: { $0.id == track.id }) {
-                audioPlayer.play(queue, startingAt: index)
-            } else {
-                audioPlayer.play([track])
-            }
+            let list = queue.isEmpty ? [track] : queue  // ← подумай, не перепутал ли порядок
+            let index = list.firstIndex { $0.id == track.id } ?? 0
+            audioPlayer.play(list, startingAt: index)
         }
         .sheet(isPresented: $showEditTrack) {
             EditTrackView(track: track)

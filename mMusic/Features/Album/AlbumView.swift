@@ -1,7 +1,16 @@
 import SwiftUI
 
 struct AlbumView: View {
+    
+    @Environment(AudioPlayer.self) var audioPlayer
+    
     var album: Album
+    
+    private var sortedTracks: [Track] {
+        album.tracks.sorted {
+            $0.position < $1.position
+        }
+    }
 
     @State private var backgroundArtwork: UIImage?
 
@@ -37,7 +46,7 @@ struct AlbumView: View {
                 
                 HStack {
                     Button {
-                        
+                        audioPlayer.play(sortedTracks)
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)
@@ -54,7 +63,7 @@ struct AlbumView: View {
                             }
                     }
                     Button {
-                        
+                        audioPlayer.play(sortedTracks.shuffled())
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)
