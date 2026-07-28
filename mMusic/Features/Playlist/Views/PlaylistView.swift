@@ -4,6 +4,7 @@ import SwiftData
 struct PlaylistView: View {
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(AudioPlayer.self) var audioPlayer
     
     @State private var isShowingTrackPicker = false
     @State private var editingPlaylist = false
@@ -38,7 +39,7 @@ struct PlaylistView: View {
                     .tint(.secondary)
                 HStack {
                     Button {
-                        
+                        audioPlayer.play(playlist.tracks.shuffled())
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)
@@ -55,7 +56,7 @@ struct PlaylistView: View {
                             }
                     }
                     Button {
-                        
+                        audioPlayer.play(playlist.tracks)
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)
