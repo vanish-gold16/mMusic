@@ -120,12 +120,12 @@ struct CreateAlbumView: View {
                 .buttonBorderShape(.roundedRectangle(radius: 15))
                 .padding(.top)
                 .tint(.orange)
-                if !tracks.isEmpty {
-                    ForEach(tracks) { track in
-                        AlbumTrackCell(track: track)
-                    }
-                }
                 Section {
+                    if !trackDrafts.isEmpty {
+                        ForEach(trackDrafts.indices, id: \.self) { index in
+                            AlbumTrackDraftCell(draft: trackDrafts[index], position: index + 1)
+                        }
+                    }
                     Button {
                         showTrackPicker = true
                     } label: {
