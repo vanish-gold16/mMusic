@@ -7,7 +7,11 @@ import Observation
 class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private var player: AVAudioPlayer?
 
-    var currentTrack: Track?
+    var queue: [Track] = []
+    var currentIndex: Int = 0
+    var currentTrack: Track? {
+        queue.indices.contains(currentIndex) ? queue[currentIndex] : nil
+    }
     var isPlaying = false
 
     override init() {
@@ -22,14 +26,22 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         setupRemoteCommands()
     }
     
-    func play(_ track: Track) {
+    func play(_ tracks: [Track], startingAt index: Int = 0) {
+        guard tracks.indices.contains(index) else { return }
+        queue = tracks
+        currentIndex = index
+        playCurrent()
+    }
+    
+    private func playCurrent() {
+        guard let track = currentTrack else { return }
+        
         let url = URL.documentsDirectory.appending(path: track.filename)
         
         do {
             player = try AVAudioPlayer(contentsOf: url)
             player?.delegate = self
             player?.play()
-            currentTrack = track
             
             UserDefaults.standard.set(track.filename, forKey: "lastTrack")
             
@@ -46,7 +58,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             isPlaying = false
         } else {
             if (player == nil && currentTrack != nil) {
-                play(currentTrack!)
+                play([currentTrack!])
             } else {
                 player?.play()
                 isPlaying = true
@@ -56,15 +68,28 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
     
     func playNext() {
-        
+        guard currentIndex + 1 < queue.count else { return }
+        currentIndex += 1
+        playCurrent()
     }
     
     func playPrevious() {
-        
+        if let time = player?.currentTime, time > 3 {
+            seek(to: 0)
+            return
+        }
+        guard currentIndex > 0 else { seek(to: 0); return }
+        currentIndex -= 1
+        playCurrent()
     }
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        isPlaying = false
+        if flag && currentIndex + 1 < queue.count {
+            currentIndex += 1
+            playCurrent()
+        } else {
+            isPlaying = false
+        }
         updateNowPlayingInfo()
     }
     
@@ -131,6 +156,11 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     func seek(to time: TimeInterval) {
         player?.currentTime = time
         updateNowPlayingInfo()
+    }
+    
+    func restore(_ track: Track) {
+        queue = [track]
+        currentIndex = 0
     }
     
 }

@@ -100,7 +100,7 @@ struct TrackCell: View {
         .glassEffect()
         .padding(.horizontal)
         .onTapGesture {
-            audioPlayer.play(track)
+            audioPlayer.play([track])
         }
         .sheet(isPresented: $showEditTrack) {
             EditTrackView(track: track)

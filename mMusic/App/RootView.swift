@@ -58,9 +58,11 @@ struct RootView: View {
             let descriptor = FetchDescriptor<Track>(
                 predicate: #Predicate { $0.filename == lastTrack }
             )
-            let track = try? modelContext.fetch(descriptor).first
-            
-            audioPlayer.currentTrack = track
+            guard let track = try? modelContext.fetch(descriptor).first else {
+                return
+            }
+
+            audioPlayer.restore(track)
         }
         .tint(.orange)
     }
