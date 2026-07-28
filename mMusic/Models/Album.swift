@@ -42,7 +42,7 @@ class Album {
         self.artwork = artwork
     }
     
-    enum AlbumType: String, Codable {
+    enum AlbumType: String, Codable, CaseIterable {
         case single = "single"
         case EP = "EP"
         case LP = "LP"

@@ -11,6 +11,7 @@ struct CreateAlbumView: View {
     @State private var artworkData: Data?
     @State private var artists: [ArtistDraft] = []
     @State private var release: Date?
+    @State private var type: Album.AlbumType = .single
     @State private var pickedFile: PickedFile? = nil
     
     @State private var showImagePicker = false
@@ -73,6 +74,12 @@ struct CreateAlbumView: View {
                 Section("artists") {
                     ArtistsEditor(artists: $artists)
                 }
+                Picker("type", selection: $type) {
+                    ForEach(Album.AlbumType.allCases, id: \.self) { type in
+                        Text(type.rawValue).tag(type)
+                    }
+                }
+                
                 Section("release") {
                     Toggle("has release date", isOn: hasRelease)
                     if release != nil {
