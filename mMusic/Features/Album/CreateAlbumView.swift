@@ -206,7 +206,7 @@ struct CreateAlbumView: View {
                 trackDrafts.append(
                     TrackDraft(
                         name: url.parseMusic().name,
-                        artists: names.map { ArtistDraft(name: $0) },
+                        artists: names.map { ArtistDraft(name: $0, role: .featured) },
                         stagedURL: stagedURL
                     )
                 )
