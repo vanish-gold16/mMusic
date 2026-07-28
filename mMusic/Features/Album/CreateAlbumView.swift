@@ -186,20 +186,32 @@ struct CreateAlbumView: View {
         
         modelContext.insert(album)
         
+        var previousAlbums = Set<Album>()
+
         for (index, draft) in trackDrafts.enumerated() {
             guard let id = draft.sourceTrack,
                   let track = modelContext.model(for: id) as? Track else { continue }
+
+            if let previous = track.album {
+                previousAlbums.insert(previous)
+                previous.tracks.removeAll { $0.persistentModelID == id }
+            }
+
             track.album = album
             track.position = index
         }
-        
+
         for(position, draft) in artists.enumerated() {
             let artistModel = modelContext.findOrCreateArtist(named: draft.name)
             let credit = Credit(artist: artistModel, role: draft.role, position: position, album: album)
-            
+
             modelContext.insert(credit)
         }
-        
+
+        for previous in previousAlbums where previous.type == .single && previous.tracks.isEmpty {
+            modelContext.delete(previous)
+        }
+
         dismiss()
     }
     
