@@ -21,14 +21,7 @@ struct TrackCell: View {
                 .fill(Color.gray.opacity(0.2))
                 .frame(width: 40, height: 40)
                 .overlay {
-                    if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFit()
-                            .cornerRadius(4)
-                    } else {
-                        Image(systemName: "music.note")
-                    }
+                    Text("\(track.position + 1)")
                 }
             VStack(alignment: .leading) {
                 Text(track.name)

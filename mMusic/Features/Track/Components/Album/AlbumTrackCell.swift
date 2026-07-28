@@ -21,7 +21,7 @@ struct AlbumTrackCell: View {
                 .fill(Color.gray.opacity(0.2))
                 .frame(width: 40, height: 40)
                 .overlay {
-                    Text("1")
+                    Text("\(track.position)")
                 }
             VStack(alignment: .leading) {
                 Text(track.name)
