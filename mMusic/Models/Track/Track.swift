@@ -22,6 +22,7 @@ class Track {
     var genre: Genre
     var filename: String
     var isFavourite = false
+    var position: Int = 0
     
     var addedAt: Date = Date.now
     

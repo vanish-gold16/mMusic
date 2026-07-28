@@ -179,10 +179,11 @@ struct CreateAlbumView: View {
         
         modelContext.insert(album)
         
-        for draft in trackDrafts {
+        for (index, draft) in trackDrafts.enumerated() {
             guard let id = draft.sourceTrack,
                   let track = modelContext.model(for: id) as? Track else { continue }
             track.album = album
+            track.position = index
         }
         
         for(position, draft) in artists.enumerated() {

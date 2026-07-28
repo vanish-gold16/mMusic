@@ -73,7 +73,7 @@ struct AlbumView: View {
                 
                 Spacer()
 
-                ForEach(album.tracks) { track in
+                ForEach(album.tracks.sorted { $0.position < $1.position }) { track in
                     Divider()
                     TrackCell(track: track)
                 }
