@@ -24,7 +24,11 @@ struct LibraryView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         LazyVGrid(columns: columnsPinned, spacing: 16) {
                             ForEach(pinnedPlaylists) { playlist in
-                                PinnedPlaylistCell(playlist: playlist)
+                                NavigationLink {
+                                    PlaylistView(playlist: playlist)
+                                } label: {
+                                    PinnedPlaylistCell(playlist: playlist)
+                                }
                             }
                         }
                     }
