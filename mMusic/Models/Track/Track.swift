@@ -23,7 +23,7 @@ class Track {
     var filename: String
     var isFavourite = false
     @Relationship(deleteRule: .cascade, inverse: \TrackPlaylistItem.track)
-    var item: TrackPlaylistItem
+    var items: [TrackPlaylistItem] = []
     var position: Int = 0
     
     var addedAt: Date = Date.now

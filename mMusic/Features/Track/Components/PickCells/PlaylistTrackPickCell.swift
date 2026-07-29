@@ -9,7 +9,7 @@ struct PlaylistTrackPickCell: View {
     var playlist: Playlist
 
     private var isPicked: Bool {
-        playlist.orderedTracks.contains(track)
+        playlist.items.contains { $0.track == track }
     }
 
     var body: some View {
