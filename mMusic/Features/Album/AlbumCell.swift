@@ -27,6 +27,16 @@ struct AlbumCell: View {
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(alignment: .topLeading) {
+                        if album.isFavourite {
+                            Image(systemName: "star.fill")
+                                .font(.title3)
+                                .foregroundStyle(.yellow)
+                                .padding(8)
+                                .background(.ultraThinMaterial, in: Circle())
+                                .padding(8)
+                        }
+                    }
                 Text(album.name)
                 Text(album.artistNames.joined(separator: ", "))
                     .font(.caption)

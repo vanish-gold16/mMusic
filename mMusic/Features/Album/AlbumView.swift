@@ -107,6 +107,22 @@ struct AlbumView: View {
                     .padding(.horizontal)
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    album.isFavourite.toggle()
+                } label: {
+                    Image(systemName: album.isFavourite ? "star.fill": "star")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+            }
+        }
         .background {
             artworkBackground
         }

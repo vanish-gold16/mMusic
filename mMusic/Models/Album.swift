@@ -28,6 +28,7 @@ class Album {
         }
     }
     var release: Date?
+    var isFavourite: Bool = false
     
     var addedAt: Date = Date.now
     

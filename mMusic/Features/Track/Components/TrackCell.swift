@@ -8,6 +8,7 @@ struct TrackCell: View {
     
     @State private var showEditTrack: Bool = false
     @State private var showDeleteConfirmation: Bool = false
+    @State private var albumToShow: Album?
 
     enum LeadingStyle {
         case number
@@ -56,7 +57,7 @@ struct TrackCell: View {
             Menu {
                 ControlGroup {
                     Button {
-
+                        track.isFavourite.toggle()
                     } label: {
                         Label("Favourite", systemImage: track.isFavourite ? "star.fill" : "star")
                     }
@@ -96,10 +97,12 @@ struct TrackCell: View {
 
                 Divider()
                 
-                Button {
-                    
-                } label: {
-                    Label("Go to Album", systemImage: "music.note.square.stack")
+                if track.album != nil {
+                    Button {
+                        albumToShow = track.album
+                    } label: {
+                        Label("Go to Album", systemImage: "music.note.square.stack")
+                    }
                 }
                 
                 Divider()
@@ -127,6 +130,9 @@ struct TrackCell: View {
         }
         .sheet(isPresented: $showEditTrack) {
             EditTrackView(track: track)
+        }
+        .navigationDestination(item: $albumToShow) { album in
+            AlbumView(album: album)
         }
         .confirmationDialog(
             "Remove \"\(track.name)\"?",

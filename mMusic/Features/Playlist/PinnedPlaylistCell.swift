@@ -21,6 +21,7 @@ struct PinnedPlaylistCell: View {
             Text(playlist.name)
                 .bold()
                 .lineLimit(1)
+                .foregroundStyle(Color.primary)
         }
         .foregroundStyle(.primary)
     }
