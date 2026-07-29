@@ -117,7 +117,11 @@ struct AlbumView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-
+                    Button {
+                        
+                    } label: {
+                        
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                 }

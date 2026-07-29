@@ -4,6 +4,7 @@ import SwiftUI
 struct AlbumCell: View {
     
     @Environment(\.modelContext) private var modelContext
+    @Environment(AudioPlayer.self) var audioPlayer
 
     @State private var showDeleteConfirmation = false
 
@@ -46,6 +47,47 @@ struct AlbumCell: View {
         }
         .contextMenu {
             VStack {
+                Button {
+                    album.isFavourite.toggle()
+                } label: {
+                    Label("Favorite", systemImage: album.isFavourite ? "star.fill" : "star")
+                }
+                
+                Divider()
+                
+                Button {
+                    audioPlayer.play(album.tracks.sorted { $0.position < $1.position })
+                } label: {
+                    Label("Play", systemImage: "play")
+                }
+                Button {
+                    audioPlayer.play(album.tracks.shuffled())
+                } label: {
+                    Label("Shuffle", systemImage: "shuffle")
+                }
+                
+                Divider()
+                
+                Button {
+                    
+                } label: {
+                    Label("Add to playlist", systemImage: "text.badge.plus")
+                }
+                
+                Divider()
+                
+                Button {
+                    audioPlayer.queue.insert(contentsOf: album.tracks.sorted { $0.position < $1.position }, at: 0)
+                } label: {
+                    Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                }
+                
+                Button {
+                    audioPlayer.queue.append(contentsOf: album.tracks.sorted { $0.position < $1.position })
+                } label: {
+                    Label("Play After", systemImage: "text.line.last.and.arrowtriangle.forward")
+                }
+                
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
                 } label: {
