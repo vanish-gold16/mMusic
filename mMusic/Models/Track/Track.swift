@@ -22,6 +22,8 @@ class Track {
     var genre: Genre
     var filename: String
     var isFavourite = false
+    @Relationship(deleteRule: .cascade, inverse: \TrackPlaylistItem.track)
+    var item: TrackPlaylistItem
     var position: Int = 0
     
     var addedAt: Date = Date.now

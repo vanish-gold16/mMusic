@@ -1,6 +1,9 @@
+import SwiftData
 import SwiftUI
 
 struct PlaylistTrackPickCell: View {
+    
+    @Environment(\.modelContext) var modelContext
     
     var track: Track
     var playlist: Playlist
@@ -46,7 +49,10 @@ struct PlaylistTrackPickCell: View {
     
     func swapIsPicked() {
         if isPicked {
-            playlist.items.removeAll { $0.track == track }
+            if let item = playlist.items.first(where: { $0.track == track }) {
+                playlist.items.removeAll { $0.track == track }
+                modelContext.delete(item)
+            }
         } else {
             let position = (playlist.items.map(\.position).max() ?? -1) + 1
             let item = TrackPlaylistItem(track: track, playlist: playlist, position: position)
