@@ -273,7 +273,7 @@ struct CreateAlbumView: View {
     }
 
     private func save() {
-        let album = Album(name: name, release: release, artwork: artworkData)
+        let album = Album(name: name, type: type, release: release, artwork: artworkData)
 
         modelContext.insert(album)
 
