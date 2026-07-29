@@ -24,14 +24,15 @@ struct TrackCell: View {
                 .foregroundStyle(.orange)
                 .opacity(track.isFavourite ? 1 : 0)
                 .frame(width: 16)
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .overlay {
-                    switch leadingStyle {
-                    case .number:
-                        Text("\(track.position + 1)")
-                    case .artwork:
+            switch leadingStyle {
+            case .number:
+                Text("\(track.position + 1)")
+                    .frame(width: 40, height: 40)
+            case .artwork:
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                    .overlay {
                         if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
                             Image(uiImage: uiImage)
                                 .resizable()
@@ -41,8 +42,8 @@ struct TrackCell: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 2))
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+            }
             VStack(alignment: .leading) {
                 Text(track.name)
                     .bold()
