@@ -6,7 +6,7 @@ struct PlaylistTrackPickCell: View {
     var playlist: Playlist
 
     private var isPicked: Bool {
-        playlist.tracks.contains(track)
+        playlist.orderedTracks.contains(track)
     }
 
     var body: some View {
@@ -46,9 +46,11 @@ struct PlaylistTrackPickCell: View {
     
     func swapIsPicked() {
         if isPicked {
-            playlist.tracks.removeAll { $0 == track }
+            playlist.items.removeAll { $0.track == track }
         } else {
-            playlist.tracks.append(track)
+            let position = (playlist.items.map(\.position).max() ?? -1) + 1
+            let item = TrackPlaylistItem(track: track, playlist: playlist, position: position)
+            playlist.items.append(item)
         }
     }
 }

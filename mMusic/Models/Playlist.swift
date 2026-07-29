@@ -5,15 +5,20 @@ import SwiftData
 class Playlist {
     var name: String
     var playlistDescription: String
-    var tracks: [Track]
+    @Relationship(deleteRule: .cascade, inverse: \TrackPlaylistItem.playlist)
+    var items: [TrackPlaylistItem]
+    var orderedTracks: [Track] {
+        items.sorted { $0.position < $1.position }
+            .map(\.track)
+    }
     var isPinned = false
     
     @Attribute(.externalStorage) var artwork: Data?
     
-    init(name: String, playlistDescription: String = "", tracks: [Track], isPinned: Bool = false, artwork: Data? = nil) {
+    init(name: String, playlistDescription: String = "", items: [TrackPlaylistItem], isPinned: Bool = false, artwork: Data? = nil) {
         self.name = name
         self.playlistDescription = playlistDescription
-        self.tracks = tracks
+        self.items = items
         self.isPinned = isPinned
         self.artwork = artwork
     }

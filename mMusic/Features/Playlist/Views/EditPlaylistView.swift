@@ -50,8 +50,8 @@ struct EditPlaylistView: View {
                     TextField(playlist.playlistDescription, text: $playlist.playlistDescription)
                 }
                 
-                if !playlist.tracks.isEmpty {
-                    ForEach(playlist.tracks) { track in
+                if !playlist.orderedTracks.isEmpty {
+                    ForEach(playlist.orderedTracks) { track in
                         TrackCell(track: track, leadingStyle: .artwork)
                     }
                 }

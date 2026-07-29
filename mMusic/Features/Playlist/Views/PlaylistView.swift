@@ -41,7 +41,7 @@ struct PlaylistView: View {
                     .tint(.secondary)
                 HStack {
                     Button {
-                        audioPlayer.play(playlist.tracks.shuffled())
+                        audioPlayer.play(playlist.orderedTracks)
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)
@@ -58,7 +58,7 @@ struct PlaylistView: View {
                             }
                     }
                     Button {
-                        audioPlayer.play(playlist.tracks)
+                        audioPlayer.play(playlist.orderedTracks.shuffled())
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)
@@ -78,8 +78,8 @@ struct PlaylistView: View {
                     Spacer()
                 }
                 
-                ForEach(playlist.tracks) { track in
-                    TrackCell(track: track, queue: playlist.tracks, leadingStyle: .artwork)
+                ForEach(playlist.orderedTracks) { track in
+                    TrackCell(track: track, queue: playlist.orderedTracks, leadingStyle: .artwork)
                 }
 
                 Button {
@@ -105,15 +105,15 @@ struct PlaylistView: View {
                     .padding(.horizontal)
                 }
 
-                if !playlist.tracks.isEmpty {
-                    Text("\(playlist.tracks.count) songs • \(Duration.seconds(totalDuration).formatted(.units(allowed: [.hours, .minutes], width: .wide)))")
+                if !playlist.orderedTracks.isEmpty {
+                    Text("\(playlist.orderedTracks.count) songs • \(Duration.seconds(totalDuration).formatted(.units(allowed: [.hours, .minutes], width: .wide)))")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.top)
                 }
             }
         }
-        .task(id: playlist.tracks.map(\.filename)) {
+        .task(id: playlist.orderedTracks.map(\.filename)) {
             await calculateTotalDuration()
         }
         .toolbar {
@@ -202,7 +202,7 @@ struct PlaylistView: View {
 
     private func calculateTotalDuration() async {
         var total: TimeInterval = 0
-        for track in playlist.tracks {
+        for track in playlist.orderedTracks {
             let url = URL.documentsDirectory.appending(path: track.filename)
             let asset = AVURLAsset(url: url)
             if let duration = try? await asset.load(.duration) {

@@ -8,7 +8,7 @@ struct CreatePlaylistView: View {
     @State private var showImagePicker = false
     @State private var showTrackPicker = false
 
-    @State private var playlist = Playlist(name: "", tracks: [])
+    @State private var playlist = Playlist(name: "", items: [])
     @State private var artworkData: Data?
 
     var body: some View {
@@ -56,9 +56,9 @@ struct CreatePlaylistView: View {
                     TextField("", text: $playlist.playlistDescription)
                 }
 
-                if !playlist.tracks.isEmpty {
+                if !playlist.items.isEmpty {
                     Section {
-                        ForEach(playlist.tracks) { track in
+                        ForEach(playlist.orderedTracks) { track in
                             TrackCell(track: track, leadingStyle: .artwork)
                         }
                     }
