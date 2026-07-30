@@ -13,6 +13,7 @@ struct AlbumView: View {
     }
 
     @State private var backgroundArtwork: UIImage?
+    @State private var editingAlbum = false
 
     var body: some View {
         ScrollView {
@@ -118,14 +119,17 @@ struct AlbumView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
-                        
+                        editingAlbum = true
                     } label: {
-                        
+                        Label("Edit", systemImage: "pencil")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
                 }
             }
+        }
+        .sheet(isPresented: $editingAlbum) {
+            EditAlbumView(album: album)
         }
         .background {
             artworkBackground
