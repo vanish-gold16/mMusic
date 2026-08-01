@@ -18,6 +18,7 @@ struct RootView: View {
     @State private var searchPath: NavigationPath = .init()
     
     @State private var audioPlayer = AudioPlayer()
+    @State private var isPlayerPresented = false
     
     var body: some View {
         TabView(selection: tabBinding) {
@@ -48,7 +49,10 @@ struct RootView: View {
 //                .tag(Tab.search)
         }
         .tabViewBottomAccessory {
-            MiniPlayerView(audioPlayer: audioPlayer)
+            MiniPlayerView(audioPlayer: audioPlayer, isPlayerPresented: $isPlayerPresented)
+        }
+        .sheet(isPresented: $isPlayerPresented) {
+            PlayerView(audioPlayer: audioPlayer)
         }
         .environment(audioPlayer)
         .task {

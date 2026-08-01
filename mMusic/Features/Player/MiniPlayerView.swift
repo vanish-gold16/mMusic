@@ -2,35 +2,41 @@ import SwiftUI
 
 struct MiniPlayerView: View {
     let audioPlayer: AudioPlayer
-    
+
+    @Binding var isPlayerPresented: Bool
+
     var body: some View {
         if let track = audioPlayer.currentTrack {
             HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 8)
-                    .overlay {
-                        if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } else {
-                            Image(systemName: "music.note")
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .overlay {
+                            if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } else {
+                                Image(systemName: "music.note")
+                            }
                         }
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .frame(width: 30, height: 30)
+                    VStack(alignment: .leading) {
+                        Text(track.name)
+                            .lineLimit(1)
+                            .font(.subheadline)
+                            .bold()
+                        Text(track.artistNames.joined(separator: ", "))
+                            .lineLimit(1)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .frame(width: 30, height: 30)
-                VStack(alignment: .leading) {
-                    Text(track.name)
-                        .lineLimit(1)
-                        .font(.subheadline)
-                        .bold()
-                    Text(track.artistNames.joined(separator: ", "))
-                        .lineLimit(1)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                    Spacer()
                 }
-                
-                Spacer()
-                
+                .contentShape(Rectangle())
+                .onTapGesture { isPlayerPresented = true }
+
                 HStack {
                     Button {
                         audioPlayer.playPrevious()

@@ -13,6 +13,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         queue.indices.contains(currentIndex) ? queue[currentIndex] : nil
     }
     var isPlaying = false
+    var currentTime: TimeInterval = 0
+    var duration: TimeInterval = 0
+
+    private var progressTimer: Timer?
 
     override init() {
         super.init()
@@ -47,22 +51,27 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             UserDefaults.standard.set(queue.map(\.filename), forKey: "queue")
             
             isPlaying = true
+            duration = player?.duration ?? 0
+            currentTime = 0
+            startProgressTimer()
             updateNowPlayingInfo()
         } catch {
             print(error)
         }
     }
-    
+
     func togglePlayPause() {
         if isPlaying {
             player?.pause()
             isPlaying = false
+            stopProgressTimer()
         } else {
             if (player == nil && currentTrack != nil) {
                 playCurrent()
             } else {
                 player?.play()
                 isPlaying = true
+                startProgressTimer()
             }
         }
         updateNowPlayingInfo()
@@ -90,8 +99,23 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             playCurrent()
         } else {
             isPlaying = false
+            stopProgressTimer()
+            currentTime = duration
         }
         updateNowPlayingInfo()
+    }
+
+    private func startProgressTimer() {
+        stopProgressTimer()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            guard let self, let player = self.player else { return }
+            self.currentTime = player.currentTime
+        }
+    }
+
+    private func stopProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = nil
     }
     
     private func updateNowPlayingInfo() {
@@ -155,10 +179,12 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
     
     func seek(to time: TimeInterval) {
-        player?.currentTime = time
+        let clamped = min(max(0, time), duration)
+        player?.currentTime = clamped
+        currentTime = clamped
         updateNowPlayingInfo()
     }
-    
+
     func restore(_ tracks: [Track], current filename: String) {
         queue = tracks
         currentIndex = tracks.firstIndex { $0.filename == filename } ?? 0
