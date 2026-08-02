@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Полоски-«эквалайзер», пляшущие под общий уровень громкости.
-/// Уровень один, поэтому каждая полоска тянется к своей цели со своей скоростью —
-/// иначе они двигались бы синхронно, как один блок.
+/// Уровень один на всех, поэтому каждой полоске один раз выдаётся свой характер:
+/// базовая высота, размах и скорость. Иначе они двигались бы синхронно, как один блок.
 struct EqualizerView: View {
     /// Громкость 0...1, обычно `audioPlayer.level`.
     let level: Double
@@ -12,10 +12,18 @@ struct EqualizerView: View {
     var spacing: CGFloat = 2
     var maxHeight: CGFloat = 20
 
-    /// Насколько быстро каждая полоска догоняет свою цель: 1 — мгновенно, 0.2 — лениво.
-    private let speeds: [Double] = [0.5, 0.28, 0.7, 0.22, 0.45, 0.6]
+    /// Характер одной полоски. Задаётся при появлении вью и больше не меняется.
+    private struct BarProfile {
+        /// Базовая высота: 1.0 — полоска высокая, 0.45 — низкая.
+        let gain: Double
+        /// Размах: насколько сильно она гуляет вокруг своей базы.
+        let swing: Double
+        /// Скорость догона цели: 0.7 — дёргается резко, 0.2 — плывёт лениво.
+        let speed: Double
+    }
 
     @State private var bars: [Double] = []
+    @State private var profiles: [BarProfile] = []
 
     var body: some View {
         HStack(alignment: .center, spacing: spacing) {
@@ -26,15 +34,26 @@ struct EqualizerView: View {
         }
         .frame(height: maxHeight)
         .onAppear {
-            if bars.isEmpty {
-                bars = Array(repeating: 0, count: barCount)
+            guard bars.isEmpty else { return }
+
+            bars = Array(repeating: 0, count: barCount)
+            profiles = (0..<barCount).map { _ in
+                BarProfile(
+                    gain: .random(in: 0.30...1.0),
+                    swing: .random(in: 0.10...0.50),
+                    speed: .random(in: 0.10...0.60)
+                )
             }
         }
         .onChange(of: level) { _, newLevel in
+            guard profiles.count == bars.count else { return }
+
             for index in bars.indices {
-                let target = newLevel * Double.random(in: 0.35...1)
-                let speed = speeds[index % speeds.count]
-                bars[index] += (target - bars[index]) * speed
+                let profile = profiles[index]
+                let jitter = Double.random(in: -profile.swing...profile.swing)
+                let target = min(max(newLevel * (profile.gain + jitter), 0), 1)
+
+                bars[index] += (target - bars[index]) * profile.speed
             }
         }
     }
@@ -43,7 +62,7 @@ struct EqualizerView: View {
 #Preview {
     @Previewable @State var level: Double = 0
 
-    EqualizerView(level: level)
+    EqualizerView(level: level, barCount: 12, barWidth: 6, spacing: 4, maxHeight: 80)
         .foregroundStyle(.orange)
         .task {
             while !Task.isCancelled {
