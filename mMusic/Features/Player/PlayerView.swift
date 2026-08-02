@@ -14,6 +14,7 @@ struct PlayerView: View {
     /// чтобы фон одинаково хорошо дышал и на тихой записи, и на громкой.
     @State private var quiet: Double = 0
     @State private var loud: Double = 1
+    @State private var isRangeCalibrated = false
 
     var body: some View {
         Text(String(format: "%.2f", punch))
@@ -120,7 +121,16 @@ struct PlayerView: View {
                 glow += (newLevel - glow) * 0.06
             }
 
-            // Границы мгновенно раздвигаются наружу и очень медленно сползают внутрь.
+            // Первый замер нового трека задаёт коридор вокруг его реальной громкости.
+            // Без этого стартовые 0...1 несколько секунд врут в сторону максимума.
+            guard isRangeCalibrated else {
+                quiet = max(glow - 0.15, 0)
+                loud = min(glow + 0.15, 1)
+                isRangeCalibrated = true
+                return
+            }
+
+            // Дальше границы мгновенно раздвигаются наружу и медленно сползают внутрь.
             loud = max(glow, loud + (glow - loud) * 0.004)
             quiet = min(glow, quiet + (glow - quiet) * 0.004)
         }
@@ -132,9 +142,8 @@ struct PlayerView: View {
             isScrubbing = false
             sliderValue = audioPlayer.currentTime
 
-            // У нового трека своя громкость — границы ищем заново.
-            quiet = 0
-            loud = 1
+            // У нового трека своя громкость — калибруемся заново.
+            isRangeCalibrated = false
         }
     }
 
