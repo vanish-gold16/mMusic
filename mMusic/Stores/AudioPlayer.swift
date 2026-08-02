@@ -6,6 +6,9 @@ import Observation
 @Observable
 class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private var player: AVAudioPlayer?
+    
+    private var meterTimer: Timer?
+    private var progressTimer: Timer?
 
     var queue: [Track] = []
     var currentIndex: Int = 0
@@ -15,9 +18,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     var isPlaying = false
     var currentTime: TimeInterval = 0
     var duration: TimeInterval = 0
-
-    private var progressTimer: Timer?
-
+    
+    var level: Double = 0
+    private let meterFloor: Double = -50
+    
     override init() {
         super.init()
         do {
@@ -48,9 +52,6 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             player?.isMeteringEnabled = true
             player?.play()
             
-            player?.updateMeters()
-            let db = player?.averagePower(forChannel: 0)
-            
             UserDefaults.standard.set(track.filename, forKey: "lastTrack")
             UserDefaults.standard.set(queue.map(\.filename), forKey: "queue")
             
@@ -58,6 +59,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             duration = player?.duration ?? 0
             currentTime = 0
             startProgressTimer()
+            startMeterTimer()
             updateNowPlayingInfo()
         } catch {
             print(error)
@@ -69,6 +71,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             player?.pause()
             isPlaying = false
             stopProgressTimer()
+            stopMeterTimer()
         } else {
             if (player == nil && currentTrack != nil) {
                 playCurrent()
@@ -76,6 +79,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
                 player?.play()
                 isPlaying = true
                 startProgressTimer()
+                startMeterTimer()
             }
         }
         updateNowPlayingInfo()
@@ -104,6 +108,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         } else {
             isPlaying = false
             stopProgressTimer()
+            stopMeterTimer()
             currentTime = duration
         }
         updateNowPlayingInfo()
@@ -111,15 +116,37 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
     private func startProgressTimer() {
         stopProgressTimer()
-        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
             guard let self, let player = self.player else { return }
             self.currentTime = player.currentTime
         }
+        RunLoop.main.add(timer, forMode: .common)
+        progressTimer = timer
     }
 
     private func stopProgressTimer() {
         progressTimer?.invalidate()
         progressTimer = nil
+    }
+    
+    private func startMeterTimer() {
+        stopMeterTimer()
+        let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+            guard let self, let player = self.player else { return }
+            player.updateMeters()
+
+            let db = Double(player.averagePower(forChannel: 0))
+            let normalized = (db - self.meterFloor) / (0 - self.meterFloor)
+            self.level = min(max(normalized, 0), 1)
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        meterTimer = timer
+    }
+
+    private func stopMeterTimer() {
+        meterTimer?.invalidate()
+        meterTimer = nil
+        level = 0
     }
     
     private func updateNowPlayingInfo() {
@@ -192,6 +219,11 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     func restore(_ tracks: [Track], current filename: String) {
         queue = tracks
         currentIndex = tracks.firstIndex { $0.filename == filename } ?? 0
+    }
+    
+    func shorten(to time: TimeInterval) {
+        let clamped = min(max(0, time), duration)
+        level = clamped
     }
     
 }
