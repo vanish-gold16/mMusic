@@ -27,8 +27,14 @@ struct TrackCell: View {
                 .frame(width: 16)
             switch leadingStyle {
             case .number:
-                Text("\(track.position + 1)")
-                    .frame(width: 40, height: 40)
+                if audioPlayer.currentTrack?.id == track.id {
+                    EqualizerView(level: audioPlayer.level)
+                        .foregroundStyle(.orange)
+                        .frame(width: 40, height: 40)
+                } else {
+                    Text("\(track.position + 1)")
+                        .frame(width: 40, height: 40)
+                }
             case .artwork:
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.gray.opacity(0.2))
@@ -41,6 +47,13 @@ struct TrackCell: View {
                         } else {
                             Image(systemName: "music.note")
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+                    .overlay {
+                        if audioPlayer.currentTrack?.id == track.id {
+                            Color.black.opacity(0.4)
+                            EqualizerView(level: audioPlayer.level)
+                                .foregroundStyle(.white)
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 2))
