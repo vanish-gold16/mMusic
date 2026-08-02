@@ -113,9 +113,12 @@ struct PlayerView: View {
         .presentationBackground { artworkBackground }
         .onAppear { sliderValue = audioPlayer.currentTime }
         .onChange(of: audioPlayer.level) { _, newLevel in
-            // Резкий подъём, медленный спад — так удары читаются как удары.
-            let speed = newLevel > glow ? 0.45 : 0.06
-            glow += (newLevel - glow) * speed
+            // Вспышка мгновенная, гаснет плавно — так удары читаются как удары.
+            if newLevel > glow {
+                glow = newLevel
+            } else {
+                glow += (newLevel - glow) * 0.06
+            }
 
             // Границы мгновенно раздвигаются наружу и очень медленно сползают внутрь.
             loud = max(glow, loud + (glow - loud) * 0.004)
