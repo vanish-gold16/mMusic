@@ -1,10 +1,14 @@
+import SwiftData
 import SwiftUI
 
 struct EditAlbumView: View {
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     @State private var showImagePicker = false
+    @State private var showTrackPicker = false
+    @State private var addedTracks: [TrackDraft] = []
 
     @Bindable var album: Album
 
@@ -82,11 +86,20 @@ struct EditAlbumView: View {
                         ForEach(sortedTracks) { track in
                             TrackCell(track: track, leadingStyle: .artwork)
                         }
+                        Button {
+                            seedTrackDrafts()
+                            showTrackPicker = true
+                        } label: {
+                            Label("Add Music", systemImage: "plus")
+                        }
                     }
                 }
             }
             .navigationTitle("Edit album")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showTrackPicker, onDismiss: applyTrackDrafts) {
+                AlbumTrackPickerView(album: [album], addedTracks: $addedTracks)
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("done") {
@@ -94,6 +107,40 @@ struct EditAlbumView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Заполняет черновики уже добавленными треками, чтобы пикер показывал их выбранными.
+    private func seedTrackDrafts() {
+        addedTracks = sortedTracks.map { track in
+            TrackDraft(
+                name: track.name,
+                genre: track.genre,
+                artists: track.artistNames.map { ArtistDraft(name: $0) },
+                stagedURL: URL.documentsDirectory.appending(path: track.filename),
+                sourceTrack: track.persistentModelID
+            )
+        }
+    }
+
+    /// Приводит состав альбома в соответствие с выбором в пикере: добавляет выбранные треки и убирает снятые.
+    private func applyTrackDrafts() {
+        let selectedIDs = Set(addedTracks.compactMap(\.sourceTrack))
+
+        for track in album.tracks where !selectedIDs.contains(track.persistentModelID) {
+            track.album = nil
+        }
+
+        for (index, draft) in addedTracks.enumerated() {
+            guard let id = draft.sourceTrack,
+                  let track = modelContext.model(for: id) as? Track else { continue }
+
+            if let previous = track.album, previous.persistentModelID != album.persistentModelID {
+                previous.tracks.removeAll { $0.persistentModelID == id }
+            }
+
+            track.album = album
+            track.position = index
         }
     }
 }

@@ -58,10 +58,14 @@ struct EqualizerView: View {
         .onChange(of: level) { _, newLevel in
             for index in bars.indices {
                 let profile = Self.profiles[index % Self.profiles.count]
-                let jitter = Double.random(in: -profile.swing...profile.swing)
+
+                // На тихом разброс гасим: полный размах полоска получает только на громком.
+                let jitter = Double.random(in: -profile.swing...profile.swing) * newLevel
                 let target = min(max(newLevel * (profile.gain + jitter), 0), 1)
 
-                bars[index] += (target - bars[index]) * profile.speed
+                // Вверх — со своей скоростью, вниз — заметно медленнее.
+                let speed = target > bars[index] ? profile.speed : profile.speed * 0.35
+                bars[index] += (target - bars[index]) * speed
             }
         }
     }
