@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Полоски-«эквалайзер», пляшущие под общий уровень громкости.
-/// Уровень один на всех, поэтому каждой полоске один раз выдаётся свой характер:
+/// Уровень один на всех, поэтому у каждой полоски свой фиксированный характер:
 /// базовая высота, размах и скорость. Иначе они двигались бы синхронно, как один блок.
 struct EqualizerView: View {
     /// Громкость 0...1, обычно `audioPlayer.level`.
@@ -12,18 +12,35 @@ struct EqualizerView: View {
     var spacing: CGFloat = 2
     var maxHeight: CGFloat = 20
 
-    /// Характер одной полоски. Задаётся при появлении вью и больше не меняется.
+    /// Характер одной полоски.
     private struct BarProfile {
-        /// Базовая высота: 1.0 — полоска высокая, 0.45 — низкая.
+        /// Базовая высота: 1.0 — полоска высокая, 0.35 — низкая.
         let gain: Double
         /// Размах: насколько сильно она гуляет вокруг своей базы.
         let swing: Double
-        /// Скорость догона цели: 0.7 — дёргается резко, 0.2 — плывёт лениво.
+        /// Скорость догона цели: 0.6 — дёргается резко, 0.15 — плывёт лениво.
         let speed: Double
     }
 
+    /// Роли полосок слева направо. Фиксированы, поэтому картинка одинакова
+    /// в плеере и в списке и не меняется при перезапуске трека.
+    /// Если `barCount` больше длины таблицы — рисунок повторяется по кругу.
+    private static let profiles: [BarProfile] = [
+        BarProfile(gain: 0.55, swing: 0.20, speed: 0.25),
+        BarProfile(gain: 0.80, swing: 0.35, speed: 0.45),
+        BarProfile(gain: 1.00, swing: 0.15, speed: 0.60),
+        BarProfile(gain: 0.70, swing: 0.50, speed: 0.15),
+        BarProfile(gain: 0.90, swing: 0.25, speed: 0.50),
+        BarProfile(gain: 0.45, swing: 0.40, speed: 0.35),
+        BarProfile(gain: 0.75, swing: 0.18, speed: 0.55),
+        BarProfile(gain: 1.00, swing: 0.30, speed: 0.20),
+        BarProfile(gain: 0.60, swing: 0.45, speed: 0.40),
+        BarProfile(gain: 0.85, swing: 0.22, speed: 0.60),
+        BarProfile(gain: 0.35, swing: 0.35, speed: 0.30),
+        BarProfile(gain: 0.65, swing: 0.28, speed: 0.48),
+    ]
+
     @State private var bars: [Double] = []
-    @State private var profiles: [BarProfile] = []
 
     var body: some View {
         HStack(alignment: .center, spacing: spacing) {
@@ -34,22 +51,13 @@ struct EqualizerView: View {
         }
         .frame(height: maxHeight)
         .onAppear {
-            guard bars.isEmpty else { return }
-
-            bars = Array(repeating: 0, count: barCount)
-            profiles = (0..<barCount).map { _ in
-                BarProfile(
-                    gain: .random(in: 0.30...1.0),
-                    swing: .random(in: 0.10...0.50),
-                    speed: .random(in: 0.10...0.60)
-                )
+            if bars.count != barCount {
+                bars = Array(repeating: 0, count: barCount)
             }
         }
         .onChange(of: level) { _, newLevel in
-            guard profiles.count == bars.count else { return }
-
             for index in bars.indices {
-                let profile = profiles[index]
+                let profile = Self.profiles[index % Self.profiles.count]
                 let jitter = Double.random(in: -profile.swing...profile.swing)
                 let target = min(max(newLevel * (profile.gain + jitter), 0), 1)
 
