@@ -45,7 +45,11 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         do {
             player = try AVAudioPlayer(contentsOf: url)
             player?.delegate = self
+            player?.isMeteringEnabled = true
             player?.play()
+            
+            player?.updateMeters()
+            let db = player?.averagePower(forChannel: 0)
             
             UserDefaults.standard.set(track.filename, forKey: "lastTrack")
             UserDefaults.standard.set(queue.map(\.filename), forKey: "queue")
