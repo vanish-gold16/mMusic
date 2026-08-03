@@ -44,53 +44,52 @@ struct PlaylistView: View {
                         audioPlayer.play(playlist.orderedTracks)
                     } label: {
                         Capsule()
+                            .foregroundStyle(.orange)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .padding(.horizontal)
                             .overlay {
                                 HStack {
                                     Image(systemName: "play.fill")
-                                        .tint(.primary)
                                     Text("Play")
-                                        .tint(.primary)
                                         .bold()
                                 }
+                                .foregroundStyle(.white)
                             }
-                            .backgroundStyle(.orange)
                     }
                     Button {
                         audioPlayer.play(playlist.orderedTracks.shuffled())
                     } label: {
                         Capsule()
+                            .foregroundStyle(.orange)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .padding(.horizontal)
                             .overlay {
                                 HStack {
                                     Image(systemName: "shuffle")
-                                        .tint(.primary)
                                     Text("Shuffle")
-                                        .tint(.primary)
                                         .bold()
                                 }
+                                .foregroundStyle(.white)
                             }
-                            .backgroundStyle(.orange)
                     }
                 }
-                
-                Spacer()
             }
-            
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+
             ForEach(playlist.orderedTracks) { track in
                 TrackCell(track: track, queue: playlist.orderedTracks, leadingStyle: .artwork)
             }
-            .onMove { from, to in
-                moveTracks(from: from, to: to)
+            .onMove { source, destination in
+                moveTracks(from: source, to: destination)
             }
-            .listRowSeparator(.hidden)      // убрать разделители
-            .listRowBackground(Color.clear) // убрать белую подложку строки
-            .listRowInsets(EdgeInsets())    // убрать системные отступы (у тебя свои внутри ячейки)
-            
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+
             Button {
                 isShowingTrackPicker = true
             } label: {
@@ -113,21 +112,23 @@ struct PlaylistView: View {
                 .glassEffect()
                 .padding(.horizontal)
             }
-            .listRowSeparator(.hidden)      // убрать разделители
-            .listRowBackground(Color.clear) // убрать белую подложку строки
-            .listRowInsets(EdgeInsets())    // убрать системные отступы (у тебя свои внутри ячейки)
-            
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+
             if !playlist.orderedTracks.isEmpty {
                 Text("\(playlist.orderedTracks.count) songs • \(Duration.seconds(totalDuration).formatted(.units(allowed: [.hours, .minutes], width: .wide)))")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.top)
-                    .listRowSeparator(.hidden)      // убрать разделители
-                    .listRowBackground(Color.clear) // убрать белую подложку строки
-                    .listRowInsets(EdgeInsets())    // убрать системные отступы (у тебя свои внутри ячейки)
+                    .frame(maxWidth: .infinity)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
             }
         }
         .listStyle(.plain)
+        .listRowSpacing(8)
         .task(id: playlist.orderedTracks.map(\.filename)) {
             await calculateTotalDuration()
         }
