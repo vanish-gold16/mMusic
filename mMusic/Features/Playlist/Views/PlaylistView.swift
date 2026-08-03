@@ -3,7 +3,7 @@ import SwiftData
 import AVFoundation
 
 struct PlaylistView: View {
-
+    
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) var audioPlayer
     
@@ -11,11 +11,11 @@ struct PlaylistView: View {
     @State private var editingPlaylist = false
     @State private var showDeleteConfirmation = false
     @State private var totalDuration: TimeInterval = 0
-
+    
     let playlist: Playlist
     
     var body: some View {
-        ScrollView {
+        List {
             VStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.gray.opacity(0.2))
@@ -56,6 +56,7 @@ struct PlaylistView: View {
                                         .bold()
                                 }
                             }
+                            .backgroundStyle(.orange)
                     }
                     Button {
                         audioPlayer.play(playlist.orderedTracks.shuffled())
@@ -73,46 +74,60 @@ struct PlaylistView: View {
                                         .bold()
                                 }
                             }
+                            .backgroundStyle(.orange)
                     }
-                    
-                    Spacer()
                 }
                 
-                ForEach(playlist.orderedTracks) { track in
-                    TrackCell(track: track, queue: playlist.orderedTracks, leadingStyle: .artwork)
+                Spacer()
+            }
+            
+            ForEach(playlist.orderedTracks) { track in
+                TrackCell(track: track, queue: playlist.orderedTracks, leadingStyle: .artwork)
+            }
+            .onMove { from, to in
+                moveTracks(from: from, to: to)
+            }
+            .listRowSeparator(.hidden)      // убрать разделители
+            .listRowBackground(Color.clear) // убрать белую подложку строки
+            .listRowInsets(EdgeInsets())    // убрать системные отступы (у тебя свои внутри ячейки)
+            
+            Button {
+                isShowingTrackPicker = true
+            } label: {
+                HStack {
+                    Color.clear
+                        .frame(width: 16)
+                    Image(systemName: "plus")
+                        .resizable()
+                        .bold()
+                        .frame(width: 15, height: 15)
+                        .tint(.orange)
+                        .frame(width: 40, height: 40)
+                    Text("Add Music")
+                        .tint(.primary)
+                    Spacer()
                 }
-
-                Button {
-                    isShowingTrackPicker = true
-                } label: {
-                    HStack {
-                        Color.clear
-                            .frame(width: 16)
-                        Image(systemName: "plus")
-                            .resizable()
-                            .bold()
-                            .frame(width: 15, height: 15)
-                            .tint(.orange)
-                            .frame(width: 40, height: 40)
-                        Text("Add Music")
-                            .tint(.primary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                    .glassEffect()
-                    .padding(.horizontal)
-                }
-
-                if !playlist.orderedTracks.isEmpty {
-                    Text("\(playlist.orderedTracks.count) songs • \(Duration.seconds(totalDuration).formatted(.units(allowed: [.hours, .minutes], width: .wide)))")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.top)
-                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+                .glassEffect()
+                .padding(.horizontal)
+            }
+            .listRowSeparator(.hidden)      // убрать разделители
+            .listRowBackground(Color.clear) // убрать белую подложку строки
+            .listRowInsets(EdgeInsets())    // убрать системные отступы (у тебя свои внутри ячейки)
+            
+            if !playlist.orderedTracks.isEmpty {
+                Text("\(playlist.orderedTracks.count) songs • \(Duration.seconds(totalDuration).formatted(.units(allowed: [.hours, .minutes], width: .wide)))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.top)
+                    .listRowSeparator(.hidden)      // убрать разделители
+                    .listRowBackground(Color.clear) // убрать белую подложку строки
+                    .listRowInsets(EdgeInsets())    // убрать системные отступы (у тебя свои внутри ячейки)
             }
         }
+        .listStyle(.plain)
         .task(id: playlist.orderedTracks.map(\.filename)) {
             await calculateTotalDuration()
         }
@@ -199,7 +214,7 @@ struct PlaylistView: View {
             Text("This playlist will be permanently deleted.")
         }
     }
-
+    
     private func calculateTotalDuration() async {
         var total: TimeInterval = 0
         for track in playlist.orderedTracks {
@@ -211,4 +226,14 @@ struct PlaylistView: View {
         }
         totalDuration = total
     }
+    
+    private func moveTracks(from: IndexSet, to: Int) {
+        var items = playlist.items.sorted { $0.position < $1.position }
+        items.move(fromOffsets: from, toOffset: to)
+
+        for (index, item) in items.enumerated() {
+            item.position = index
+        }
+    }
+    
 }
