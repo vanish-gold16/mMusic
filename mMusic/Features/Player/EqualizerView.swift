@@ -42,6 +42,10 @@ struct EqualizerView: View {
 
     @State private var bars: [Double] = []
 
+    /// Недавний пик громкости. Нужен, чтобы отличить настоящее затухание
+    /// от нашей же случайной ряби: в `level` ряби нет, она добавляется ниже.
+    @State private var levelPeak: Double = 0
+
     var body: some View {
         HStack(alignment: .center, spacing: spacing) {
             ForEach(bars.indices, id: \.self) { index in
@@ -56,6 +60,9 @@ struct EqualizerView: View {
             }
         }
         .onChange(of: level) { _, newLevel in
+            levelPeak = max(newLevel, levelPeak - 0.02)
+            let isFading = newLevel < levelPeak - 0.08
+
             for index in bars.indices {
                 let profile = Self.profiles[index % Self.profiles.count]
 
@@ -63,8 +70,15 @@ struct EqualizerView: View {
                 let jitter = Double.random(in: -profile.swing...profile.swing) * newLevel
                 let target = min(max(newLevel * (profile.gain + jitter), 0), 1)
 
-                // Вверх — со своей скоростью, вниз — заметно медленнее.
-                let speed = target > bars[index] ? profile.speed : profile.speed * 0.35
+                let speed: Double
+                if target > bars[index] {
+                    speed = profile.speed        // вверх — со своей скоростью
+                } else if isFading {
+                    speed = 1                    // звук реально уходит — падаем сразу
+                } else {
+                    speed = profile.speed * 0.35 // мелкая рябь — сглаживаем
+                }
+
                 bars[index] += (target - bars[index]) * speed
             }
         }
