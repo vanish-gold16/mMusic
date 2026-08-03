@@ -10,7 +10,12 @@ struct PlayerView: View {
     /// иначе фон мигал бы на каждой ноте.
     @State private var glow: Double = 0
     @State private var artworkWidth: CGFloat = 0
-    
+
+    /// Обложка светлая — значит, текст поверх неё должен быть тёмным.
+    /// Считается один раз на трек в `.task`: `body` пересобирается десятки раз
+    /// в секунду вслед за `glow`, там такому расчёту не место.
+    @State private var isLightBackground = false
+
     /// Ползучие границы громкости этого трека — подстраиваются сами,
     /// чтобы фон одинаково хорошо дышал и на тихой записи, и на громкой.
     @State private var quiet: Double = 0
@@ -43,7 +48,7 @@ struct PlayerView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { location in
-                    if location.x < artworkWidth {
+                    if location.x < artworkWidth / 2 {
                         audioPlayer.playPrevious()
                     } else {
                         audioPlayer.playNext()
@@ -56,9 +61,10 @@ struct PlayerView: View {
                     DragGesture(minimumDistance: 30)
                         .onEnded { value in
                             let dx = value.translation.width
-                            let yx = value.translation.height
-                            
-                            guard abs(dx) > abs(yx) else { return }
+                            let dy = value.translation.height
+
+                            // Вертикальная протяжка — не наше дело, это жест шторки.
+                            guard abs(dx) > abs(dy) else { return }
                             
                             if dx < 0 {
                                 audioPlayer.playNext()
@@ -80,38 +86,41 @@ struct PlayerView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
-            VStack(spacing: 16) {
-                
-                VStack(spacing: 4) {
-                    Slider(
-                        value: $sliderValue,
-                        in: 0...max(audioPlayer.duration, 0.01)
-                    ) { editing in
-                        isScrubbing = editing
-                        if !editing {
-                            audioPlayer.seek(to: sliderValue)
-                        }
+            VStack(spacing: 4) {
+                Slider(
+                    value: $sliderValue,
+                    in: 0...max(audioPlayer.duration, 0.01)
+                ) { editing in
+                    isScrubbing = editing
+                    if !editing {
+                        audioPlayer.seek(to: sliderValue)
                     }
-                    .tint(.orange)
-                    
-                    HStack {
-                        Text(timeString(sliderValue))
-                        Spacer()
-                        Text("-" + timeString(audioPlayer.duration - sliderValue))
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
                 }
+                .tint(.orange)
+
+                HStack {
+                    Text(timeString(sliderValue))
+                    Spacer()
+                    Text("-" + timeString(audioPlayer.duration - sliderValue))
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
             }
-            
+
             Spacer()
         }
         .padding(.horizontal, 24)
         .padding(.top, 32)
         .presentationDragIndicator(.visible)
         .presentationBackground { artworkBackground }
+        // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
+        // обложке вуаль становится светлой, а `.primary` / `.secondary` — тёмными.
+        .environment(\.colorScheme, isLightBackground ? .light : .dark)
         .onAppear { sliderValue = audioPlayer.currentTime }
+        .task(id: audioPlayer.currentTrack?.filename) {
+            isLightBackground = await Self.isLight(artwork: audioPlayer.currentTrack?.displayArtwork)
+        }
         .onChange(of: audioPlayer.level) { _, newLevel in
             // Вспышка мгновенная, гаснет плавно — так удары читаются как удары.
             if newLevel > glow {
@@ -177,6 +186,18 @@ struct PlayerView: View {
         }
     }
     
+    /// Декодирование обложки — не мгновенная операция, уводим её с главного потока.
+    /// Порог 0.6, а не 0.5: под текстом лежит не сама обложка, а её размытая
+    /// и подсвеченная версия — она заметно светлее оригинала.
+    private static func isLight(artwork data: Data?) async -> Bool {
+        guard let data else { return false }   // нет обложки — фон чёрный, текст белый
+
+        return await Task.detached(priority: .utility) {
+            guard let brightness = UIImage(data: data)?.averageBrightness else { return false }
+            return brightness > 0.6
+        }.value
+    }
+
     private func timeString(_ time: TimeInterval) -> String {
         let total = Int(max(0, time.rounded()))
         return String(format: "%d:%02d", total / 60, total % 60)

@@ -15,6 +15,9 @@ struct AlbumView: View {
     @State private var backgroundArtwork: UIImage?
     @State private var editingAlbum = false
 
+    /// Обложка светлая — значит, текст поверх неё должен быть тёмным.
+    @State private var isLightBackground = false
+
     var body: some View {
         ScrollView {
             VStack {
@@ -108,6 +111,12 @@ struct AlbumView: View {
                     .padding(.horizontal)
             }
         }
+        .background {
+            artworkBackground
+        }
+        // Строго между фоном и `.toolbar` / `.sheet`: контент и фон переворачиваются
+        // вместе, а панель навигации и лист редактирования остаются в системной теме.
+        .environment(\.colorScheme, isLightBackground ? .light : .dark)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -131,11 +140,12 @@ struct AlbumView: View {
         .sheet(isPresented: $editingAlbum) {
             EditAlbumView(album: album)
         }
-        .background {
-            artworkBackground
-        }
         .task {
             backgroundArtwork = await Self.makeBackgroundArtwork(from: album.artwork)
+
+            // Считаем по готовой миниатюре 12×12: усреднять уже усреднённое —
+            // то же число, но мгновенно и без второго декодирования обложки.
+            isLightBackground = (backgroundArtwork?.averageBrightness ?? 0) > 0.55
         }
     }
 
