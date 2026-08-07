@@ -86,6 +86,9 @@ struct EditAlbumView: View {
                         ForEach(sortedTracks) { track in
                             TrackCell(track: track, leadingStyle: .artwork)
                         }
+                        .onMove { source, destination in
+                            moveTracks(from: source, to: destination)
+                        }
                         Button {
                             seedTrackDrafts()
                             showTrackPicker = true
@@ -107,6 +110,16 @@ struct EditAlbumView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Меняет порядок треков в альбоме, пересчитывая их позиции.
+    private func moveTracks(from: IndexSet, to: Int) {
+        var tracks = sortedTracks
+        tracks.move(fromOffsets: from, toOffset: to)
+
+        for (index, track) in tracks.enumerated() {
+            track.position = index
         }
     }
 
