@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct EditAlbumView: View {
 
@@ -8,6 +9,7 @@ struct EditAlbumView: View {
 
     @State private var showImagePicker = false
     @State private var showTrackPicker = false
+    @State private var isImporting = false
     @State private var addedTracks: [TrackDraft] = []
 
     @Bindable var album: Album
@@ -81,6 +83,53 @@ struct EditAlbumView: View {
                     }
                 }
 
+                VStack {
+                    HStack(spacing: 16) {
+                        Button {
+                            isImporting = true
+                        } label: {
+                            VStack {
+                                Text("Upload music")
+                                Image(systemName: "square.and.arrow.down")
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 120)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: 15))
+                        .tint(.blue)
+                        Button {
+
+                        } label: {
+                            VStack {
+                                Text("From YouTube")
+                                Image(systemName: "video")
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 120)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: 15))
+                        .tint(.red)
+                    }
+                    Button {
+
+                    } label: {
+                        VStack {
+                            Text("Soundloud")
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                    }
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 15))
+                .padding(.top)
+                .tint(.orange)
+                .fileImporter(
+                    isPresented: $isImporting,
+                    allowedContentTypes: [.audio],
+                    allowsMultipleSelection: true,
+                    onCompletion: handleFileLoading
+                )
+
                 if !sortedTracks.isEmpty {
                     Section("tracks") {
                         ForEach(sortedTracks) { track in
@@ -110,6 +159,61 @@ struct EditAlbumView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Импортирует выбранные аудиофайлы в альбом, создавая треки и добавляя их в конец списка.
+    private func handleFileLoading(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            let base = album.tracks.count
+            let albumArtistNames = album.artists.map(\.name)
+
+            for (offset, url) in urls.enumerated() {
+                guard let filename = importFile(url) else { continue }
+
+                let track = Track(name: url.parseMusic().name, album: album, credits: [], genre: .pop, filename: filename)
+                track.position = base + offset
+
+                modelContext.insert(track)
+
+                let names = url.parsedArtistNames().filter { name in
+                    !albumArtistNames.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+                }
+
+                for (position, name) in names.enumerated() {
+                    let artistModel = modelContext.findOrCreateArtist(named: name)
+                    let credit = Credit(artist: artistModel, role: .featured, position: position, track: track)
+
+                    modelContext.insert(credit)
+                }
+            }
+        case .failure(let error):
+            print(error)
+        }
+    }
+
+    /// Копирует выбранный файл в документы и возвращает имя, под которым он там лежит.
+    private func importFile(_ source: URL) -> String? {
+        let fileManager = FileManager.default
+        var destination = URL.documentsDirectory.appending(path: source.lastPathComponent)
+
+        let didAccess = source.startAccessingSecurityScopedResource()
+        defer { if didAccess { source.stopAccessingSecurityScopedResource() } }
+
+        if fileManager.fileExists(atPath: destination.path) {
+            let unique = source.deletingPathExtension().lastPathComponent + "-" + UUID().uuidString
+            destination = URL.documentsDirectory
+                .appending(path: unique)
+                .appendingPathExtension(source.pathExtension)
+        }
+
+        do {
+            try fileManager.copyItem(at: source, to: destination)
+            return destination.lastPathComponent
+        } catch {
+            print("Import error: \(error)")
+            return nil
         }
     }
 
