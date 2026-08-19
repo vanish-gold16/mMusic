@@ -7,6 +7,7 @@ struct AlbumCell: View {
     @Environment(AudioPlayer.self) var audioPlayer
 
     @State private var showDeleteConfirmation = false
+    @State private var showAddToPlaylist = false
 
     let album: Album
 
@@ -73,7 +74,7 @@ struct AlbumCell: View {
                 Divider()
                 
                 Button {
-                    
+                    showAddToPlaylist = true
                 } label: {
                     Label("Add to playlist", systemImage: "text.badge.plus")
                 }
@@ -100,6 +101,9 @@ struct AlbumCell: View {
             }
         }
         .buttonStyle(.plain)
+        .sheet(isPresented: $showAddToPlaylist) {
+            AddToPlaylistView(tracks: sortedTracks)
+        }
         .confirmationDialog(
             "Delete \"\(album.name)\"?",
             isPresented: $showDeleteConfirmation,

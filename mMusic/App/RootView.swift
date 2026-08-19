@@ -39,19 +39,6 @@ struct RootView: View {
             SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) {
                 SearchTab(path: $searchPath)
             }
-//            HomeTab(path: $homePath)
-//                .tabItem { Label("Home", systemImage: "house") }
-//                .tag(Tab.home)
-//            DownloadTab(path: $downloadPath)
-//                .tabItem { Label("Download", systemImage: "music.note")}
-//                .tag(Tab.download)
-//            LibraryTab(path: $libraryPath)
-//                .tabItem { Label("Library", systemImage: "music.note.square.stack") }
-//                .tag(Tab.library)
-//            Spacer()
-//            SearchTab(path: $searchPath)
-//                .tabItem { Label("Search", systemImage: "magnifyingglass", role: .search) }
-//                .tag(Tab.search)
         }
         .tabViewBottomAccessory {
             MiniPlayerView(audioPlayer: audioPlayer, isPlayerPresented: $isPlayerPresented)

@@ -56,6 +56,9 @@ struct HomeView: View {
                     NavigationLink(destination: ArtistsView()) {
                         Label("Artists", systemImage: "music.note")
                     }
+                    NavigationLink(destination: FavouritesView()) {
+                        Label("Favourites", systemImage: "star")
+                    }
                  } label: {
                     Image(systemName: "line.3.horizontal")
                 }

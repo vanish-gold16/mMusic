@@ -9,6 +9,7 @@ struct TrackCell: View {
     @State private var showEditTrack: Bool = false
     @State private var showDeleteConfirmation: Bool = false
     @State private var albumToShow: Album?
+    @State private var showAddToPlaylist = false
 
     enum LeadingStyle {
         case number
@@ -74,9 +75,7 @@ struct TrackCell: View {
                     } label: {
                         Label("Favourite", systemImage: track.isFavourite ? "star.fill" : "star")
                     }
-                    Button {
-
-                    } label: {
+                    ShareLink(item: AudioFileStore.url(for: track.filename)) {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                 }
@@ -90,7 +89,7 @@ struct TrackCell: View {
                 }
                 
                 Button {
-                    
+                    showAddToPlaylist = true
                 } label: {
                     Label("Add to a Playlist", systemImage: "text.badge.plus")
                 }
@@ -143,6 +142,9 @@ struct TrackCell: View {
         }
         .sheet(isPresented: $showEditTrack) {
             EditTrackView(track: track)
+        }
+        .sheet(isPresented: $showAddToPlaylist) {
+            AddToPlaylistView(tracks: [track])
         }
         .navigationDestination(item: $albumToShow) { album in
             AlbumView(album: album)

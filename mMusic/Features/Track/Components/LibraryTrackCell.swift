@@ -44,9 +44,7 @@ struct LibraryTrackCell: View {
                         Label("Favourite", systemImage: track.isFavourite ? "star.fill" : "star")
                     }
 
-                    Button {
-
-                    } label: {
+                    ShareLink(item: AudioFileStore.url(for: track.filename)) {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                 }

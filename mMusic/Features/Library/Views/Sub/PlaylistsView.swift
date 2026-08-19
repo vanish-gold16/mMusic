@@ -34,9 +34,7 @@ struct PlaylistsView: View {
                                             Label("Pin", systemImage: "pin")
                                         }
                                     }
-                                    Button {
-                                        
-                                    } label: {
+                                    ShareLink(items: playlist.orderedTracks.map { AudioFileStore.url(for: $0.filename) }) {
                                         Label("Share", systemImage: "square.and.arrow.up")
                                     }
                                 }

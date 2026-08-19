@@ -12,6 +12,7 @@ class Playlist {
             .map(\.track)
     }
     var isPinned = false
+    var isFavourite = false
     
     @Attribute(.externalStorage) var artwork: Data?
     

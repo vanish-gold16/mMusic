@@ -138,13 +138,11 @@ struct PlaylistView: View {
                     VStack {
                         ControlGroup {
                             Button {
-                                
+                                playlist.isFavourite.toggle()
                             } label: {
-                                Label("Favourite", systemImage: "star")
+                                Label("Favourite", systemImage: playlist.isFavourite ? "star.fill" : "star")
                             }
-                            Button {
-                                
-                            } label: {
+                            ShareLink(items: playlist.orderedTracks.map { AudioFileStore.url(for: $0.filename) }) {
                                 Label("Share", systemImage: "square.and.arrow.up")
                             }
                         }
