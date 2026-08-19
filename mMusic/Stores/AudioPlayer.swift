@@ -2,6 +2,9 @@ import AVFoundation
 import Foundation
 import MediaPlayer
 import Observation
+// Ради move(fromOffsets:toOffset:) и remove(atOffsets:) — их объявляет SwiftUI,
+// а без них перестановку из List пришлось бы писать руками.
+import SwiftUI
 
 @Observable
 class AudioPlayer: NSObject, AVAudioPlayerDelegate {
@@ -11,6 +14,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private var progressTimer: Timer?
 
     var queue: [Track] = []
+    /// Порядок очереди до перемешивания. Пуст, когда shuffle выключен.
+    private var originalQueue: [Track] = []
     var currentIndex: Int = 0
     var currentTrack: Track? {
         queue.indices.contains(currentIndex) ? queue[currentIndex] : nil
@@ -19,8 +24,18 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     var currentTime: TimeInterval = 0
     var duration: TimeInterval = 0
     
+    var repeatMode: RepeatMode = .off { didSet { persistModes() } }
+    var isShuffled = false { didSet { persistModes() } }
+
     var level: Double = 0
     private let meterFloor: Double = -50
+
+    private enum Keys {
+        static let lastTrack = "lastTrack"
+        static let queue = "queue"
+        static let repeatMode = "repeatMode"
+        static let isShuffled = "isShuffled"
+    }
 
     /// Играли ли мы до звонка. Возобновлять после прерывания нужно только то,
     /// что прервали: иначе музыка сама заиграет там, где её никто не включал.
@@ -29,6 +44,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     
     override init() {
         super.init()
+
+        let defaults = UserDefaults.standard
+        repeatMode = RepeatMode(rawValue: defaults.string(forKey: Keys.repeatMode) ?? "") ?? .off
+        // Очередь сохраняется уже перемешанной, а исходный порядок — нет: после перезапуска
+        // shuffle остаётся включённым, но выключение его больше ничего не переставит.
+        isShuffled = defaults.bool(forKey: Keys.isShuffled)
+
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
@@ -49,7 +71,25 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     func play(_ tracks: [Track], startingAt index: Int = 0) {
         guard tracks.indices.contains(index) else { return }
         queue = tracks
+        originalQueue = []
         currentIndex = index
+
+        // Пользователь ткнул в конкретный трек — он и должен заиграть,
+        // перемешивается только то, что за ним.
+        if isShuffled { shuffleQueue() }
+
+        playCurrent()
+    }
+
+    /// Кнопка «Shuffle» в альбоме и плейлисте: включает режим и запускает список с начала.
+    func playShuffled(_ tracks: [Track]) {
+        guard !tracks.isEmpty else { return }
+
+        isShuffled = true
+        originalQueue = tracks
+        queue = tracks.shuffled()
+        currentIndex = 0
+
         playCurrent()
     }
     
@@ -119,8 +159,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
     
     func playNext() {
-        guard currentIndex + 1 < queue.count else { return }
-        currentIndex += 1
+        if currentIndex + 1 < queue.count {
+            currentIndex += 1
+        } else if repeatMode == .all, !queue.isEmpty {
+            currentIndex = 0
+        } else {
+            return
+        }
         playCurrent()
     }
     
@@ -129,21 +174,54 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             seek(to: 0)
             return
         }
-        guard currentIndex > 0 else { seek(to: 0); return }
-        currentIndex -= 1
+
+        if currentIndex > 0 {
+            currentIndex -= 1
+        } else if repeatMode == .all, !queue.isEmpty {
+            currentIndex = queue.count - 1
+        } else {
+            seek(to: 0)
+            return
+        }
+        playCurrent()
+    }
+
+    /// Прыжок к треку из экрана очереди.
+    func jump(to index: Int) {
+        guard queue.indices.contains(index) else { return }
+        currentIndex = index
         playCurrent()
     }
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        if flag && currentIndex + 1 < queue.count {
-            currentIndex += 1
-            playCurrent()
-        } else {
-            isPlaying = false
-            stopProgressTimer()
-            stopMeterTimer()
-            currentTime = duration
+        guard flag else {
+            finishPlayback()
+            return
         }
+
+        switch repeatMode {
+        case .one:
+            // Повтор одного: тот же файл заново, очередь не двигается.
+            playCurrent()
+        case .all where !queue.isEmpty:
+            currentIndex = (currentIndex + 1) % queue.count
+            playCurrent()
+        case .all, .off:
+            if currentIndex + 1 < queue.count {
+                currentIndex += 1
+                playCurrent()
+            } else {
+                finishPlayback()
+            }
+        }
+    }
+
+    /// Очередь кончилась: замираем на последнем кадре, не сбрасывая трек.
+    private func finishPlayback() {
+        isPlaying = false
+        stopProgressTimer()
+        stopMeterTimer()
+        currentTime = duration
         updateNowPlayingInfo()
     }
 
@@ -259,6 +337,104 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         currentIndex = tracks.firstIndex { $0.filename == filename } ?? 0
     }
     
+    /// «Play next» — треки встают сразу за текущим.
+    func enqueueNext(_ tracks: [Track]) {
+        guard !tracks.isEmpty else { return }
+
+        // Играть нечего — значит это и есть начало воспроизведения.
+        guard !queue.isEmpty else {
+            play(tracks)
+            return
+        }
+
+        queue.insert(contentsOf: tracks, at: min(currentIndex + 1, queue.count))
+        if !originalQueue.isEmpty { originalQueue.append(contentsOf: tracks) }
+        persistQueue()
+    }
+
+    /// «Play after» — треки уходят в конец очереди.
+    func enqueueLast(_ tracks: [Track]) {
+        guard !tracks.isEmpty else { return }
+
+        guard !queue.isEmpty else {
+            play(tracks)
+            return
+        }
+
+        queue.append(contentsOf: tracks)
+        if !originalQueue.isEmpty { originalQueue.append(contentsOf: tracks) }
+        persistQueue()
+    }
+
+    func toggleShuffle() {
+        isShuffled.toggle()
+        isShuffled ? shuffleQueue() : restoreQueueOrder()
+        persistQueue()
+    }
+
+    func cycleRepeatMode() {
+        repeatMode = repeatMode.next
+    }
+
+    /// Текущий трек продолжает играть и переезжает в начало — мешается то, что впереди.
+    private func shuffleQueue() {
+        originalQueue = queue
+
+        guard queue.indices.contains(currentIndex) else {
+            queue.shuffle()
+            return
+        }
+
+        let current = queue.remove(at: currentIndex)
+        queue.shuffle()
+        queue.insert(current, at: 0)
+        currentIndex = 0
+    }
+
+    /// Возврат к исходному порядку. Текущий трек ищем в нём заново, чтобы музыка не прыгнула.
+    private func restoreQueueOrder() {
+        guard !originalQueue.isEmpty else { return }
+
+        let current = currentTrack
+        queue = originalQueue
+        originalQueue = []
+        currentIndex = current.flatMap { track in queue.firstIndex { $0.id == track.id } } ?? 0
+    }
+
+    /// Перестановка треков на экране очереди.
+    func moveInQueue(from source: IndexSet, to destination: Int) {
+        let current = currentTrack
+        queue.move(fromOffsets: source, toOffset: destination)
+
+        if let current, let index = queue.firstIndex(where: { $0.id == current.id }) {
+            currentIndex = index
+        }
+        persistQueue()
+    }
+
+    /// Удаление с экрана очереди — из очереди, но не из библиотеки.
+    func removeFromQueue(at offsets: IndexSet) {
+        guard !offsets.isEmpty else { return }
+
+        let removedIDs = Set(offsets.compactMap { queue.indices.contains($0) ? queue[$0].id : nil })
+        let removingCurrent = offsets.contains(currentIndex)
+        // Индекс после удаления съедет, поэтому держимся за сам трек.
+        let anchor = removingCurrent ? nil : currentTrack
+
+        if removingCurrent { stop() }
+
+        queue.remove(atOffsets: offsets)
+        originalQueue.removeAll { removedIDs.contains($0.id) }
+
+        if let anchor, let index = queue.firstIndex(where: { $0.id == anchor.id }) {
+            currentIndex = index
+        } else {
+            currentIndex = min(currentIndex, max(queue.count - 1, 0))
+        }
+
+        persistQueue()
+    }
+
     /// Вызывается перед удалением трека из базы. Без этого он остаётся в очереди
     /// ссылкой на несуществующую строку, и следующий `playNext` падает или играет пустоту.
     func forget(_ track: Track) {
@@ -271,6 +447,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         if removingCurrent { stop() }
 
         queue.removeAll { $0.id == track.id }
+        originalQueue.removeAll { $0.id == track.id }
 
         if let anchor, let index = queue.firstIndex(where: { $0.id == anchor.id }) {
             currentIndex = index
@@ -284,8 +461,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
     /// Очередь пишется на диск здесь, а зовётся отовсюду, где она меняется.
     private func persistQueue() {
-        UserDefaults.standard.set(currentTrack?.filename, forKey: "lastTrack")
-        UserDefaults.standard.set(queue.map(\.filename), forKey: "queue")
+        UserDefaults.standard.set(currentTrack?.filename, forKey: Keys.lastTrack)
+        UserDefaults.standard.set(queue.map(\.filename), forKey: Keys.queue)
+    }
+
+    private func persistModes() {
+        UserDefaults.standard.set(repeatMode.rawValue, forKey: Keys.repeatMode)
+        UserDefaults.standard.set(isShuffled, forKey: Keys.isShuffled)
     }
 
     private func observeAudioSession() {

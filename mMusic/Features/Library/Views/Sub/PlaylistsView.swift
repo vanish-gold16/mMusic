@@ -6,6 +6,7 @@ struct PlaylistsView: View {
     
     @Query private var playlists: [Playlist]
     @Environment(\.modelContext) private var modelContext
+    @Environment(AudioPlayer.self) private var audioPlayer
     
     @State private var isCreating = false
     @State private var editedPlaylist: Playlist?
@@ -43,12 +44,12 @@ struct PlaylistsView: View {
                                 Divider()
                                 
                                 Button {
-                                    
+                                    audioPlayer.play(playlist.orderedTracks)
                                 } label: {
                                     Label("Play", systemImage: "play")
                                 }
                                 Button {
-                                    
+                                    audioPlayer.playShuffled(playlist.orderedTracks)
                                 } label: {
                                     Label("Shuffle", systemImage: "shuffle")
                                 }
@@ -64,12 +65,12 @@ struct PlaylistsView: View {
                                 Divider()
                                 
                                 Button {
-                                    
+                                    audioPlayer.enqueueNext(playlist.orderedTracks)
                                 } label: {
                                     Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                                 }
                                 Button {
-                                    
+                                    audioPlayer.enqueueLast(playlist.orderedTracks)
                                 } label: {
                                     Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
                                 }

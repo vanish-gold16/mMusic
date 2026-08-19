@@ -9,6 +9,10 @@ struct AlbumCell: View {
     @State private var showDeleteConfirmation = false
 
     let album: Album
+
+    private var sortedTracks: [Track] {
+        album.tracks.sorted { $0.position < $1.position }
+    }
     
     var body: some View {
         NavigationLink {
@@ -56,12 +60,12 @@ struct AlbumCell: View {
                 Divider()
                 
                 Button {
-                    audioPlayer.play(album.tracks.sorted { $0.position < $1.position })
+                    audioPlayer.play(sortedTracks)
                 } label: {
                     Label("Play", systemImage: "play")
                 }
                 Button {
-                    audioPlayer.play(album.tracks.shuffled())
+                    audioPlayer.playShuffled(sortedTracks)
                 } label: {
                     Label("Shuffle", systemImage: "shuffle")
                 }
@@ -77,13 +81,13 @@ struct AlbumCell: View {
                 Divider()
                 
                 Button {
-                    audioPlayer.queue.insert(contentsOf: album.tracks.sorted { $0.position < $1.position }, at: 0)
+                    audioPlayer.enqueueNext(sortedTracks)
                 } label: {
                     Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                 }
                 
                 Button {
-                    audioPlayer.queue.append(contentsOf: album.tracks.sorted { $0.position < $1.position })
+                    audioPlayer.enqueueLast(sortedTracks)
                 } label: {
                     Label("Play After", systemImage: "text.line.last.and.arrowtriangle.forward")
                 }

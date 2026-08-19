@@ -67,7 +67,7 @@ struct AlbumView: View {
                             }
                     }
                     Button {
-                        audioPlayer.play(sortedTracks.shuffled())
+                        audioPlayer.playShuffled(sortedTracks)
                     } label: {
                         Capsule()
                             .frame(maxWidth: .infinity)

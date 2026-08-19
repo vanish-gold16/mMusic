@@ -61,7 +61,7 @@ struct PlaylistView: View {
                             }
                     }
                     Button {
-                        audioPlayer.play(playlist.orderedTracks.shuffled())
+                        audioPlayer.playShuffled(playlist.orderedTracks)
                     } label: {
                         Capsule()
                             .foregroundStyle(.orange)
@@ -151,12 +151,12 @@ struct PlaylistView: View {
                         Divider()
                         
                         Button {
-                            
+                            audioPlayer.play(playlist.orderedTracks)
                         } label: {
                             Label("Play", systemImage: "play")
                         }
                         Button {
-                            
+                            audioPlayer.playShuffled(playlist.orderedTracks)
                         } label: {
                             Label("Shuffle", systemImage: "shuffle")
                         }
@@ -172,12 +172,12 @@ struct PlaylistView: View {
                         Divider()
                         
                         Button {
-                            
+                            audioPlayer.enqueueNext(playlist.orderedTracks)
                         } label: {
                             Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                         }
                         Button {
-                            
+                            audioPlayer.enqueueLast(playlist.orderedTracks)
                         } label: {
                             Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
                         }

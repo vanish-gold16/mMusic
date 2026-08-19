@@ -98,12 +98,12 @@ struct TrackCell: View {
                 Divider()
 
                 Button {
-
+                    audioPlayer.enqueueNext([track])
                 } label: {
                     Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                 }
                 Button {
-
+                    audioPlayer.enqueueLast([track])
                 } label: {
                     Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
                 }

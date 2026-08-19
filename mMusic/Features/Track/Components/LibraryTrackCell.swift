@@ -39,7 +39,7 @@ struct LibraryTrackCell: View {
             VStack {
                 ControlGroup {
                     Button {
-
+                        track.isFavourite.toggle()
                     } label: {
                         Label("Favourite", systemImage: track.isFavourite ? "star.fill" : "star")
                     }
