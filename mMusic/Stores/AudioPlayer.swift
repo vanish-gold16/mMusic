@@ -102,8 +102,12 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             player = try AVAudioPlayer(contentsOf: url)
             player?.delegate = self
             player?.isMeteringEnabled = true
+            // enableRate обязателен до play(), иначе rate молча игнорируется.
+            player?.enableRate = true
+            player?.rate = Float(UserDefaults.standard.double(forKey: AppSettings.playbackRate))
             player?.play()
             
+            track.lastPlayedAt = .now
             persistQueue()
             
             isPlaying = true
@@ -139,6 +143,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             return
         }
 
+        player?.rate = Float(UserDefaults.standard.double(forKey: AppSettings.playbackRate))
         player?.play()
         isPlaying = true
         startProgressTimer()
@@ -184,6 +189,12 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             return
         }
         playCurrent()
+    }
+
+    /// Новая скорость должна услышаться сразу, а не со следующего трека.
+    func applyPlaybackRate() {
+        guard isPlaying else { return }
+        player?.rate = Float(UserDefaults.standard.double(forKey: AppSettings.playbackRate))
     }
 
     /// Прыжок к треку из экрана очереди.
@@ -508,6 +519,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             guard wasPlayingBeforeInterruption else { return }
             wasPlayingBeforeInterruption = false
 
+            guard UserDefaults.standard.bool(forKey: AppSettings.resumeAfterInterruption) else { return }
+
             // `.shouldResume` — разрешение системы. Без него возобновлять нельзя:
             // поверх нас может до сих пор говорить навигатор.
             let optionsRaw = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
@@ -524,7 +537,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private func handleRouteChange(_ notification: Notification) {
         guard let raw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: raw),
-              reason == .oldDeviceUnavailable else { return }
+              reason == .oldDeviceUnavailable,
+              UserDefaults.standard.bool(forKey: AppSettings.pauseOnDisconnect) else { return }
 
         pause()
     }

@@ -10,6 +10,10 @@ import SwiftData
 
 @main
 struct mMusicApp: App {
+    init() {
+        AppSettings.registerDefaults()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
