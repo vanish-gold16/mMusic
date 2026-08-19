@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import AVFoundation
 
 struct PlaylistView: View {
     
@@ -10,9 +9,13 @@ struct PlaylistView: View {
     @State private var isShowingTrackPicker = false
     @State private var editingPlaylist = false
     @State private var showDeleteConfirmation = false
-    @State private var totalDuration: TimeInterval = 0
     
     let playlist: Playlist
+
+    /// Складывается из уже прочитанных длительностей — файлы для этого больше не открываются.
+    private var totalDuration: TimeInterval {
+        playlist.orderedTracks.reduce(0) { $0 + $1.duration }
+    }
     
     var body: some View {
         List {
@@ -129,9 +132,6 @@ struct PlaylistView: View {
         }
         .listStyle(.plain)
         .listRowSpacing(8)
-        .task(id: playlist.orderedTracks.map(\.filename)) {
-            await calculateTotalDuration()
-        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -214,18 +214,6 @@ struct PlaylistView: View {
         } message: {
             Text("This playlist will be permanently deleted.")
         }
-    }
-    
-    private func calculateTotalDuration() async {
-        var total: TimeInterval = 0
-        for track in playlist.orderedTracks {
-            let url = AudioFileStore.url(for: track.filename)
-            let asset = AVURLAsset(url: url)
-            if let duration = try? await asset.load(.duration) {
-                total += CMTimeGetSeconds(duration)
-            }
-        }
-        totalDuration = total
     }
     
     private func moveTracks(from: IndexSet, to: Int) {

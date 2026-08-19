@@ -25,6 +25,10 @@ class Track {
     @Relationship(deleteRule: .cascade, inverse: \TrackPlaylistItem.track)
     var items: [TrackPlaylistItem] = []
     var position: Int = 0
+    /// Длительность в секундах. 0 — ещё не прочитана из файла; этим занимается
+    /// `TrackDurationLoader`, поэтому у треков, импортированных до появления поля,
+    /// она появится сама, без переимпорта.
+    var duration: TimeInterval = 0
     
     var addedAt: Date = Date.now
     

@@ -10,6 +10,11 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
+
+    /// Треки, у которых длительность ещё не прочитана. Запрос сам сужается по мере
+    /// заполнения, поэтому `task(id:)` ниже перезапускается ровно тогда, когда работа появилась —
+    /// и после импорта, и после первого запуска с новым полем.
+    @Query(filter: #Predicate<Track> { $0.duration == 0 }) private var tracksNeedingDuration: [Track]
     
     @State private var selected: Tab = .home
     @State private var homePath: NavigationPath = .init()
@@ -71,6 +76,9 @@ struct RootView: View {
             }
 
             audioPlayer.restore(orderedTracks, current: lastTrack)
+        }
+        .task(id: tracksNeedingDuration.count) {
+            await TrackDurationLoader.fill(tracksNeedingDuration)
         }
         .tint(.orange)
     }
