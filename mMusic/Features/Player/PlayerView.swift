@@ -5,6 +5,7 @@ struct PlayerView: View {
     
     @State private var sliderValue: TimeInterval = 0
     @State private var isScrubbing = false
+    @State private var isQueuePresented = false
     
     /// Сглаженная громкость для фона: тянется за `audioPlayer.level`, но лениво,
     /// иначе фон мигал бы на каждой ноте.
@@ -108,11 +109,18 @@ struct PlayerView: View {
                 .monospacedDigit()
             }
 
+            controls
+
             Spacer()
+
+            queueButton
         }
         .padding(.horizontal, 24)
         .padding(.top, 32)
         .presentationDragIndicator(.visible)
+        .sheet(isPresented: $isQueuePresented) {
+            QueueView(audioPlayer: audioPlayer)
+        }
         .presentationBackground { artworkBackground }
         // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
         // обложке вуаль становится светлой, а `.primary` / `.secondary` — тёмными.
@@ -155,6 +163,78 @@ struct PlayerView: View {
         }
     }
     
+    /// Перемотка вперёд-назад жестами по обложке осталась, но вслепую ей пользоваться
+    /// неудобно — обычные кнопки нужны рядом.
+    private var controls: some View {
+        HStack {
+            Button {
+                audioPlayer.toggleShuffle()
+            } label: {
+                Image(systemName: "shuffle")
+                    .font(.title3)
+            }
+            .foregroundStyle(audioPlayer.isShuffled ? Color.orange : Color.secondary)
+
+            Spacer()
+
+            Button {
+                audioPlayer.playPrevious()
+            } label: {
+                Image(systemName: "backward.fill")
+                    .font(.title)
+            }
+            .foregroundStyle(.primary)
+
+            Spacer()
+
+            Button {
+                audioPlayer.togglePlayPause()
+            } label: {
+                Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 44))
+                    .frame(width: 60, height: 60)
+                    .contentShape(Rectangle())
+            }
+            .foregroundStyle(.primary)
+
+            Spacer()
+
+            Button {
+                audioPlayer.playNext()
+            } label: {
+                Image(systemName: "forward.fill")
+                    .font(.title)
+            }
+            .foregroundStyle(.primary)
+
+            Spacer()
+
+            Button {
+                audioPlayer.cycleRepeatMode()
+            } label: {
+                Image(systemName: audioPlayer.repeatMode.systemImage)
+                    .font(.title3)
+            }
+            .foregroundStyle(audioPlayer.repeatMode.isActive ? Color.orange : Color.secondary)
+        }
+    }
+
+    private var queueButton: some View {
+        HStack {
+            Spacer()
+
+            Button {
+                isQueuePresented = true
+            } label: {
+                Image(systemName: "list.bullet")
+                    .font(.title3)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .foregroundStyle(.secondary)
+        }
+    }
+
     /// Где `glow` находится между тихим и громким местом этого трека, 0...1.
     /// `span` не даёт делить на почти-ноль: на ровном месте фон должен замереть,
     /// а не раздувать микроскопические колебания до полного размаха.
