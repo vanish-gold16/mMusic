@@ -153,8 +153,8 @@ struct TrackCell: View {
             titleVisibility: .visible
         ) {
             Button("Remove", role: .destructive) {
-                let url = URL.documentsDirectory.appending(path: track.filename)
-                try? FileManager.default.removeItem(at: url)
+                audioPlayer.forget(track)
+                AudioFileStore.remove(filename: track.filename)
                 modelContext.delete(track)
             }
             Button("Cancel", role: .cancel) { }

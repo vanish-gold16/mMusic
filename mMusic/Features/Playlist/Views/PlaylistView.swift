@@ -219,7 +219,7 @@ struct PlaylistView: View {
     private func calculateTotalDuration() async {
         var total: TimeInterval = 0
         for track in playlist.orderedTracks {
-            let url = URL.documentsDirectory.appending(path: track.filename)
+            let url = AudioFileStore.url(for: track.filename)
             let asset = AVURLAsset(url: url)
             if let duration = try? await asset.load(.duration) {
                 total += CMTimeGetSeconds(duration)

@@ -11,6 +11,8 @@ struct EditAlbumView: View {
     @State private var showTrackPicker = false
     @State private var isImporting = false
     @State private var addedTracks: [TrackDraft] = []
+    /// Файлы, которые не удалось положить в библиотеку. Пустой список — всё прошло.
+    @State private var failedImports: [String] = []
 
     @Bindable var album: Album
 
@@ -159,6 +161,17 @@ struct EditAlbumView: View {
                     }
                 }
             }
+            .alert(
+                "Some files were not imported",
+                isPresented: Binding(
+                    get: { !failedImports.isEmpty },
+                    set: { if !$0 { failedImports = [] } }
+                )
+            ) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(failedImports.joined(separator: "\n"))
+            }
         }
     }
 
@@ -170,7 +183,13 @@ struct EditAlbumView: View {
             let albumArtistNames = album.artists.map(\.name)
 
             for (offset, url) in urls.enumerated() {
-                guard let filename = importFile(url) else { continue }
+                let filename: String
+                do {
+                    filename = try AudioFileStore.importFile(from: url)
+                } catch {
+                    failedImports.append(url.lastPathComponent)
+                    continue
+                }
 
                 let track = Track(name: url.parseMusic().name, album: album, credits: [], genre: .pop, filename: filename)
                 track.position = base + offset
@@ -189,31 +208,7 @@ struct EditAlbumView: View {
                 }
             }
         case .failure(let error):
-            print(error)
-        }
-    }
-
-    /// Копирует выбранный файл в документы и возвращает имя, под которым он там лежит.
-    private func importFile(_ source: URL) -> String? {
-        let fileManager = FileManager.default
-        var destination = URL.documentsDirectory.appending(path: source.lastPathComponent)
-
-        let didAccess = source.startAccessingSecurityScopedResource()
-        defer { if didAccess { source.stopAccessingSecurityScopedResource() } }
-
-        if fileManager.fileExists(atPath: destination.path) {
-            let unique = source.deletingPathExtension().lastPathComponent + "-" + UUID().uuidString
-            destination = URL.documentsDirectory
-                .appending(path: unique)
-                .appendingPathExtension(source.pathExtension)
-        }
-
-        do {
-            try fileManager.copyItem(at: source, to: destination)
-            return destination.lastPathComponent
-        } catch {
-            print("Import error: \(error)")
-            return nil
+            failedImports.append(error.localizedDescription)
         }
     }
 
@@ -234,7 +229,7 @@ struct EditAlbumView: View {
                 name: track.name,
                 genre: track.genre,
                 artists: track.artistNames.map { ArtistDraft(name: $0) },
-                stagedURL: URL.documentsDirectory.appending(path: track.filename),
+                stagedURL: AudioFileStore.url(for: track.filename),
                 sourceTrack: track.persistentModelID
             )
         }

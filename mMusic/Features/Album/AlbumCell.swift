@@ -111,9 +111,10 @@ struct AlbumCell: View {
     }
     
     private func deleteAlbum() {
+        // Каскад в SwiftData уберёт строки треков, но не mp3 — их мы копировали руками.
         for track in album.tracks {
-            let url = URL.documentsDirectory.appending(path: track.filename)
-            try? FileManager.default.removeItem(at: url)
+            audioPlayer.forget(track)
+            AudioFileStore.remove(filename: track.filename)
         }
         modelContext.delete(album)
     }

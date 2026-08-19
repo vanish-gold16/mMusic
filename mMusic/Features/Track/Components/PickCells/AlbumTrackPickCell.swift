@@ -62,7 +62,7 @@ struct AlbumTrackPickCell: View {
                 name: track.name,
                 genre: track.genre,
                 artists: draftArtists,
-                stagedURL: URL.documentsDirectory.appending(path: track.filename),
+                stagedURL: AudioFileStore.url(for: track.filename),
                 sourceTrack: track.persistentModelID
             )
             

@@ -18,6 +18,8 @@ struct CreateAlbumView: View {
     @State private var showImagePicker = false
     @State private var showTrackPicker = false
     @State private var isImporting = false
+    /// Файлы, которые не удалось положить в библиотеку. Пустой список — всё прошло.
+    @State private var failedImports: [String] = []
     
     private var hasRelease: Binding<Bool> {
         Binding (
@@ -192,6 +194,17 @@ struct CreateAlbumView: View {
                     }
                 }
             }
+            .alert(
+                "Some files were not imported",
+                isPresented: Binding(
+                    get: { !failedImports.isEmpty },
+                    set: { if !$0 { failedImports = [] } }
+                )
+            ) {
+                Button("OK") { dismiss() }
+            } message: {
+                Text(failedImports.joined(separator: "\n"))
+            }
         }
     }
     
@@ -212,7 +225,7 @@ struct CreateAlbumView: View {
                 )
             }
         case .failure(let error):
-            print(error)
+            failedImports.append(error.localizedDescription)
         }
     }
 
@@ -230,28 +243,7 @@ struct CreateAlbumView: View {
             try FileManager.default.copyItem(at: source, to: destination)
             return destination
         } catch {
-            print("Staging error: \(error)")
-            return nil
-        }
-    }
-
-    /// Переносит подготовленный файл в документы и возвращает имя, под которым он там лежит.
-    private func importStagedFile(_ stagedURL: URL) -> String? {
-        let fileManager = FileManager.default
-        var destination = URL.documentsDirectory.appending(path: stagedURL.lastPathComponent)
-
-        if fileManager.fileExists(atPath: destination.path) {
-            let unique = stagedURL.deletingPathExtension().lastPathComponent + "-" + UUID().uuidString
-            destination = URL.documentsDirectory
-                .appending(path: unique)
-                .appendingPathExtension(stagedURL.pathExtension)
-        }
-
-        do {
-            try fileManager.moveItem(at: stagedURL, to: destination)
-            return destination.lastPathComponent
-        } catch {
-            print("Import error: \(error)")
+            failedImports.append(source.lastPathComponent)
             return nil
         }
     }
@@ -291,7 +283,13 @@ struct CreateAlbumView: View {
                 track.album = album
                 track.position = index
             } else {
-                guard let filename = importStagedFile(draft.stagedURL) else { continue }
+                let filename: String
+                do {
+                    filename = try AudioFileStore.moveIntoLibrary(from: draft.stagedURL)
+                } catch {
+                    failedImports.append(draft.name)
+                    continue
+                }
 
                 let track = Track(name: draft.name, album: album, credits: [], genre: draft.genre, filename: filename)
                 track.position = index
@@ -320,7 +318,8 @@ struct CreateAlbumView: View {
 
         trackDrafts.forEach(discardStagedFile)
 
-        dismiss()
+        // Есть непопавшие файлы — экран закроет кнопка в alert, чтобы список успели прочитать.
+        if failedImports.isEmpty { dismiss() }
     }
 
 }
