@@ -3,8 +3,9 @@ import UniformTypeIdentifiers
 
 struct DownloadView: View {
     @State private var isImporting = false
-    @State private var isLoading = false
-    @State private var pickedFile: PickedFile? = nil
+    /// Файлы, выбранные разом, ждут своей очереди: настройки заполняются по одному.
+    @State private var pendingFiles: [PickedFile] = []
+    @State private var currentFile: PickedFile?
     
     var body: some View {
         VStack {
@@ -51,27 +52,47 @@ struct DownloadView: View {
                 .padding(.top)
                 .tint(.orange)
             }
-            .fileImporter(isPresented: $isImporting, allowedContentTypes: [.audio], onCompletion: handleFileLoading)
+            .fileImporter(
+                isPresented: $isImporting,
+                allowedContentTypes: [.audio],
+                allowsMultipleSelection: true,
+                onCompletion: handleFileLoading
+            )
             .padding()
 
             Spacer()
-            
-            if isLoading {
-                Text("File is loading...")
+
+            if !pendingFiles.isEmpty {
+                Text("\(pendingFiles.count) more to go")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom)
             }
         }
         .navigationTitle("Download")
-        .sheet(item: $pickedFile) { file in
+        .sheet(item: $currentFile, onDismiss: showNextFile) { file in
             SettingView(file: file)
         }
     }
     
-    private func handleFileLoading(_ result: Result<URL, Error>) {
-        switch (result) {
-        case .success(let url):
-            pickedFile = PickedFile(url: url)
-        case .failure(let erorr):
-            print(erorr)
+    private func handleFileLoading(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            pendingFiles = urls.map { PickedFile(url: $0) }
+            showNextFile()
+        case .failure(let error):
+            print(error)
+        }
+    }
+
+    /// Следующий файл открывается не в тот же такт, что закрылся предыдущий лист:
+    /// присвоенный прямо в `onDismiss` item новый sheet не показывает.
+    private func showNextFile() {
+        guard !pendingFiles.isEmpty else { return }
+
+        let next = pendingFiles.removeFirst()
+        Task { @MainActor in
+            currentFile = next
         }
     }
 }

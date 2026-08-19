@@ -181,6 +181,7 @@ struct EditAlbumView: View {
         case .success(let urls):
             let base = album.tracks.count
             let albumArtistNames = album.artists.map(\.name)
+            var imported: [Track] = []
 
             for (offset, url) in urls.enumerated() {
                 let filename: String
@@ -195,6 +196,7 @@ struct EditAlbumView: View {
                 track.position = base + offset
 
                 modelContext.insert(track)
+                imported.append(track)
 
                 let names = url.parsedArtistNames().filter { name in
                     !albumArtistNames.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
@@ -207,8 +209,21 @@ struct EditAlbumView: View {
                     modelContext.insert(credit)
                 }
             }
+
+            Task { await applyMetadata(to: imported) }
         case .failure(let error):
             failedImports.append(error.localizedDescription)
+        }
+    }
+
+    /// Читается уже из скопированного файла: доступ к исходному URL короткоживущий.
+    /// Артистов не трогаем — их credits уже созданы, и правит их пользователь в редакторе.
+    private func applyMetadata(to tracks: [Track]) async {
+        for track in tracks {
+            let metadata = await AudioMetadata.load(from: AudioFileStore.url(for: track.filename))
+
+            if let title = metadata.title { track.name = title }
+            if let artwork = metadata.artwork, track.artwork == nil { track.artwork = artwork }
         }
     }
 

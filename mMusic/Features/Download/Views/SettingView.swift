@@ -15,7 +15,13 @@ struct SettingView: View {
     @State private var release = Date()
     @State private var hasReleaseOn = false
     @State private var importError: String?
-    
+    /// nil — создать новый сингл; иначе трек добавляется в выбранный альбом.
+    @State private var destinationAlbum: Album?
+    /// Теги читаются один раз: перезаписывать поля, которые пользователь уже правит, нельзя.
+    @State private var didLoadMetadata = false
+
+    @Query(sort: \Album.name) private var albums: [Album]
+
     let file: PickedFile
     
     var body: some View {
@@ -67,10 +73,21 @@ struct SettingView: View {
                         }
                     }
                 }
-                Section("release") {
-                    Toggle("has release date", isOn: $hasReleaseOn)
-                    if hasReleaseOn {
-                        DatePicker("release date", selection: $release, displayedComponents: .date)
+                Section("album") {
+                    Picker("album", selection: $destinationAlbum) {
+                        Text("New single").tag(Album?.none)
+                        ForEach(albums) { album in
+                            Text(album.name).tag(Album?.some(album))
+                        }
+                    }
+                }
+                // У существующего альбома свои обложка и дата — трек их наследует.
+                if destinationAlbum == nil {
+                    Section("release") {
+                        Toggle("has release date", isOn: $hasReleaseOn)
+                        if hasReleaseOn {
+                            DatePicker("release date", selection: $release, displayedComponents: .date)
+                        }
                     }
                 }
             }
@@ -88,6 +105,9 @@ struct SettingView: View {
                     }
                 }
             }
+            .task {
+                await loadMetadata()
+            }
             .alert(
                 "Import failed",
                 isPresented: Binding(
@@ -103,12 +123,35 @@ struct SettingView: View {
         }
     }
 
+    /// Поля заполняются разбором имени файла сразу, чтобы форма не открывалась пустой.
+    /// Теги из самого файла приходят следом, в `loadMetadata`.
     init(file: PickedFile) {
         self.file = file
         _name = State(initialValue: file.url.parseMusic().name)
         let names = file.url.parsedArtistNames()
         let drafts = names.isEmpty ? [ArtistDraft(name: "unknown")] : names.map { ArtistDraft(name: $0) }
         _artists = State(initialValue: drafts)
+    }
+
+    /// Тег точнее имени файла, поэтому он выигрывает — но только там, где он есть.
+    private func loadMetadata() async {
+        guard !didLoadMetadata else { return }
+        didLoadMetadata = true
+
+        let metadata = await AudioMetadata.load(from: file.url)
+
+        if let title = metadata.title { name = title }
+        if !metadata.artistNames.isEmpty {
+            artists = metadata.artistNames.map { ArtistDraft(name: $0) }
+        }
+        if let artwork = metadata.artwork, artworkData == nil { artworkData = artwork }
+
+        // Альбом из тега выбираем, только если такой уже есть в библиотеке:
+        // создавать его вслепую по названию — верный способ наплодить дубли.
+        if let albumName = metadata.albumName,
+           let existing = albums.first(where: { $0.name.caseInsensitiveCompare(albumName) == .orderedSame }) {
+            destinationAlbum = existing
+        }
     }
     
     private func save() {
@@ -122,6 +165,17 @@ struct SettingView: View {
             return
         }
 
+        if let album = destinationAlbum {
+            addToExisting(album, filename: filename)
+        } else {
+            createSingle(filename: filename)
+        }
+
+        dismiss()
+    }
+
+    /// Обычный импорт: трек и одноимённый альбом-сингл, авторство на альбоме.
+    private func createSingle(filename: String) {
         let album = Album(name: name, type: .single, release: hasReleaseOn ? release : nil, artwork: artworkData)
         let track = Track(name: name, album: album, credits: [], genre: genre, filename: filename)
 
@@ -134,8 +188,29 @@ struct SettingView: View {
 
             modelContext.insert(credit)
         }
+    }
 
-        dismiss()
+    /// Трек в существующий альбом. Авторов альбома он наследует, поэтому в его
+    /// собственные credits попадают только те, кого в альбоме ещё нет.
+    private func addToExisting(_ album: Album, filename: String) {
+        let track = Track(name: name, album: album, credits: [], genre: genre, filename: filename)
+        track.position = album.tracks.count
+        track.artwork = artworkData
+
+        modelContext.insert(track)
+
+        let albumArtistNames = album.artistNames
+
+        let extras = artists.filter { draft in
+            !albumArtistNames.contains { $0.caseInsensitiveCompare(draft.name) == .orderedSame }
+        }
+
+        for (position, draft) in extras.enumerated() {
+            let artistModel = modelContext.findOrCreateArtist(named: draft.name)
+            let credit = Credit(artist: artistModel, role: .featured, position: position, track: track)
+
+            modelContext.insert(credit)
+        }
     }
 
 }

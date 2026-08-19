@@ -211,21 +211,29 @@ struct CreateAlbumView: View {
     private func handleFileLoading(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            for url in urls {
-                guard let stagedURL = stage(url) else { continue }
-
-                let names = url.parsedArtistNames().filter { !isAlbumArtist($0) }
-
-                trackDrafts.append(
-                    TrackDraft(
-                        name: url.parseMusic().name,
-                        artists: names.map { ArtistDraft(name: $0, role: .featured) },
-                        stagedURL: stagedURL
-                    )
-                )
-            }
+            Task { await stageFiles(urls) }
         case .failure(let error):
             failedImports.append(error.localizedDescription)
+        }
+    }
+
+    /// Теги внутри файла точнее его имени, поэтому имя файла остаётся запасным вариантом.
+    private func stageFiles(_ urls: [URL]) async {
+        for url in urls {
+            guard let stagedURL = stage(url) else { continue }
+
+            let metadata = await AudioMetadata.load(from: stagedURL)
+
+            let parsedNames = metadata.artistNames.isEmpty ? url.parsedArtistNames() : metadata.artistNames
+            let names = parsedNames.filter { !isAlbumArtist($0) }
+
+            trackDrafts.append(
+                TrackDraft(
+                    name: metadata.title ?? url.parseMusic().name,
+                    artists: names.map { ArtistDraft(name: $0, role: .featured) },
+                    stagedURL: stagedURL
+                )
+            )
         }
     }
 
