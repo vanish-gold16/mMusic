@@ -2,6 +2,7 @@ import AVFoundation
 import Foundation
 import MediaPlayer
 import Observation
+import SwiftData
 // Ради move(fromOffsets:toOffset:) и remove(atOffsets:) — их объявляет SwiftUI,
 // а без них перестановку из List пришлось бы писать руками.
 import SwiftUI
@@ -47,6 +48,14 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     /// Засчитан ли текущий трек. Сбрасывается на каждом запуске трека,
     /// поэтому повтор одного и того же честно считается заново.
     private var didCountCurrentPlay = false
+
+    /// Контекст для записи истории. Присваивается из `RootView`: плеер живёт
+    /// в `@State` и своего контекста не получает.
+    var modelContext: ModelContext?
+    /// Событие текущего прослушивания. Создаётся, когда трек засчитан, и до конца
+    /// прослушивания копит секунды — так в истории оказывается реальное время,
+    /// а не порог засчитывания.
+    private var currentEvent: PlayEvent?
     private var sessionObservers: [NSObjectProtocol] = []
     
     override init() {
@@ -120,6 +129,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             
             track.lastPlayedAt = .now
             didCountCurrentPlay = false
+            currentEvent = nil
             persistQueue()
             
             isPlaying = true
@@ -262,6 +272,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     /// Прослушиванием считается полминуты звука (или половина трека, если он короче),
     /// а не факт запуска: иначе перебор очереди накрутил бы счётчик всем подряд.
     private func countPlayIfNeeded() {
+        // Уже засчитанный трек продолжает копить секунды: событие закрывается не по
+        // порогу, а когда с трека уходят.
+        if let currentEvent {
+            currentEvent.seconds = currentTime
+            return
+        }
+
         guard !didCountCurrentPlay, let track = currentTrack else { return }
 
         let threshold = duration > 0 ? min(30, duration / 2) : 30
@@ -269,6 +286,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
         didCountCurrentPlay = true
         track.playCount += 1
+
+        let event = PlayEvent(track: track, seconds: currentTime)
+        modelContext?.insert(event)
+        currentEvent = event
     }
 
     private func stopProgressTimer() {

@@ -6,7 +6,7 @@ enum LibrarySection: String, CaseIterable, Identifiable {
     case albums
     case playlists
     case artists
-    case favourites
+    case smart
 
     var id: String { rawValue }
 
@@ -15,7 +15,7 @@ enum LibrarySection: String, CaseIterable, Identifiable {
         case .albums: "Albums"
         case .playlists: "Playlists"
         case .artists: "Artists"
-        case .favourites: "Favourites"
+        case .smart: "Smart"
         }
     }
 }

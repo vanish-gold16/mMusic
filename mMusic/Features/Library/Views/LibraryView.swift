@@ -31,8 +31,8 @@ struct LibraryView: View {
                     PlaylistsSection()
                 case .artists:
                     ArtistsSection()
-                case .favourites:
-                    FavouritesSection()
+                case .smart:
+                    SmartPlaylistsSection()
                 }
             }
             .padding(.vertical)

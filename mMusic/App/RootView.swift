@@ -47,6 +47,9 @@ struct RootView: View {
         }
         .environment(audioPlayer)
         .task {
+            // Плеер живёт в @State и своего контекста не имеет — отдаём ему рабочий.
+            audioPlayer.modelContext = modelContext
+
             guard let lastTrack = UserDefaults.standard.string(forKey: "lastTrack") else {
                 return
             }
