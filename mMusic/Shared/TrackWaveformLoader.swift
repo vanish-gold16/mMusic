@@ -21,6 +21,15 @@ enum TrackWaveformLoader {
         }
     }
 
+    /// Считает волну одного трека и запоминает её. Плеер зовёт это для играющего трека:
+    /// общий проход идёт по библиотеке подряд и до нужного может дойти нескоро.
+    nonisolated static func fill(_ track: Track) async {
+        guard track.waveform == nil else { return }
+        guard let waveform = await makeWaveform(for: AudioFileStore.url(for: track.filename)) else { return }
+
+        track.waveform = waveform
+    }
+
     /// Чтение и возведение в квадрат сотен тысяч сэмплов — работа не для главного потока.
     private nonisolated static func makeWaveform(for url: URL) async -> Data? {
         await Task.detached(priority: .utility) {

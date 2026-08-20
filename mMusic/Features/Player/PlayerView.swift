@@ -6,10 +6,6 @@ struct PlayerView: View {
     @State private var sliderValue: TimeInterval = 0
     @State private var isScrubbing = false
     @State private var isQueuePresented = false
-
-    /// Через несколько секунд бездействия остаётся только обложка и дышащий фон.
-    @State private var controlsVisible = true
-    @State private var hideControlsTask: Task<Void, Never>?
     
     /// Сглаженная громкость для фона: тянется за `audioPlayer.level`, но лениво,
     /// иначе фон мигал бы на каждой ноте.
@@ -44,6 +40,12 @@ struct PlayerView: View {
         .onAppear { sliderValue = audioPlayer.currentTime }
         .task(id: audioPlayer.currentTrack?.filename) {
             isLightBackground = await Self.isLight(artwork: audioPlayer.currentTrack?.displayArtwork)
+
+            // Фоновый проход идёт по всей библиотеке подряд; тот трек, что открыт
+            // прямо сейчас, ждать своей очереди не должен.
+            if let track = audioPlayer.currentTrack {
+                await TrackWaveformLoader.fill(track)
+            }
         }
     }
 
@@ -80,15 +82,7 @@ struct PlayerView: View {
                     }
                 }
                 .onTapGesture {
-                    // Интерфейс спрятан — первый тап только возвращает его,
-                    // иначе попытка достать кнопки ставила бы музыку на паузу.
-                    guard controlsVisible else {
-                        revealControls()
-                        return
-                    }
-
                     audioPlayer.togglePlayPause()
-                    revealControls()
                 }
                 .gesture(
                     DragGesture(minimumDistance: 30)
@@ -107,76 +101,57 @@ struct PlayerView: View {
                         }
                 )
             
-            if controlsVisible {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(audioPlayer.currentTrack?.name ?? "")
-                        .font(.title2)
-                        .bold()
-                        .lineLimit(1)
-                    ArtistPillRow(artists: audioPlayer.currentTrack?.artists ?? [])
-                        .font(.subheadline)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(audioPlayer.currentTrack?.name ?? "")
+                    .font(.title2)
+                    .bold()
+                    .lineLimit(1)
+                ArtistPillRow(artists: audioPlayer.currentTrack?.artists ?? [])
+                    .font(.subheadline)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        
+            VStack(spacing: 4) {
+                Slider(
+                    value: $sliderValue,
+                    in: 0...max(audioPlayer.duration, 0.01)
+                ) { editing in
+                    isScrubbing = editing
+                    if !editing {
+                        audioPlayer.seek(to: sliderValue)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-                VStack(spacing: 4) {
-                    Slider(
-                        value: $sliderValue,
-                        in: 0...max(audioPlayer.duration, 0.01)
-                    ) { editing in
-                        isScrubbing = editing
-                        if !editing {
-                            audioPlayer.seek(to: sliderValue)
-                        }
+                .background {
+                    if let waveformSamples {
+                        WaveformView(
+                            samples: waveformSamples,
+                            progress: playedFraction,
+                            played: audioPlayer.accent.opacity(0.35),
+                            upcoming: Color.primary.opacity(0.12)
+                        )
+                        .frame(height: 44)
+                        // Иначе волна перехватывала бы касания у слайдера.
+                        .allowsHitTesting(false)
                     }
-                    .background {
-                        if let waveformSamples {
-                            WaveformView(
-                                samples: waveformSamples,
-                                progress: playedFraction,
-                                played: audioPlayer.accent.opacity(0.35),
-                                upcoming: Color.primary.opacity(0.12)
-                            )
-                            .frame(height: 44)
-                            // Иначе волна перехватывала бы касания у слайдера.
-                            .allowsHitTesting(false)
-                        }
-                    }
-
-                    HStack {
-                        Text(timeString(sliderValue))
-                        Spacer()
-                        Text("-" + timeString(audioPlayer.duration - sliderValue))
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
                 }
 
-                controls
+                HStack {
+                    Text(timeString(sliderValue))
+                    Spacer()
+                    Text("-" + timeString(audioPlayer.duration - sliderValue))
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
             }
 
+            controls
             Spacer()
 
-            if controlsVisible {
-                queueButton
-            }
+            queueButton
         }
-        // Без отступов обложка занимает всю ширину — ради этого интерфейс и убирается.
-        .padding(.horizontal, controlsVisible ? 24 : 0)
-        .padding(.top, controlsVisible ? 32 : 0)
-        .animation(.easeInOut(duration: 0.35), value: controlsVisible)
-        .overlay(alignment: .bottom) {
-            if !controlsVisible {
-                thinProgressLine
-            }
-        }
-        .onAppear { scheduleControlsHiding() }
-        .onDisappear { hideControlsTask?.cancel() }
-        .onChange(of: audioPlayer.currentIndex) { _, _ in revealControls() }
-        .onChange(of: isScrubbing) { _, scrubbing in
-            // Пока тянут ползунок, интерфейс убирать нельзя.
-            if scrubbing { hideControlsTask?.cancel() } else { scheduleControlsHiding() }
-        }
+        .padding(.horizontal, 24)
+        .padding(.top, 32)
         .onChange(of: audioPlayer.level) { _, newLevel in
             // Вспышка мгновенная, гаснет плавно — так удары читаются как удары.
             if newLevel > glow {
@@ -217,7 +192,6 @@ struct PlayerView: View {
         HStack {
             Button {
                 audioPlayer.toggleShuffle()
-                revealControls()
             } label: {
                 Image(systemName: "shuffle")
                     .font(.title3)
@@ -229,7 +203,6 @@ struct PlayerView: View {
 
             Button {
                 audioPlayer.playPrevious()
-                revealControls()
             } label: {
                 Image(systemName: "backward.fill")
                     .font(.title)
@@ -241,7 +214,6 @@ struct PlayerView: View {
 
             Button {
                 audioPlayer.togglePlayPause()
-                revealControls()
             } label: {
                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 44))
@@ -255,7 +227,6 @@ struct PlayerView: View {
 
             Button {
                 audioPlayer.playNext()
-                revealControls()
             } label: {
                 Image(systemName: "forward.fill")
                     .font(.title)
@@ -267,7 +238,6 @@ struct PlayerView: View {
 
             Button {
                 audioPlayer.cycleRepeatMode()
-                revealControls()
             } label: {
                 Image(systemName: audioPlayer.repeatMode.systemImage)
                     .font(.title3)
@@ -291,33 +261,6 @@ struct PlayerView: View {
             }
             .foregroundStyle(.secondary)
             .buttonStyle(PressableButtonStyle())
-        }
-    }
-
-    /// Всё, что остаётся от интерфейса, когда он убран.
-    private var thinProgressLine: some View {
-        GeometryReader { proxy in
-            Rectangle()
-                .fill(audioPlayer.accent)
-                .frame(width: proxy.size.width * playedFraction)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-        }
-        .frame(height: 2)
-        .transition(.opacity)
-    }
-
-    private func revealControls() {
-        withAnimation(.easeOut(duration: 0.2)) { controlsVisible = true }
-        scheduleControlsHiding()
-    }
-
-    private func scheduleControlsHiding() {
-        hideControlsTask?.cancel()
-        hideControlsTask = Task {
-            try? await Task.sleep(for: .seconds(3))
-            guard !Task.isCancelled else { return }
-
-            withAnimation(.easeInOut(duration: 0.4)) { controlsVisible = false }
         }
     }
 
