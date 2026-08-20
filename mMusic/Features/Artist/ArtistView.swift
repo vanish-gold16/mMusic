@@ -7,11 +7,11 @@ struct ArtistView: View {
 
     var artist: Artist
 
-    @State private var sortOption: SortOption = .albumOrder
+    @State private var sortOption: SortOption = .mostPlayed
 
     private enum SortOption: String, CaseIterable, Identifiable {
-        case albumOrder = "Album order"
         case mostPlayed = "Most played"
+        case albumOrder = "Album order"
         case name = "Name"
         case recent = "Recently played"
 
@@ -52,10 +52,13 @@ struct ArtistView: View {
     /// Порядок по альбомам — исходный, его и оставляем как есть.
     private var tracks: [Track] {
         switch sortOption {
+        case .mostPlayed:
+            // При равном счёте порядок альбома — иначе непрослушанные встают как попало.
+            allTracks.enumerated()
+                .sorted { ($0.element.playCount, $1.offset) > ($1.element.playCount, $0.offset) }
+                .map(\.element)
         case .albumOrder:
             allTracks
-        case .mostPlayed:
-            allTracks.sorted { $0.playCount > $1.playCount }
         case .name:
             allTracks.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         case .recent:
