@@ -75,6 +75,16 @@ struct SettingsView: View {
                     }
                 }
 
+                Section {
+                    NavigationLink {
+                        WrappedView()
+                    } label: {
+                        Label("Your year in music", systemImage: "chart.bar.fill")
+                    }
+                } header: {
+                    Text("stats")
+                }
+
                 Section("library") {
                     LabeledContent("Tracks", value: "\(tracks.count)")
                     LabeledContent("Albums", value: "\(albums.count)")

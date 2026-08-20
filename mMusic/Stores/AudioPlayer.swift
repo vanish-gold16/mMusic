@@ -56,6 +56,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     /// прослушивания копит секунды — так в истории оказывается реальное время,
     /// а не порог засчитывания.
     private var currentEvent: PlayEvent?
+
+    /// Когда таймер сна погасит музыку. nil — таймера нет.
+    var sleepEndsAt: Date?
+    /// Остановиться, доиграв текущий трек: обрывать песню на середине — не то,
+    /// чего ждут от таймера сна.
+    var stopsAfterCurrentTrack = false
+    private var sleepTask: Task<Void, Never>?
     private var sessionObservers: [NSObjectProtocol] = []
     
     override init() {
@@ -79,6 +86,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
 
     deinit {
+        sleepTask?.cancel()
         sessionObservers.forEach(NotificationCenter.default.removeObserver)
         meterTimer?.invalidate()
         progressTimer?.invalidate()
@@ -213,6 +221,38 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         playCurrent()
     }
 
+    /// Таймер сна на заданное число минут. Повторный вызов заменяет предыдущий.
+    func startSleepTimer(minutes: Int) {
+        cancelSleepTimer()
+
+        let seconds = minutes * 60
+        sleepEndsAt = .now.addingTimeInterval(TimeInterval(seconds))
+
+        sleepTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+
+            pause()
+            sleepEndsAt = nil
+        }
+    }
+
+    func stopAfterCurrentTrack() {
+        cancelSleepTimer()
+        stopsAfterCurrentTrack = true
+    }
+
+    func cancelSleepTimer() {
+        sleepTask?.cancel()
+        sleepTask = nil
+        sleepEndsAt = nil
+        stopsAfterCurrentTrack = false
+    }
+
+    var hasSleepTimer: Bool {
+        sleepEndsAt != nil || stopsAfterCurrentTrack
+    }
+
     /// Новая скорость должна услышаться сразу, а не со следующего трека.
     func applyPlaybackRate() {
         guard isPlaying else { return }
@@ -228,6 +268,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         guard flag else {
+            finishPlayback()
+            return
+        }
+
+        // Таймер сна «до конца трека»: дослушали — и тишина, очередь не трогаем.
+        if stopsAfterCurrentTrack {
+            stopsAfterCurrentTrack = false
             finishPlayback()
             return
         }

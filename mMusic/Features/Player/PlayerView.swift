@@ -16,6 +16,8 @@ struct PlayerView: View {
     @State private var isQueuePresented = false
     @State private var isAddingToPlaylist = false
     @State private var isEditingTrack = false
+
+    @AppStorage(AppSettings.playbackRate) private var playbackRate = 1.0
     
     /// Сглаженная громкость для фона: тянется за `audioPlayer.level`, но лениво,
     /// иначе фон мигал бы на каждой ноте.
@@ -373,6 +375,11 @@ struct PlayerView: View {
                 } label: {
                     Label("Edit track", systemImage: "pencil")
                 }
+
+                Divider()
+
+                speedMenu
+                sleepMenu
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -381,6 +388,55 @@ struct PlayerView: View {
                 .contentShape(Rectangle())
         }
         .foregroundStyle(.secondary)
+    }
+
+    /// Скорость лежит и в настройках, но менять её на слух удобнее там же, где слушаешь.
+    private var speedMenu: some View {
+        Menu {
+            ForEach([0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
+                Button {
+                    playbackRate = rate
+                    audioPlayer.applyPlaybackRate()
+                } label: {
+                    Label(
+                        String(format: "%.2f×", rate),
+                        systemImage: abs(playbackRate - rate) < 0.01 ? "checkmark" : "speedometer"
+                    )
+                }
+            }
+        } label: {
+            Label("Speed", systemImage: "speedometer")
+        }
+    }
+
+    private var sleepMenu: some View {
+        Menu {
+            if audioPlayer.hasSleepTimer {
+                Button(role: .destructive) {
+                    audioPlayer.cancelSleepTimer()
+                } label: {
+                    Label("Turn off", systemImage: "xmark")
+                }
+
+                Divider()
+            }
+
+            Button {
+                audioPlayer.stopAfterCurrentTrack()
+            } label: {
+                Label("End of track", systemImage: "music.note")
+            }
+
+            ForEach([15, 30, 45, 60], id: \.self) { minutes in
+                Button {
+                    audioPlayer.startSleepTimer(minutes: minutes)
+                } label: {
+                    Label("\(minutes) minutes", systemImage: "clock")
+                }
+            }
+        } label: {
+            Label(audioPlayer.hasSleepTimer ? "Sleep timer • on" : "Sleep timer", systemImage: "moon.zzz")
+        }
     }
 
     private var waveformSamples: [UInt8]? {
