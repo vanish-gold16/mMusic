@@ -5,6 +5,8 @@ enum AppSettings {
     static let pauseOnDisconnect = "pauseOnDisconnect"
     static let resumeAfterInterruption = "resumeAfterInterruption"
     static let playbackRate = "playbackRate"
+    static let deleteOriginalAfterImport = "deleteOriginalAfterImport"
+    static let appearance = "appearance"
 
     /// Без регистрации `bool(forKey:)` вернул бы false для ещё не записанного ключа,
     /// и обе настройки стартовали бы выключенными, хотя в интерфейсе выглядят включёнными.
@@ -12,7 +14,9 @@ enum AppSettings {
         UserDefaults.standard.register(defaults: [
             pauseOnDisconnect: true,
             resumeAfterInterruption: true,
-            playbackRate: 1.0
+            playbackRate: 1.0,
+            deleteOriginalAfterImport: true,
+            appearance: Appearance.system.rawValue
         ])
     }
 }

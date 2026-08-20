@@ -10,6 +10,8 @@ struct SettingsView: View {
     @AppStorage(AppSettings.pauseOnDisconnect) private var pauseOnDisconnect = true
     @AppStorage(AppSettings.resumeAfterInterruption) private var resumeAfterInterruption = true
     @AppStorage(AppSettings.playbackRate) private var playbackRate = 1.0
+    @AppStorage(AppSettings.deleteOriginalAfterImport) private var deleteOriginalAfterImport = true
+    @AppStorage(AppSettings.appearance) private var appearance = Appearance.system.rawValue
 
     @Query private var tracks: [Track]
     @Query private var albums: [Album]
@@ -37,6 +39,24 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("appearance") {
+                    Picker("Theme", selection: $appearance) {
+                        ForEach(Appearance.allCases) { option in
+                            Label(option.title, systemImage: option.systemImage)
+                                .tag(option.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section {
+                    Toggle("Delete original after import", isOn: $deleteOriginalAfterImport)
+                } header: {
+                    Text("import")
+                } footer: {
+                    Text("The file is removed from Files only after it has been copied into the library. Some locations don't allow deleting — those files stay.")
+                }
+
                 Section("playback") {
                     Toggle("Pause when headphones disconnect", isOn: $pauseOnDisconnect)
                     Toggle("Resume after a call", isOn: $resumeAfterInterruption)

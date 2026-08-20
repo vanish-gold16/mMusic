@@ -22,6 +22,8 @@ struct RootView: View {
     @State private var libraryPath: NavigationPath = .init()
     @State private var searchPath: NavigationPath = .init()
     
+    @AppStorage(AppSettings.appearance) private var appearance = Appearance.system.rawValue
+
     @State private var audioPlayer = AudioPlayer()
     @State private var isPlayerPresented = false
     
@@ -68,6 +70,7 @@ struct RootView: View {
             await TrackDurationLoader.fill(tracksNeedingDuration)
         }
         .tint(.orange)
+        .preferredColorScheme(Appearance(rawValue: appearance)?.colorScheme)
     }
     
     private var tabBinding: Binding<Tab> {

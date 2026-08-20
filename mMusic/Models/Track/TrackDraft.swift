@@ -7,5 +7,8 @@ struct TrackDraft: Identifiable {
     var genre: Genre = .pop
     var artists: [ArtistDraft] = []
     var stagedURL: URL
+    /// Файл в «Файлах», из которого сделан черновик. Нужен, чтобы убрать оригинал
+    /// после сохранения альбома — но не раньше: создание можно и отменить.
+    var originalURL: URL?
     var sourceTrack: PersistentIdentifier?
 }

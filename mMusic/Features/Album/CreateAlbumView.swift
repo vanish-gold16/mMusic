@@ -231,7 +231,8 @@ struct CreateAlbumView: View {
                 TrackDraft(
                     name: metadata.title ?? url.parseMusic().name,
                     artists: names.map { ArtistDraft(name: $0, role: .featured) },
-                    stagedURL: stagedURL
+                    stagedURL: stagedURL,
+                    originalURL: url
                 )
             )
         }
@@ -297,6 +298,10 @@ struct CreateAlbumView: View {
                 } catch {
                     failedImports.append(draft.name)
                     continue
+                }
+
+                if let original = draft.originalURL {
+                    AudioFileStore.removeOriginalIfNeeded(original)
                 }
 
                 let track = Track(name: draft.name, album: album, credits: [], genre: draft.genre, filename: filename)

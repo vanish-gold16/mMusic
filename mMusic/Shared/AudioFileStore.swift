@@ -28,7 +28,29 @@ enum AudioFileStore {
         let didAccess = source.startAccessingSecurityScopedResource()
         defer { if didAccess { source.stopAccessingSecurityScopedResource() } }
 
-        return try place(source, using: FileManager.default.copyItem(at:to:))
+        let filename = try place(source, using: FileManager.default.copyItem(at:to:))
+
+        // Строго после успешного копирования: упало бы — и файла не осталось бы нигде.
+        removeOriginal(source)
+
+        return filename
+    }
+
+    /// Убирает исходник из «Файлов», чтобы после импорта не разгребать их вручную.
+    /// Своим security-scoped доступом, потому что зовётся и отдельно от `importFile`.
+    static func removeOriginalIfNeeded(_ source: URL) {
+        let didAccess = source.startAccessingSecurityScopedResource()
+        defer { if didAccess { source.stopAccessingSecurityScopedResource() } }
+
+        removeOriginal(source)
+    }
+
+    /// Прав на удаление может и не быть — например, файл лежит в чужом провайдере.
+    /// Это не повод считать импорт неудавшимся.
+    private static func removeOriginal(_ source: URL) {
+        guard UserDefaults.standard.bool(forKey: AppSettings.deleteOriginalAfterImport) else { return }
+
+        try? FileManager.default.removeItem(at: source)
     }
 
     /// Переносит в Documents файл, уже подготовленный во временной папке.
