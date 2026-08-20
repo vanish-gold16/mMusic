@@ -6,6 +6,9 @@ struct DownloadView: View {
     /// Файлы, выбранные разом, ждут своей очереди: настройки заполняются по одному.
     @State private var pendingFiles: [PickedFile] = []
     @State private var currentFile: PickedFile?
+    @State private var showSoundCloud = false
+    /// Заполнено только для трека из SoundCloud — у обычного импорта теги читаются из файла.
+    @State private var presetMetadata: AudioMetadata?
     
     var body: some View {
         VStack {
@@ -40,10 +43,10 @@ struct DownloadView: View {
                 }
                 
                 Button {
-                    
+                    showSoundCloud = true
                 } label: {
                     VStack {
-                        Text("Soundloud")
+                        Text("SoundCloud")
                     }
                     .frame(maxWidth: .infinity, minHeight: 120)
                 }
@@ -71,13 +74,21 @@ struct DownloadView: View {
         }
         .navigationTitle("Download")
         .sheet(item: $currentFile, onDismiss: showNextFile) { file in
-            SettingView(file: file)
+            SettingView(file: file, preset: presetMetadata)
+        }
+        .sheet(isPresented: $showSoundCloud) {
+            SoundCloudImportView { file, metadata in
+                presetMetadata = metadata
+                pendingFiles = [file]
+                showNextFile()
+            }
         }
     }
     
     private func handleFileLoading(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
+            presetMetadata = nil
             pendingFiles = urls.map { PickedFile(url: $0) }
             showNextFile()
         case .failure(let error):

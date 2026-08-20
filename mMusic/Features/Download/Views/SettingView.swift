@@ -23,6 +23,9 @@ struct SettingView: View {
     @Query(sort: \Album.name) private var albums: [Album]
 
     let file: PickedFile
+    /// Метаданные, добытые не из файла (например, из SoundCloud). Если они есть,
+    /// теги самого файла не читаются: у скачанного mp3 их может не быть вовсе.
+    let preset: AudioMetadata?
     
     var body: some View {
         
@@ -125,8 +128,9 @@ struct SettingView: View {
 
     /// Поля заполняются разбором имени файла сразу, чтобы форма не открывалась пустой.
     /// Теги из самого файла приходят следом, в `loadMetadata`.
-    init(file: PickedFile) {
+    init(file: PickedFile, preset: AudioMetadata? = nil) {
         self.file = file
+        self.preset = preset
         _name = State(initialValue: file.url.parseMusic().name)
         let names = file.url.parsedArtistNames()
         let drafts = names.isEmpty ? [ArtistDraft(name: "unknown")] : names.map { ArtistDraft(name: $0) }
@@ -138,7 +142,12 @@ struct SettingView: View {
         guard !didLoadMetadata else { return }
         didLoadMetadata = true
 
-        let metadata = await AudioMetadata.load(from: file.url)
+        let metadata: AudioMetadata
+        if let preset {
+            metadata = preset
+        } else {
+            metadata = await AudioMetadata.load(from: file.url)
+        }
 
         if let title = metadata.title { name = title }
         if !metadata.artistNames.isEmpty {
