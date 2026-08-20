@@ -22,6 +22,10 @@ struct TrackCell: View {
     /// В обычных списках счётчик — лишний шум, поэтому включается точечно.
     var showPlayCount: Bool = false
 
+    private var isCurrent: Bool {
+        audioPlayer.currentTrack?.id == track.id
+    }
+
     var body: some View {
         HStack {
             Image(systemName: "star.fill")
@@ -30,7 +34,7 @@ struct TrackCell: View {
                 .frame(width: 16)
             switch leadingStyle {
             case .number:
-                if audioPlayer.currentTrack?.id == track.id {
+                if isCurrent {
                     EqualizerView(level: audioPlayer.level)
                         .foregroundStyle(.tint)
                         .frame(width: 40, height: 40)
@@ -53,7 +57,7 @@ struct TrackCell: View {
                         }
                     }
                     .overlay {
-                        if audioPlayer.currentTrack?.id == track.id {
+                        if isCurrent {
                             Color.black.opacity(0.4)
                             EqualizerView(level: audioPlayer.level)
                                 .foregroundStyle(.white)
@@ -144,7 +148,9 @@ struct TrackCell: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .glassEffect()
+        // Играющая строка красится стеклом, а не отдельной плашкой: видно сразу,
+        // и цвет тот же, что у обложки.
+        .glassEffect(isCurrent ? .regular.tint(audioPlayer.accent.opacity(0.28)) : .regular)
         .padding(.horizontal)
         .onTapGesture {
             let list = queue.isEmpty ? [track] : queue  // ← подумай, не перепутал ли порядок

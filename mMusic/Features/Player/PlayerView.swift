@@ -6,6 +6,8 @@ struct PlayerView: View {
     @State private var sliderValue: TimeInterval = 0
     @State private var isScrubbing = false
     @State private var isQueuePresented = false
+    @State private var isAddingToPlaylist = false
+    @State private var isEditingTrack = false
     
     /// Сглаженная громкость для фона: тянется за `audioPlayer.level`, но лениво,
     /// иначе фон мигал бы на каждой ноте.
@@ -33,6 +35,16 @@ struct PlayerView: View {
         .sheet(isPresented: $isQueuePresented) {
             QueueView(audioPlayer: audioPlayer)
         }
+        .sheet(isPresented: $isAddingToPlaylist) {
+            if let track = audioPlayer.currentTrack {
+                AddToPlaylistView(tracks: [track])
+            }
+        }
+        .sheet(isPresented: $isEditingTrack) {
+            if let track = audioPlayer.currentTrack {
+                EditTrackView(track: track)
+            }
+        }
         .presentationBackground { artworkBackground }
         // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
         // обложке вуаль становится светлой, а `.primary` / `.secondary` — тёмными.
@@ -51,7 +63,9 @@ struct PlayerView: View {
 
     private var content: some View {
         VStack(spacing: 32) {
-            RoundedRectangle(cornerRadius: 16)
+            // Concentric — скругление, повторяющее радиус корпуса: обложка перестаёт
+            // выглядеть наклеенной поверх экрана.
+            ConcentricRectangle(corners: .concentric(minimum: .fixed(16)), isUniform: true)
                 .fill(.quaternary)
                 .overlay {
                     if let data = audioPlayer.currentTrack?.displayArtwork,
@@ -65,7 +79,7 @@ struct PlayerView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .clipShape(ConcentricRectangle(corners: .concentric(minimum: .fixed(16)), isUniform: true))
                 .aspectRatio(1, contentMode: .fit)
                 .frame(maxWidth: .infinity)
                 .onGeometryChange(for: CGFloat.self) { proxy in
@@ -146,9 +160,12 @@ struct PlayerView: View {
             }
 
             controls
+
+            outputRow
+
             Spacer()
 
-            queueButton
+            bottomRow
         }
         .padding(.horizontal, 24)
         .padding(.top, 32)
@@ -186,70 +203,99 @@ struct PlayerView: View {
         }
     }
     
-    /// Перемотка вперёд-назад жестами по обложке осталась, но вслепую ей пользоваться
-    /// неудобно — обычные кнопки нужны рядом.
+    /// Кнопки лежат в общем `GlassEffectContainer`: соседние стеклянные фигуры
+    /// внутри него сливаются при сближении — ради этого Liquid Glass и сделан.
+    /// Центральная тонируется цветом обложки, остальные остаются нейтральными.
     private var controls: some View {
-        HStack {
-            Button {
-                audioPlayer.toggleShuffle()
-            } label: {
-                Image(systemName: "shuffle")
-                    .font(.title3)
+        GlassEffectContainer(spacing: 14) {
+            HStack(spacing: 14) {
+                circleButton("shuffle", size: 48, active: audioPlayer.isShuffled) {
+                    audioPlayer.toggleShuffle()
+                }
+
+                circleButton("backward.fill", size: 56) {
+                    audioPlayer.playPrevious()
+                }
+
+                Button {
+                    audioPlayer.togglePlayPause()
+                } label: {
+                    Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title)
+                        .foregroundStyle(.primary)
+                        .frame(width: 76, height: 76)
+                }
+                .glassEffect(.regular.tint(audioPlayer.accent.opacity(0.35)).interactive(), in: .circle)
+                .buttonStyle(PressableButtonStyle())
+
+                circleButton("forward.fill", size: 56) {
+                    audioPlayer.playNext()
+                }
+
+                circleButton(audioPlayer.repeatMode.systemImage, size: 48, active: audioPlayer.repeatMode.isActive) {
+                    audioPlayer.cycleRepeatMode()
+                }
             }
-            .foregroundStyle(audioPlayer.isShuffled ? audioPlayer.accent : Color.secondary)
-            .buttonStyle(PressableButtonStyle())
-
-            Spacer()
-
-            Button {
-                audioPlayer.playPrevious()
-            } label: {
-                Image(systemName: "backward.fill")
-                    .font(.title)
-            }
-            .foregroundStyle(.primary)
-            .buttonStyle(PressableButtonStyle())
-
-            Spacer()
-
-            Button {
-                audioPlayer.togglePlayPause()
-            } label: {
-                Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 44))
-                    .frame(width: 60, height: 60)
-                    .contentShape(Rectangle())
-            }
-            .foregroundStyle(.primary)
-            .buttonStyle(PressableButtonStyle())
-
-            Spacer()
-
-            Button {
-                audioPlayer.playNext()
-            } label: {
-                Image(systemName: "forward.fill")
-                    .font(.title)
-            }
-            .foregroundStyle(.primary)
-            .buttonStyle(PressableButtonStyle())
-
-            Spacer()
-
-            Button {
-                audioPlayer.cycleRepeatMode()
-            } label: {
-                Image(systemName: audioPlayer.repeatMode.systemImage)
-                    .font(.title3)
-            }
-            .foregroundStyle(audioPlayer.repeatMode.isActive ? audioPlayer.accent : Color.secondary)
-            .buttonStyle(PressableButtonStyle())
         }
     }
 
-    private var queueButton: some View {
-        HStack {
+    /// Включённый режим подсвечивается самим стеклом, а не только цветом значка —
+    /// так состояние видно, пока смотришь на кнопку, а не приглядываешься к оттенку.
+    private func circleButton(
+        _ systemImage: String,
+        size: CGFloat,
+        active: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(size > 50 ? .title3 : .subheadline)
+                .foregroundStyle(active ? audioPlayer.accent : Color.primary)
+                .frame(width: size, height: size)
+        }
+        .glassEffect(
+            active ? .regular.tint(audioPlayer.accent.opacity(0.25)).interactive() : .regular.interactive(),
+            in: .circle
+        )
+        .buttonStyle(PressableButtonStyle())
+    }
+
+    /// Громкость и выбор устройства — системные вьюхи: своих аналогов iOS не разрешает.
+    private var outputRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "speaker.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            SystemVolumeSlider(tint: UIColor(audioPlayer.accent))
+                .frame(height: 28)
+
+            Image(systemName: "speaker.wave.3.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var bottomRow: some View {
+        HStack(spacing: 20) {
+            Button {
+                audioPlayer.currentTrack?.isFavourite.toggle()
+            } label: {
+                Image(systemName: (audioPlayer.currentTrack?.isFavourite ?? false) ? "star.fill" : "star")
+                    .font(.title3)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .foregroundStyle((audioPlayer.currentTrack?.isFavourite ?? false) ? audioPlayer.accent : Color.secondary)
+            .buttonStyle(PressableButtonStyle())
+
             Spacer()
+
+            RoutePickerButton(
+                tint: UIColor(Color.secondary),
+                activeTint: UIColor(audioPlayer.accent)
+            )
+            .frame(width: 44, height: 44)
 
             Button {
                 isQueuePresented = true
@@ -261,7 +307,50 @@ struct PlayerView: View {
             }
             .foregroundStyle(.secondary)
             .buttonStyle(PressableButtonStyle())
+
+            trackMenu
         }
+    }
+
+    /// Параметры играющего трека — то же, что в меню строки списка,
+    /// но под рукой, пока слушаешь.
+    private var trackMenu: some View {
+        Menu {
+            if let track = audioPlayer.currentTrack {
+                Button {
+                    track.isFavourite.toggle()
+                } label: {
+                    Label(
+                        track.isFavourite ? "Remove from favourites" : "Add to favourites",
+                        systemImage: track.isFavourite ? "star.slash" : "star"
+                    )
+                }
+
+                Button {
+                    isAddingToPlaylist = true
+                } label: {
+                    Label("Add to a Playlist", systemImage: "text.badge.plus")
+                }
+
+                ShareLink(item: AudioFileStore.url(for: track.filename)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+
+                Divider()
+
+                Button {
+                    isEditingTrack = true
+                } label: {
+                    Label("Edit track", systemImage: "pencil")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.title3)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .foregroundStyle(.secondary)
     }
 
     private var waveformSamples: [UInt8]? {
