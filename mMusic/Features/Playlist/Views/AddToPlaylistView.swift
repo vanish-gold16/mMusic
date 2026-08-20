@@ -12,6 +12,8 @@ struct AddToPlaylistView: View {
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
 
     @State private var newPlaylistName = ""
+    /// Сообщение о том, сколько треков легло, а сколько уже было.
+    @State private var result: String?
 
     private var trimmedName: String {
         newPlaylistName.trimmingCharacters(in: .whitespaces)
@@ -58,6 +60,18 @@ struct AddToPlaylistView: View {
                     Button("cancel") { dismiss() }
                 }
             }
+            .alert(
+                "Added",
+                isPresented: Binding(
+                    get: { result != nil },
+                    set: { if !$0 { result = nil } }
+                ),
+                presenting: result
+            ) { _ in
+                Button("OK") { dismiss() }
+            } message: { message in
+                Text(message)
+            }
         }
     }
 
@@ -73,11 +87,25 @@ struct AddToPlaylistView: View {
         let existing = Set(playlist.items.map(\.track.persistentModelID))
         var position = playlist.items.count
 
+        var added = 0
+
         for track in tracks where !existing.contains(track.persistentModelID) {
             modelContext.insert(TrackPlaylistItem(track: track, playlist: playlist, position: position))
             position += 1
+            added += 1
         }
 
-        dismiss()
+        let skipped = tracks.count - added
+
+        // Про пропуски нужно сказать: молчаливое «ничего не произошло» выглядит
+        // как сбой, особенно когда добавляешь альбом целиком.
+        guard skipped > 0 else {
+            dismiss()
+            return
+        }
+
+        result = added == 0
+            ? "All \(skipped) tracks are already in \"\(playlist.name)\"."
+            : "\(added) added, \(skipped) already there."
     }
 }

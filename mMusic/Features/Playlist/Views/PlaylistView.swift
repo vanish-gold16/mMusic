@@ -165,6 +165,18 @@ struct PlaylistView: View {
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
+
+                        Menu {
+                            ForEach(PlaylistSort.allCases) { option in
+                                Button {
+                                    applySort(option)
+                                } label: {
+                                    Label(option.rawValue, systemImage: option.systemImage)
+                                }
+                            }
+                        } label: {
+                            Label("Sort", systemImage: "arrow.up.arrow.down")
+                        }
                         
                         Divider()
                         
@@ -213,6 +225,13 @@ struct PlaylistView: View {
         }
     }
     
+    /// Переписывает позиции раз и навсегда: дальше порядок снова ручной.
+    private func applySort(_ option: PlaylistSort) {
+        for (index, item) in option.sorted(playlist.items).enumerated() {
+            item.position = index
+        }
+    }
+
     private func moveTracks(from: IndexSet, to: Int) {
         var items = playlist.items.sorted { $0.position < $1.position }
         items.move(fromOffsets: from, toOffset: to)

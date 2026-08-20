@@ -91,6 +91,12 @@ struct SettingsView: View {
                     LabeledContent("Artists", value: "\(artists.count)")
                     LabeledContent("Playlists", value: "\(playlistCount)")
                     LabeledContent("Plays", value: "\(totalPlays)")
+
+                    // Файлы лежат в песочнице: снесёшь приложение — исчезнут вместе с ним.
+                    ShareLink(items: tracks.map { AudioFileStore.url(for: $0.filename) }) {
+                        Label("Export all tracks", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(tracks.isEmpty)
                 }
 
                 Section {
