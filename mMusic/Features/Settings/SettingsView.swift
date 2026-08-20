@@ -72,7 +72,6 @@ struct SettingsView: View {
                         Slider(value: $playbackRate, in: 0.5...2.0, step: 0.05) { editing in
                             if !editing { audioPlayer.applyPlaybackRate() }
                         }
-                        .tint(.orange)
                     }
                 }
 

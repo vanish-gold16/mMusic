@@ -63,7 +63,6 @@ struct SoundCloudImportView: View {
                         .frame(height: 44)
                     }
                     .buttonStyle(.glassProminent)
-                    .tint(.orange)
                     .disabled(!canStart)
                 }
                 .listRowBackground(Color.clear)

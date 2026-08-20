@@ -25,14 +25,14 @@ struct TrackCell: View {
     var body: some View {
         HStack {
             Image(systemName: "star.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.tint)
                 .opacity(track.isFavourite ? 1 : 0)
                 .frame(width: 16)
             switch leadingStyle {
             case .number:
                 if audioPlayer.currentTrack?.id == track.id {
                     EqualizerView(level: audioPlayer.level)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.tint)
                         .frame(width: 40, height: 40)
                 } else {
                     Text("\(track.position + 1)")

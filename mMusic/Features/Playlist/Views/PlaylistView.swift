@@ -47,7 +47,7 @@ struct PlaylistView: View {
                         audioPlayer.play(playlist.orderedTracks)
                     } label: {
                         Capsule()
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.tint)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .padding(.horizontal)
@@ -64,7 +64,7 @@ struct PlaylistView: View {
                         audioPlayer.playShuffled(playlist.orderedTracks)
                     } label: {
                         Capsule()
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.tint)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .padding(.horizontal)
@@ -103,7 +103,6 @@ struct PlaylistView: View {
                         .resizable()
                         .bold()
                         .frame(width: 15, height: 15)
-                        .tint(.orange)
                         .frame(width: 40, height: 40)
                     Text("Add Music")
                         .tint(.primary)

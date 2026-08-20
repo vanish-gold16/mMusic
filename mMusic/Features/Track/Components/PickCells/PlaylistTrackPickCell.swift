@@ -42,7 +42,6 @@ struct PlaylistTrackPickCell: View {
                     Image(systemName: "plus")
                 }
             }
-            .tint(.orange)
         }
         .padding(.horizontal)
     }

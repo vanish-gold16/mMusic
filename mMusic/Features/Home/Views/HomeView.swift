@@ -142,7 +142,7 @@ struct HomeView: View {
 
                     Image(systemName: "play.fill")
                         .font(.title2)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.tint)
                 }
                 .padding(12)
                 .contentShape(Rectangle())

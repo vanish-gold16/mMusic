@@ -30,7 +30,7 @@ struct QueueView: View {
                     } label: {
                         Image(systemName: "shuffle")
                     }
-                    .tint(audioPlayer.isShuffled ? .orange : .secondary)
+                    .tint(audioPlayer.isShuffled ? audioPlayer.accent : Color.secondary)
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -38,7 +38,7 @@ struct QueueView: View {
                     } label: {
                         Image(systemName: audioPlayer.repeatMode.systemImage)
                     }
-                    .tint(audioPlayer.repeatMode.isActive ? .orange : .secondary)
+                    .tint(audioPlayer.repeatMode.isActive ? audioPlayer.accent : Color.secondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("done") { dismiss() }
@@ -95,7 +95,7 @@ struct QueueView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.name)
                     .lineLimit(1)
-                    .foregroundStyle(isCurrent ? .orange : .primary)
+                    .foregroundStyle(isCurrent ? audioPlayer.accent : Color.primary)
                 Text(track.artistNames.joined(separator: ", "))
                     .font(.caption)
                     .foregroundStyle(.secondary)

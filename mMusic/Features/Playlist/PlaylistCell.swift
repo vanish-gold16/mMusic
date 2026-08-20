@@ -11,7 +11,7 @@ struct PlaylistCell: View {
         
         HStack {
             Image(systemName: "pin.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.tint)
                 .opacity(playlist.isPinned ? 1 : 0)
                 .frame(width: 16)
             RoundedRectangle(cornerRadius: 8)

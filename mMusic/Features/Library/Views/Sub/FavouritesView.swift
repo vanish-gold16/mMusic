@@ -96,7 +96,6 @@ struct FavouritesView: View {
             }
             .buttonStyle(.glassProminent)
         }
-        .tint(.orange)
         .padding(.horizontal)
     }
 

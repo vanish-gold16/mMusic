@@ -44,7 +44,6 @@ struct AlbumTrackPickCell: View {
                     Image(systemName: "plus")
                 }
             }
-            .tint(.orange)
         }
         .padding(.horizontal)
     }

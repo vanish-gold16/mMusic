@@ -15,6 +15,9 @@ struct RootView: View {
     /// заполнения, поэтому `task(id:)` ниже перезапускается ровно тогда, когда работа появилась —
     /// и после импорта, и после первого запуска с новым полем.
     @Query(filter: #Predicate<Track> { $0.duration == 0 }) private var tracksNeedingDuration: [Track]
+
+    /// То же самое для формы волны — считается один раз и живёт в модели.
+    @Query(filter: #Predicate<Track> { $0.waveform == nil }) private var tracksNeedingWaveform: [Track]
     
     @State private var selected: Tab = .home
     @State private var homePath: NavigationPath = .init()
@@ -69,7 +72,11 @@ struct RootView: View {
         .task(id: tracksNeedingDuration.count) {
             await TrackDurationLoader.fill(tracksNeedingDuration)
         }
-        .tint(.orange)
+        .task(id: tracksNeedingWaveform.count) {
+            await TrackWaveformLoader.fill(tracksNeedingWaveform)
+        }
+        .tint(audioPlayer.accent)
+        .animation(.easeInOut(duration: 0.6), value: audioPlayer.accent)
         .preferredColorScheme(Appearance(rawValue: appearance)?.colorScheme)
     }
     

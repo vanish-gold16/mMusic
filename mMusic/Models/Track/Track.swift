@@ -31,6 +31,9 @@ class Track {
     var duration: TimeInterval = 0
     
     var addedAt: Date = Date.now
+    /// Форма волны: 120 байт громкости по всей длине трека. Считается один раз
+    /// в `TrackWaveformLoader`, рисуется за слайдером в плеере.
+    var waveform: Data?
     /// Сколько раз трек дослушивали. Считает `AudioPlayer`, а не сам запуск —
     /// иначе счётчик накручивался бы пролистыванием очереди.
     var playCount: Int = 0

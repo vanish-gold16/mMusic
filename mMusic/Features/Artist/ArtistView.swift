@@ -174,7 +174,6 @@ struct ArtistView: View {
             }
             .buttonStyle(.glassProminent)
         }
-        .tint(.orange)
         .padding(.horizontal)
     }
 

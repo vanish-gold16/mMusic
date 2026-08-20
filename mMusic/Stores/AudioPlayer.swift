@@ -27,6 +27,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     var repeatMode: RepeatMode = .off { didSet { persistModes() } }
     var isShuffled = false { didSet { persistModes() } }
 
+    /// Цвет играющей обложки — на него настроен tint всего приложения.
+    /// Оранжевый остаётся, пока ничего не играет.
+    var accent: Color = .orange
+
     var level: Double = 0
     private let meterFloor: Double = -50
 
@@ -112,6 +116,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             
             track.lastPlayedAt = .now
             didCountCurrentPlay = false
+            refreshAccent()
             persistQueue()
             
             isPlaying = true
@@ -363,6 +368,29 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     func restore(_ tracks: [Track], current filename: String) {
         queue = tracks
         currentIndex = tracks.firstIndex { $0.filename == filename } ?? 0
+        refreshAccent()
+    }
+
+    /// Разбор обложки уводится в фоновую задачу: она декодируется и сжимается,
+    /// а смена трека не должна ради этого подвисать.
+    private func refreshAccent() {
+        guard let track = currentTrack, let data = track.displayArtwork else {
+            accent = .orange
+            return
+        }
+
+        let filename = track.filename
+
+        Task { @MainActor in
+            let color = await Task.detached(priority: .utility) {
+                UIImage(data: data)?.dominantColor
+            }.value
+
+            // Пока считали, трек мог смениться — тогда этот цвет уже не к месту.
+            guard currentTrack?.filename == filename else { return }
+
+            accent = color.map(Color.init) ?? .orange
+        }
     }
     
     /// «Play next» — треки встают сразу за текущим.

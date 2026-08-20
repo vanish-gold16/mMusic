@@ -46,7 +46,7 @@ struct MiniPlayerView: View {
                             .frame(width: 30, height: 30)
                             .contentShape(Rectangle())
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.tint)
                     .buttonStyle(PressableButtonStyle())
                     
                     Button {
@@ -57,7 +57,7 @@ struct MiniPlayerView: View {
                             .frame(width: 30, height: 30)
                             .contentShape(Rectangle())
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.tint)
                     .buttonStyle(PressableButtonStyle())
                     
                     Button {
@@ -68,7 +68,7 @@ struct MiniPlayerView: View {
                             .frame(width: 30, height: 30)
                             .contentShape(Rectangle())
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.tint)
                     .buttonStyle(PressableButtonStyle())
                 }
                 .padding(.horizontal)

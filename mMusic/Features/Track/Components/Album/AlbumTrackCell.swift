@@ -14,7 +14,7 @@ struct AlbumTrackCell: View {
     var body: some View {
         HStack {
             Image(systemName: "star.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.tint)
                 .opacity(track.isFavourite ? 1 : 0)
                 .frame(width: 16)
             RoundedRectangle(cornerRadius: 2)
