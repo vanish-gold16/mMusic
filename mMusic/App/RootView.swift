@@ -21,7 +21,6 @@ struct RootView: View {
     
     @State private var selected: Tab = .home
     @State private var homePath: NavigationPath = .init()
-    @State private var downloadPath: NavigationPath = .init()
     @State private var libraryPath: NavigationPath = .init()
     @State private var searchPath: NavigationPath = .init()
     
@@ -34,9 +33,6 @@ struct RootView: View {
         TabView(selection: tabBinding) {
             SwiftUI.Tab("Home", systemImage: "house", value: Tab.home) {
                 HomeTab(path: $homePath)
-            }
-            SwiftUI.Tab("Download", systemImage: "music.note", value: Tab.download) {
-                DownloadTab(path: $downloadPath)
             }
             SwiftUI.Tab("Library", systemImage: "music.note.square.stack", value: Tab.library) {
                 LibraryTab(path: $libraryPath)
@@ -93,7 +89,6 @@ struct RootView: View {
     private func resetNav(for tab: Tab) {
         switch tab {
         case .home: homePath = NavigationPath()
-        case .download: downloadPath = NavigationPath()
         case .library: libraryPath = NavigationPath()
         case .search: searchPath = NavigationPath()
         }

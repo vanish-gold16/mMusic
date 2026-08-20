@@ -1,87 +1,101 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
+/// Вся библиотека на одном экране. Раньше это были четыре отдельных экрана,
+/// в которые вели два одинаковых бургер-меню — из Home и отсюда же.
 struct LibraryView: View {
-    let columns = [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)]
-    
-    let columnsPinned = Array(repeating: GridItem(.flexible(), spacing: 16, alignment: .top), count: 3)
 
-    @Query(sort: \Album.addedAt, order: .reverse) private var albums: [Album]
-    @Query(filter: #Predicate<Playlist> { $0.isPinned }) private var pinnedPlaylists: [Playlist]
+    @State private var section: LibrarySection = .albums
+    @State private var albumSort: AlbumSort = .dateAdded
 
     @State private var showCreateAlbum = false
+    @State private var showCreatePlaylist = false
+    @State private var showImport = false
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                Spacer()
-                
-                if !pinnedPlaylists.isEmpty {
-                    VStack(alignment: .leading) {
-                        Text("Pinned")
-                            .font(.title)
-                            .bold()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        LazyVGrid(columns: columnsPinned, spacing: 16) {
-                            ForEach(pinnedPlaylists) { playlist in
-                                NavigationLink {
-                                    PlaylistView(playlist: playlist)
-                                } label: {
-                                    PinnedPlaylistCell(playlist: playlist)
-                                }
-                            }
-                        }
+            LazyVStack(spacing: 20) {
+                Picker("Section", selection: $section) {
+                    ForEach(LibrarySection.allCases) { option in
+                        Text(option.title).tag(option)
                     }
                 }
-                VStack(alignment: .leading) {
-                    Text("Recently added")
-                        .font(.title)
-                        .bold()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(albums) { album in
-                            AlbumCell(album: album)
-                        }
-                    }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal)
+
+                switch section {
+                case .albums:
+                    AlbumsSection(sort: albumSort)
+                case .playlists:
+                    PlaylistsSection()
+                case .artists:
+                    ArtistsSection()
+                case .favourites:
+                    FavouritesSection()
                 }
             }
-            .padding(.horizontal)
+            .padding(.vertical)
         }
+        .navigationTitle("Library")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        showCreateAlbum = true
-                    } label: {
-                        Label("New album", systemImage: "music.note.square.stack")
-                    }
-                } label: {
-                    Image(systemName: "plus")
+            if section == .albums {
+                ToolbarItem(placement: .topBarLeading) {
+                    sortMenu
                 }
             }
-            ToolbarItem(placement: .topBarLeading) {
-                Menu {
-                    NavigationLink(destination: PlaylistsView()) {
-                        Label("Playlists", systemImage: "music.note.list")
-                    }
-                    NavigationLink(destination: AlbumsView()) {
-                        Label("Albums", systemImage: "square.stack")
-                    }
-                    NavigationLink(destination: ArtistsView()) {
-                        Label("Artists", systemImage: "music.note")
-                    }
-                    NavigationLink(destination: FavouritesView()) {
-                        Label("Favourites", systemImage: "star")
-                    }
-                } label: {
-                    Image(systemName: "line.3.horizontal")
-                }
+            ToolbarItem(placement: .topBarTrailing) {
+                addMenu
             }
         }
         .sheet(isPresented: $showCreateAlbum) {
             CreateAlbumView()
         }
-        .navigationTitle("Library")
+        .sheet(isPresented: $showCreatePlaylist) {
+            CreatePlaylistView()
+        }
+        .sheet(isPresented: $showImport) {
+            NavigationStack {
+                DownloadView()
+            }
+        }
     }
 
+    private var addMenu: some View {
+        Menu {
+            Button {
+                showImport = true
+            } label: {
+                Label("Import music", systemImage: "square.and.arrow.down")
+            }
+
+            Divider()
+
+            Button {
+                showCreateAlbum = true
+            } label: {
+                Label("New album", systemImage: "square.stack")
+            }
+            Button {
+                showCreatePlaylist = true
+            } label: {
+                Label("New playlist", systemImage: "music.note.list")
+            }
+        } label: {
+            Image(systemName: "plus")
+        }
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort By", selection: $albumSort) {
+                ForEach(AlbumSort.allCases) { option in
+                    Label(option.rawValue, systemImage: option.systemImage)
+                        .tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+    }
 }

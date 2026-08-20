@@ -184,13 +184,11 @@ struct ArtistView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title)
-                    .font(.title2)
-                    .bold()
+                SectionLabel(title)
                 Spacer()
                 trailing
+                    .padding(.horizontal)
             }
-            .padding(.horizontal)
 
             content()
         }

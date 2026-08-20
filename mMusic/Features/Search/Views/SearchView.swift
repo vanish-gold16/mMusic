@@ -107,10 +107,7 @@ struct SearchView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.title2)
-                .bold()
-                .padding(.horizontal)
+            SectionLabel(title)
             content()
         }
     }

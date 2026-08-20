@@ -45,24 +45,6 @@ struct HomeView: View {
                     Image(systemName: "gear")
                 }
             }
-            ToolbarItem(placement: .topBarLeading) {
-                Menu {
-                    NavigationLink(destination: PlaylistsView()) {
-                        Label("Playlists", systemImage: "music.note.list")
-                    }
-                    NavigationLink(destination: AlbumsView()) {
-                        Label("Albums", systemImage: "square.stack")
-                    }
-                    NavigationLink(destination: ArtistsView()) {
-                        Label("Artists", systemImage: "music.note")
-                    }
-                    NavigationLink(destination: FavouritesView()) {
-                        Label("Favourites", systemImage: "star")
-                    }
-                 } label: {
-                    Image(systemName: "line.3.horizontal")
-                }
-            }
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -86,10 +68,7 @@ struct HomeView: View {
 
     private var recentlyPlayed: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recently played")
-                .font(.title2)
-                .bold()
-                .padding(.horizontal)
+            SectionLabel("Recently played")
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
@@ -109,9 +88,7 @@ struct HomeView: View {
     private var randomMix: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Random mix")
-                    .font(.title2)
-                    .bold()
+                SectionLabel("Random mix")
                 Spacer()
                 Button {
                     refreshMix()

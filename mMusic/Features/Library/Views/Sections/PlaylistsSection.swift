@@ -1,0 +1,111 @@
+import SwiftData
+import SwiftUI
+
+/// Плейлисты одним списком: закреплённые сверху, остальные следом.
+/// Отдельной полки «Pinned» больше нет — она дублировала тот же список.
+struct PlaylistsSection: View {
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AudioPlayer.self) private var audioPlayer
+
+    @Query(sort: \Playlist.name) private var playlists: [Playlist]
+
+    @State private var editedPlaylist: Playlist?
+    @State private var playlistToDelete: Playlist?
+
+    private var ordered: [Playlist] {
+        playlists.sorted { $0.isPinned && !$1.isPinned }
+    }
+
+    var body: some View {
+        if playlists.isEmpty {
+            LibraryEmptyState(text: "No playlists yet")
+        } else {
+            LazyVStack(spacing: 5) {
+                ForEach(ordered) { playlist in
+                    NavigationLink {
+                        PlaylistView(playlist: playlist)
+                    } label: {
+                        PlaylistCell(playlist: playlist)
+                    }
+                    .contextMenu { menu(for: playlist) }
+                }
+            }
+            .sheet(item: $editedPlaylist) { playlist in
+                EditPlaylistView(playlist: playlist)
+            }
+            .confirmationDialog(
+                "Delete \"\(playlistToDelete?.name ?? "")\"?",
+                isPresented: Binding(
+                    get: { playlistToDelete != nil },
+                    set: { if !$0 { playlistToDelete = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: playlistToDelete
+            ) { playlist in
+                Button("Delete", role: .destructive) {
+                    modelContext.delete(playlist)
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: { _ in
+                Text("This playlist will be permanently deleted.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func menu(for playlist: Playlist) -> some View {
+        ControlGroup {
+            Button {
+                playlist.isPinned.toggle()
+            } label: {
+                Label(playlist.isPinned ? "Unpin" : "Pin", systemImage: playlist.isPinned ? "pin.fill" : "pin")
+            }
+            ShareLink(items: playlist.orderedTracks.map { AudioFileStore.url(for: $0.filename) }) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+        }
+
+        Divider()
+
+        Button {
+            audioPlayer.play(playlist.orderedTracks)
+        } label: {
+            Label("Play", systemImage: "play")
+        }
+        Button {
+            audioPlayer.playShuffled(playlist.orderedTracks)
+        } label: {
+            Label("Shuffle", systemImage: "shuffle")
+        }
+
+        Divider()
+
+        Button {
+            editedPlaylist = playlist
+        } label: {
+            Label("Edit", systemImage: "pencil")
+        }
+
+        Divider()
+
+        Button {
+            audioPlayer.enqueueNext(playlist.orderedTracks)
+        } label: {
+            Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+        }
+        Button {
+            audioPlayer.enqueueLast(playlist.orderedTracks)
+        } label: {
+            Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            playlistToDelete = playlist
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+    }
+}

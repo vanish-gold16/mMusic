@@ -2,6 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DownloadView: View {
+    @Environment(\.dismiss) private var dismiss
+
     @State private var isImporting = false
     /// Файлы, выбранные разом, ждут своей очереди: настройки заполняются по одному.
     @State private var pendingFiles: [PickedFile] = []
@@ -72,7 +74,13 @@ struct DownloadView: View {
                     .padding(.bottom)
             }
         }
-        .navigationTitle("Download")
+        .navigationTitle("Import")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("done") { dismiss() }
+            }
+        }
         .sheet(item: $currentFile, onDismiss: showNextFile) { file in
             SettingView(file: file, preset: presetMetadata)
         }
