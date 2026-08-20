@@ -254,11 +254,13 @@ struct HomeView: View {
                 // в переход, поэтому запуск живёт в контекстном меню.
                 .contextMenu {
                     Button {
+                        playlist.markPlayed()
                         audioPlayer.play(playlist.orderedTracks)
                     } label: {
                         Label("Play", systemImage: "play")
                     }
                     Button {
+                        playlist.markPlayed()
                         audioPlayer.playShuffled(playlist.orderedTracks)
                     } label: {
                         Label("Shuffle", systemImage: "shuffle")

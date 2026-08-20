@@ -44,6 +44,7 @@ struct PlaylistView: View {
                     .tint(.secondary)
                 HStack {
                     Button {
+                        playlist.markPlayed()
                         audioPlayer.play(playlist.orderedTracks)
                     } label: {
                         Capsule()
@@ -61,6 +62,7 @@ struct PlaylistView: View {
                             }
                     }
                     Button {
+                        playlist.markPlayed()
                         audioPlayer.playShuffled(playlist.orderedTracks)
                     } label: {
                         Capsule()
@@ -156,11 +158,13 @@ struct PlaylistView: View {
                         Divider()
                         
                         Button {
+                            playlist.markPlayed()
                             audioPlayer.play(playlist.orderedTracks)
                         } label: {
                             Label("Play", systemImage: "play")
                         }
                         Button {
+                            playlist.markPlayed()
                             audioPlayer.playShuffled(playlist.orderedTracks)
                         } label: {
                             Label("Shuffle", systemImage: "shuffle")

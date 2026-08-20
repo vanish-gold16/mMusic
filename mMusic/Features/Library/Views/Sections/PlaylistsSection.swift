@@ -13,8 +13,14 @@ struct PlaylistsSection: View {
     @State private var editedPlaylist: Playlist?
     @State private var playlistToDelete: Playlist?
 
+    /// Закреплённые всегда сверху, внутри каждой группы — по свежести запуска.
+    /// Ни разу не запускавшиеся уходят вниз, а при равенстве работает порядок
+    /// запроса, то есть по имени.
     private var ordered: [Playlist] {
-        playlists.sorted { $0.isPinned && !$1.isPinned }
+        playlists.sorted { left, right in
+            if left.isPinned != right.isPinned { return left.isPinned }
+            return (left.lastPlayedAt ?? .distantPast) > (right.lastPlayedAt ?? .distantPast)
+        }
     }
 
     var body: some View {
@@ -69,11 +75,13 @@ struct PlaylistsSection: View {
         Divider()
 
         Button {
+            playlist.markPlayed()
             audioPlayer.play(playlist.orderedTracks)
         } label: {
             Label("Play", systemImage: "play")
         }
         Button {
+            playlist.markPlayed()
             audioPlayer.playShuffled(playlist.orderedTracks)
         } label: {
             Label("Shuffle", systemImage: "shuffle")

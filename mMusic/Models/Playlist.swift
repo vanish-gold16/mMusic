@@ -13,8 +13,15 @@ class Playlist {
     }
     var isPinned = false
     var isFavourite = false
+    /// Когда этот плейлист последний раз запускали. Считается именно запуск плейлиста,
+    /// а не прослушивание входящего в него трека из библиотеки.
+    var lastPlayedAt: Date?
     
     @Attribute(.externalStorage) var artwork: Data?
+    
+    func markPlayed() {
+        lastPlayedAt = .now
+    }
     
     init(name: String, playlistDescription: String = "", items: [TrackPlaylistItem], isPinned: Bool = false, artwork: Data? = nil) {
         self.name = name
