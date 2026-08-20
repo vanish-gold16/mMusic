@@ -28,10 +28,6 @@ struct TrackCell: View {
 
     var body: some View {
         HStack {
-            Image(systemName: "star.fill")
-                .foregroundStyle(.tint)
-                .opacity(track.isFavourite ? 1 : 0)
-                .frame(width: 16)
             switch leadingStyle {
             case .number:
                 if isCurrent {
@@ -74,6 +70,12 @@ struct TrackCell: View {
                     .lineLimit(1)
             }
             Spacer()
+
+            if track.isFavourite {
+                Image(systemName: "star.fill")
+                    .font(.caption)
+                    .foregroundStyle(.tint)
+            }
 
             if showPlayCount, track.playCount > 0 {
                 Label("\(track.playCount)", systemImage: "play.fill")
