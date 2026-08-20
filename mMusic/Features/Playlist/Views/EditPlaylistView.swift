@@ -1,8 +1,10 @@
+import SwiftData
 import SwiftUI
 
 struct EditPlaylistView: View {
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     
     @State private var showImagePicker = false
     
@@ -51,8 +53,17 @@ struct EditPlaylistView: View {
                 }
                 
                 if !playlist.orderedTracks.isEmpty {
-                    ForEach(playlist.orderedTracks) { track in
-                        TrackCell(track: track, leadingStyle: .artwork)
+                    Section("tracks") {
+                        ForEach(playlist.orderedTracks) { track in
+                            TrackCell(
+                                track: track,
+                                leadingStyle: .artwork,
+                                onRemoveFromPlaylist: { remove(track) }
+                            )
+                        }
+                        .onDelete { offsets in
+                            removeTracks(at: offsets)
+                        }
                     }
                 }
             }
@@ -63,6 +74,31 @@ struct EditPlaylistView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Убирает трек из плейлиста, не трогая ни файл, ни запись в библиотеке:
+    /// удаляется только связка `TrackPlaylistItem`.
+    private func remove(_ track: Track) {
+        guard let index = playlist.items
+            .sorted(by: { $0.position < $1.position })
+            .firstIndex(where: { $0.track.persistentModelID == track.persistentModelID })
+        else { return }
+
+        removeTracks(at: IndexSet(integer: index))
+    }
+
+    private func removeTracks(at offsets: IndexSet) {
+        var items = playlist.items.sorted { $0.position < $1.position }
+
+        for index in offsets where items.indices.contains(index) {
+            modelContext.delete(items[index])
+        }
+
+        // Позиции пересчитываются, иначе в нумерации остаются дыры.
+        items.remove(atOffsets: offsets)
+        for (index, item) in items.enumerated() {
+            item.position = index
         }
     }
 }

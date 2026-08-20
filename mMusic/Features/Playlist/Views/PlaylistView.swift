@@ -84,10 +84,18 @@ struct PlaylistView: View {
             .listRowInsets(EdgeInsets())
 
             ForEach(playlist.orderedTracks) { track in
-                TrackCell(track: track, queue: playlist.orderedTracks, leadingStyle: .artwork)
+                TrackCell(
+                    track: track,
+                    queue: playlist.orderedTracks,
+                    leadingStyle: .artwork,
+                    onRemoveFromPlaylist: { remove(track) }
+                )
             }
             .onMove { source, destination in
                 moveTracks(from: source, to: destination)
+            }
+            .onDelete { offsets in
+                removeTracks(at: offsets)
             }
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
@@ -225,6 +233,32 @@ struct PlaylistView: View {
         }
     }
     
+    /// Убирает трек из плейлиста, не трогая ни файл, ни запись в библиотеке:
+    /// удаляется только связка `TrackPlaylistItem`.
+    private func remove(_ track: Track) {
+        guard let index = playlist.items
+            .sorted(by: { $0.position < $1.position })
+            .firstIndex(where: { $0.track.persistentModelID == track.persistentModelID })
+        else { return }
+
+        removeTracks(at: IndexSet(integer: index))
+    }
+
+    private func removeTracks(at offsets: IndexSet) {
+        var items = playlist.items.sorted { $0.position < $1.position }
+
+        for index in offsets where items.indices.contains(index) {
+            modelContext.delete(items[index])
+        }
+
+        // Позиции пересчитываются, иначе в нумерации остаются дыры,
+        // и следующая перестановка съезжает.
+        items.remove(atOffsets: offsets)
+        for (index, item) in items.enumerated() {
+            item.position = index
+        }
+    }
+
     /// Переписывает позиции раз и навсегда: дальше порядок снова ручной.
     private func applySort(_ option: PlaylistSort) {
         for (index, item) in option.sorted(playlist.items).enumerated() {

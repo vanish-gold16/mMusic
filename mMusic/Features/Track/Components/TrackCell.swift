@@ -21,6 +21,9 @@ struct TrackCell: View {
     var leadingStyle: LeadingStyle = .number
     /// В обычных списках счётчик — лишний шум, поэтому включается точечно.
     var showPlayCount: Bool = false
+    /// Заполняется только там, где трек показан в составе плейлиста.
+    /// Без него в меню нет и пункта — удалять «из плейлиста» на странице альбома нечего.
+    var onRemoveFromPlaylist: (() -> Void)?
 
     private var isCurrent: Bool {
         audioPlayer.currentTrack?.id == track.id
@@ -136,10 +139,18 @@ struct TrackCell: View {
                 
                 Divider()
 
+                if let onRemoveFromPlaylist {
+                    Button(role: .destructive, action: onRemoveFromPlaylist) {
+                        Label("Remove from playlist", systemImage: "minus.circle")
+                    }
+                }
+
+                // Раньше здесь было просто «Remove», и рядом с удалением из плейлиста
+                // это читалось бы одинаково — а последствия разные.
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
                 } label: {
-                    Label("Remove", systemImage: "trash")
+                    Label("Delete from library", systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -169,18 +180,18 @@ struct TrackCell: View {
             AlbumView(album: album)
         }
         .confirmationDialog(
-            "Remove \"\(track.name)\"?",
+            "Delete \"\(track.name)\"?",
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Remove", role: .destructive) {
+            Button("Delete", role: .destructive) {
                 audioPlayer.forget(track)
                 AudioFileStore.remove(filename: track.filename)
                 modelContext.delete(track)
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This track will be permanently deleted.")
+            Text("The file is deleted from the library and from every playlist.")
         }
     }
 }
