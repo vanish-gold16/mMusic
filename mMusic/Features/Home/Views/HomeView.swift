@@ -30,7 +30,7 @@ struct HomeView: View {
                 ContentUnavailableView(
                     "Library is empty",
                     systemImage: "music.note",
-                    description: Text("Import music on the Download tab.")
+                    description: Text("Import music from the Library tab.")
                 )
             } else {
                 content
@@ -49,8 +49,10 @@ struct HomeView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        .task {
-            if mix.isEmpty { refreshMix() }
+        .task(id: allTracks.count) {
+            // Пересобираем и когда микса ещё нет, и когда библиотека изменилась:
+            // иначе предложение остаётся вчерашним, а удалённый трек висит в нём ссылкой.
+            refreshMix()
         }
     }
 
@@ -87,15 +89,23 @@ struct HomeView: View {
 
     private var randomMix: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            HStack(spacing: 16) {
                 SectionLabel("Random mix")
+
                 Spacer()
+
+                Button {
+                    saveMixAsPlaylist()
+                } label: {
+                    Image(systemName: "text.badge.plus")
+                }
                 Button {
                     refreshMix()
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
             }
+            .font(.subheadline)
             .padding(.horizontal)
 
             Button {

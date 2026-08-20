@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MiniPlayerView: View {
     let audioPlayer: AudioPlayer
+    let namespace: Namespace.ID
 
     @Binding var isPlayerPresented: Bool
 
@@ -21,6 +22,8 @@ struct MiniPlayerView: View {
                         }
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .frame(width: 30, height: 30)
+                        // Источник геометрии, пока плеер закрыт: отсюда обложка растёт.
+                        .matchedGeometryEffect(id: PlayerTransition.artwork, in: namespace, isSource: !isPlayerPresented)
                     VStack(alignment: .leading) {
                         Text(track.name)
                             .lineLimit(1)
@@ -35,7 +38,11 @@ struct MiniPlayerView: View {
                     Spacer()
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { isPlayerPresented = true }
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                        isPlayerPresented = true
+                    }
+                }
 
                 HStack {
                     Button {

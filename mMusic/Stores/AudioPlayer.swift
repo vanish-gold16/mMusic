@@ -104,7 +104,11 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let track = currentTrack else { return }
         
         let url = AudioFileStore.url(for: track.filename)
-        
+
+        // До попытки открыть файл: обложка есть и у трека, который не удалось прочитать,
+        // а интерфейс всё равно перекрашивается под него.
+        refreshAccent()
+
         do {
             player = try AVAudioPlayer(contentsOf: url)
             player?.delegate = self
@@ -116,7 +120,6 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             
             track.lastPlayedAt = .now
             didCountCurrentPlay = false
-            refreshAccent()
             persistQueue()
             
             isPlaying = true

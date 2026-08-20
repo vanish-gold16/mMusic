@@ -28,24 +28,22 @@ struct RootView: View {
 
     @State private var audioPlayer = AudioPlayer()
     @State private var isPlayerPresented = false
+
+    @Namespace private var playerNamespace
     
     var body: some View {
-        TabView(selection: tabBinding) {
-            SwiftUI.Tab("Home", systemImage: "house", value: Tab.home) {
-                HomeTab(path: $homePath)
+        ZStack {
+            tabs
+
+            if isPlayerPresented {
+                PlayerView(
+                    audioPlayer: audioPlayer,
+                    namespace: playerNamespace,
+                    isPresented: $isPlayerPresented
+                )
+                .ignoresSafeArea(edges: .bottom)
+                .zIndex(1)
             }
-            SwiftUI.Tab("Library", systemImage: "music.note.square.stack", value: Tab.library) {
-                LibraryTab(path: $libraryPath)
-            }
-            SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) {
-                SearchTab(path: $searchPath)
-            }
-        }
-        .tabViewBottomAccessory {
-            MiniPlayerView(audioPlayer: audioPlayer, isPlayerPresented: $isPlayerPresented)
-        }
-        .sheet(isPresented: $isPlayerPresented) {
-            PlayerView(audioPlayer: audioPlayer)
         }
         .environment(audioPlayer)
         .task {
@@ -75,7 +73,28 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.6), value: audioPlayer.accent)
         .preferredColorScheme(Appearance(rawValue: appearance)?.colorScheme)
     }
-    
+
+    private var tabs: some View {
+        TabView(selection: tabBinding) {
+            SwiftUI.Tab("Home", systemImage: "house", value: Tab.home) {
+                HomeTab(path: $homePath)
+            }
+            SwiftUI.Tab("Library", systemImage: "music.note.square.stack", value: Tab.library) {
+                LibraryTab(path: $libraryPath)
+            }
+            SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) {
+                SearchTab(path: $searchPath)
+            }
+        }
+        .tabViewBottomAccessory {
+            MiniPlayerView(
+                audioPlayer: audioPlayer,
+                namespace: playerNamespace,
+                isPlayerPresented: $isPlayerPresented
+            )
+        }
+    }
+
     private var tabBinding: Binding<Tab> {
         Binding (
             get: { selected },

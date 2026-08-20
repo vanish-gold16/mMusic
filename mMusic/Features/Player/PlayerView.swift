@@ -2,6 +2,14 @@ import SwiftUI
 
 struct PlayerView: View {
     let audioPlayer: AudioPlayer
+    /// Общее пространство имён с мини-плеером: по нему обложка перетекает
+    /// из маленькой в полноэкранную вместо того, чтобы подмениться.
+    let namespace: Namespace.ID
+
+    @Binding var isPresented: Bool
+
+    /// Смещение при протягивании вниз — заменяет собой закрытие листа.
+    @State private var dragOffset: CGFloat = 0
     
     @State private var sliderValue: TimeInterval = 0
     @State private var isScrubbing = false
@@ -26,12 +34,19 @@ struct PlayerView: View {
     @State private var isRangeCalibrated = false
     
     var body: some View {
-        // Стек нужен ради перехода на артиста: лист сам по себе навигации не имеет.
+        // Стек нужен ради перехода на артиста.
         NavigationStack {
-            content
-                .toolbar(.hidden, for: .navigationBar)
+            VStack(spacing: 0) {
+                grabber
+                content
+            }
+            .toolbar(.hidden, for: .navigationBar)
         }
-        .presentationDragIndicator(.visible)
+        .background { artworkBackground }
+        .offset(y: dragOffset)
+        // Лист заменён оверлеем: matchedGeometryEffect не работает через границу
+        // листа — там своя иерархия, и обложке не с чем сопоставляться.
+        .gesture(dismissGesture)
         .sheet(isPresented: $isQueuePresented) {
             QueueView(audioPlayer: audioPlayer)
         }
@@ -45,7 +60,6 @@ struct PlayerView: View {
                 EditTrackView(track: track)
             }
         }
-        .presentationBackground { artworkBackground }
         // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
         // обложке вуаль становится светлой, а `.primary` / `.secondary` — тёмными.
         .environment(\.colorScheme, isLightBackground ? .light : .dark)
@@ -59,6 +73,39 @@ struct PlayerView: View {
                 await TrackWaveformLoader.fill(track)
             }
         }
+    }
+
+    /// Своя «ручка» вместо presentationDragIndicator — его даёт только лист.
+    private var grabber: some View {
+        Capsule()
+            .fill(.secondary)
+            .frame(width: 36, height: 5)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+    }
+
+    /// Горизонтальные протяжки принадлежат обложке (следующий и предыдущий трек),
+    /// поэтому закрытие реагирует только на явно вертикальное движение.
+    private var dismissGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                dragOffset = max(0, value.translation.height)
+            }
+            .onEnded { value in
+                guard abs(value.translation.height) > abs(value.translation.width) else { return }
+
+                if value.translation.height > 120 {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                        isPresented = false
+                    }
+                    dragOffset = 0
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        dragOffset = 0
+                    }
+                }
+            }
     }
 
     private var content: some View {
@@ -80,6 +127,7 @@ struct PlayerView: View {
                     }
                 }
                 .clipShape(ConcentricRectangle(corners: .concentric(minimum: .fixed(16)), isUniform: true))
+                .matchedGeometryEffect(id: PlayerTransition.artwork, in: namespace, isSource: isPresented)
                 .aspectRatio(1, contentMode: .fit)
                 .frame(maxWidth: .infinity)
                 .onGeometryChange(for: CGFloat.self) { proxy in
@@ -161,14 +209,12 @@ struct PlayerView: View {
 
             controls
 
-            outputRow
-
             Spacer()
 
             bottomRow
         }
         .padding(.horizontal, 24)
-        .padding(.top, 32)
+        .padding(.top, 16)
         .onChange(of: audioPlayer.level) { _, newLevel in
             // Вспышка мгновенная, гаснет плавно — так удары читаются как удары.
             if newLevel > glow {
@@ -258,22 +304,6 @@ struct PlayerView: View {
             in: .circle
         )
         .buttonStyle(PressableButtonStyle())
-    }
-
-    /// Громкость и выбор устройства — системные вьюхи: своих аналогов iOS не разрешает.
-    private var outputRow: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "speaker.fill")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            SystemVolumeSlider(tint: UIColor(audioPlayer.accent))
-                .frame(height: 28)
-
-            Image(systemName: "speaker.wave.3.fill")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
     }
 
     private var bottomRow: some View {
