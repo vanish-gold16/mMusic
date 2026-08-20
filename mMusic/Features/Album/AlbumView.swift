@@ -14,6 +14,7 @@ struct AlbumView: View {
 
     @State private var backgroundArtwork: UIImage?
     @State private var editingAlbum = false
+    @State private var showAddToPlaylist = false
 
     /// Обложка светлая — значит, текст поверх неё должен быть тёмным.
     @State private var isLightBackground = false
@@ -130,6 +131,33 @@ struct AlbumView: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
+
+                    // Треки уходят в порядке альбома: sortedTracks уже упорядочен
+                    // по position, а плейлист раздаёт позиции подряд.
+                    Button {
+                        showAddToPlaylist = true
+                    } label: {
+                        Label("Add to a Playlist", systemImage: "text.badge.plus")
+                    }
+
+                    Divider()
+
+                    Button {
+                        audioPlayer.enqueueNext(sortedTracks)
+                    } label: {
+                        Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                    }
+                    Button {
+                        audioPlayer.enqueueLast(sortedTracks)
+                    } label: {
+                        Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
+                    }
+
+                    Divider()
+
+                    ShareLink(items: sortedTracks.map { AudioFileStore.url(for: $0.filename) }) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                 }
@@ -137,6 +165,9 @@ struct AlbumView: View {
         }
         .sheet(isPresented: $editingAlbum) {
             EditAlbumView(album: album)
+        }
+        .sheet(isPresented: $showAddToPlaylist) {
+            AddToPlaylistView(tracks: sortedTracks)
         }
         .task {
             backgroundArtwork = await Self.makeBackgroundArtwork(from: album.artwork)

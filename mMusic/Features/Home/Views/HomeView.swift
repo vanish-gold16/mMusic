@@ -14,11 +14,14 @@ struct HomeView: View {
     ) private var playedTracks: [Track]
 
     @Query private var allTracks: [Track]
+    @Query private var playlists: [Playlist]
 
     @State private var showSettings = false
     /// Микс живёт в состоянии, а не пересчитывается в `body`: иначе он перетасовывался бы
     /// на каждую перерисовку и кнопка «play» запускала бы не то, что показано.
     @State private var mix: [Track] = []
+    /// Один из уже собранных плейлистов — напоминание о том, что лежит в медиатеке.
+    @State private var suggestedPlaylist: Playlist?
 
     private var recentTracks: [Track] {
         Array(playedTracks.prefix(15))
@@ -49,6 +52,9 @@ struct HomeView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
+        .task(id: playlists.count) {
+            pickPlaylist()
+        }
         .task(id: allTracks.count) {
             // Пересобираем и когда микса ещё нет, и когда библиотека изменилась:
             // иначе предложение остаётся вчерашним, а удалённый трек висит в нём ссылкой.
@@ -63,6 +69,10 @@ struct HomeView: View {
                     recentlyPlayed
                 }
                 randomMix
+
+                if suggestedPlaylist != nil {
+                    randomPlaylist
+                }
             }
             .padding(.vertical)
         }
@@ -183,6 +193,89 @@ struct HomeView: View {
         }
         .frame(width: 70, height: 70)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder
+    private var randomPlaylist: some View {
+        if let playlist = suggestedPlaylist {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 16) {
+                    SectionLabel("From your playlists")
+
+                    Spacer()
+
+                    Button {
+                        pickPlaylist()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                }
+                .font(.subheadline)
+                .padding(.horizontal)
+
+                NavigationLink {
+                    PlaylistView(playlist: playlist)
+                } label: {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 70, height: 70)
+                            .overlay {
+                                if let data = playlist.artwork, let uiImage = UIImage(data: data) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } else {
+                                    Image(systemName: "music.note.list")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(playlist.name)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            Text("\(playlist.items.count) tracks")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(12)
+                    .contentShape(Rectangle())
+                    .glassEffect()
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
+                // Кнопку воспроизведения внутрь ссылки не поставить — нажатие уходит
+                // в переход, поэтому запуск живёт в контекстном меню.
+                .contextMenu {
+                    Button {
+                        audioPlayer.play(playlist.orderedTracks)
+                    } label: {
+                        Label("Play", systemImage: "play")
+                    }
+                    Button {
+                        audioPlayer.playShuffled(playlist.orderedTracks)
+                    } label: {
+                        Label("Shuffle", systemImage: "shuffle")
+                    }
+                    Button {
+                        pickPlaylist()
+                    } label: {
+                        Label("Suggest another", systemImage: "arrow.clockwise")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Пустые плейлисты предлагать незачем — из них нечего слушать.
+    private func pickPlaylist() {
+        suggestedPlaylist = playlists.filter { !$0.items.isEmpty }.randomElement()
     }
 
     private func refreshMix() {
