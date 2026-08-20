@@ -10,6 +10,7 @@ struct EditAlbumView: View {
     @State private var showImagePicker = false
     @State private var showTrackPicker = false
     @State private var isImporting = false
+    @State private var showSoundCloud = false
     @State private var addedTracks: [TrackDraft] = []
     /// Файлы, которые не удалось положить в библиотеку. Пустой список — всё прошло.
     @State private var failedImports: [String] = []
@@ -113,10 +114,10 @@ struct EditAlbumView: View {
                         .tint(.red)
                     }
                     Button {
-
+                        showSoundCloud = true
                     } label: {
                         VStack {
-                            Text("Soundloud")
+                            Text("SoundCloud")
                         }
                         .frame(maxWidth: .infinity, minHeight: 120)
                     }
@@ -131,6 +132,11 @@ struct EditAlbumView: View {
                     allowsMultipleSelection: true,
                     onCompletion: handleFileLoading
                 )
+                .sheet(isPresented: $showSoundCloud) {
+                    SoundCloudImportView { file, metadata in
+                        addTrack(from: file, metadata: metadata)
+                    }
+                }
 
                 if !sortedTracks.isEmpty {
                     Section("tracks") {
@@ -224,6 +230,39 @@ struct EditAlbumView: View {
 
             if let title = metadata.title { track.name = title }
             if let artwork = metadata.artwork, track.artwork == nil { track.artwork = artwork }
+        }
+    }
+
+    /// Трек с SoundCloud: файл уже во временной папке, поэтому его переносим, а не копируем.
+    private func addTrack(from file: PickedFile, metadata: AudioMetadata) {
+        let filename: String
+        do {
+            filename = try AudioFileStore.moveIntoLibrary(from: file.url)
+        } catch {
+            failedImports.append(metadata.title ?? file.url.lastPathComponent)
+            return
+        }
+
+        let track = Track(
+            name: metadata.title ?? file.url.parseMusic().name,
+            album: album,
+            credits: [],
+            genre: .pop,
+            filename: filename,
+            artwork: metadata.artwork
+        )
+        track.position = album.tracks.count
+
+        modelContext.insert(track)
+
+        let albumArtistNames = album.artists.map(\.name)
+        let names = metadata.artistNames.filter { name in
+            !albumArtistNames.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+        }
+
+        for (position, name) in names.enumerated() {
+            let artistModel = modelContext.findOrCreateArtist(named: name)
+            modelContext.insert(Credit(artist: artistModel, role: .featured, position: position, track: track))
         }
     }
 

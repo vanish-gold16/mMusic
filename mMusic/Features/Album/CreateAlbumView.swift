@@ -18,6 +18,7 @@ struct CreateAlbumView: View {
     @State private var showImagePicker = false
     @State private var showTrackPicker = false
     @State private var isImporting = false
+    @State private var showSoundCloud = false
     /// Файлы, которые не удалось положить в библиотеку. Пустой список — всё прошло.
     @State private var failedImports: [String] = []
     
@@ -117,10 +118,10 @@ struct CreateAlbumView: View {
                         .tint(.red)
                     }
                     Button {
-                        
+                        showSoundCloud = true
                     } label: {
                         VStack {
-                            Text("Soundloud")
+                            Text("SoundCloud")
                         }
                         .frame(maxWidth: .infinity, minHeight: 120)
                     }
@@ -135,6 +136,11 @@ struct CreateAlbumView: View {
                     allowsMultipleSelection: true,
                     onCompletion: handleFileLoading
                 )
+                .sheet(isPresented: $showSoundCloud) {
+                    SoundCloudImportView { file, metadata in
+                        addDraft(from: file, metadata: metadata)
+                    }
+                }
                 if !trackDrafts.isEmpty {
                     Section {
                         ForEach(Array(trackDrafts.enumerated()), id: \.element.id) { index, draft in
@@ -236,6 +242,23 @@ struct CreateAlbumView: View {
                 )
             )
         }
+    }
+
+    /// Трек с SoundCloud уже лежит во временной папке — второй раз его копировать незачем,
+    /// а `originalURL` пуст: в «Файлах» его никогда и не было.
+    private func addDraft(from file: PickedFile, metadata: AudioMetadata) {
+        let names = metadata.artistNames.filter { !isAlbumArtist($0) }
+
+        trackDrafts.append(
+            TrackDraft(
+                name: metadata.title ?? file.url.parseMusic().name,
+                artists: names.map { ArtistDraft(name: $0, role: .featured) },
+                stagedURL: file.url
+            )
+        )
+
+        // Своей обложки у альбома может ещё не быть — берём первую пришедшую.
+        if artworkData == nil { artworkData = metadata.artwork }
     }
 
     /// Копирует выбранный файл во временную папку: доступ к URL из fileImporter короткоживущий,

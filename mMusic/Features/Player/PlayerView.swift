@@ -24,6 +24,26 @@ struct PlayerView: View {
     @State private var isRangeCalibrated = false
     
     var body: some View {
+        // Стек нужен ради перехода на артиста: лист сам по себе навигации не имеет.
+        NavigationStack {
+            content
+                .toolbar(.hidden, for: .navigationBar)
+        }
+        .presentationDragIndicator(.visible)
+        .sheet(isPresented: $isQueuePresented) {
+            QueueView(audioPlayer: audioPlayer)
+        }
+        .presentationBackground { artworkBackground }
+        // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
+        // обложке вуаль становится светлой, а `.primary` / `.secondary` — тёмными.
+        .environment(\.colorScheme, isLightBackground ? .light : .dark)
+        .onAppear { sliderValue = audioPlayer.currentTime }
+        .task(id: audioPlayer.currentTrack?.filename) {
+            isLightBackground = await Self.isLight(artwork: audioPlayer.currentTrack?.displayArtwork)
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 32) {
             RoundedRectangle(cornerRadius: 16)
                 .fill(.quaternary)
@@ -80,10 +100,8 @@ struct PlayerView: View {
                     .font(.title2)
                     .bold()
                     .lineLimit(1)
-                Text(audioPlayer.currentTrack?.artistNames.joined(separator: ", ") ?? "")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                ArtistPillRow(artists: audioPlayer.currentTrack?.artists ?? [])
+                    .font(.subheadline)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
@@ -117,18 +135,6 @@ struct PlayerView: View {
         }
         .padding(.horizontal, 24)
         .padding(.top, 32)
-        .presentationDragIndicator(.visible)
-        .sheet(isPresented: $isQueuePresented) {
-            QueueView(audioPlayer: audioPlayer)
-        }
-        .presentationBackground { artworkBackground }
-        // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
-        // обложке вуаль становится светлой, а `.primary` / `.secondary` — тёмными.
-        .environment(\.colorScheme, isLightBackground ? .light : .dark)
-        .onAppear { sliderValue = audioPlayer.currentTime }
-        .task(id: audioPlayer.currentTrack?.filename) {
-            isLightBackground = await Self.isLight(artwork: audioPlayer.currentTrack?.displayArtwork)
-        }
         .onChange(of: audioPlayer.level) { _, newLevel in
             // Вспышка мгновенная, гаснет плавно — так удары читаются как удары.
             if newLevel > glow {
@@ -174,6 +180,7 @@ struct PlayerView: View {
                     .font(.title3)
             }
             .foregroundStyle(audioPlayer.isShuffled ? Color.orange : Color.secondary)
+            .buttonStyle(PressableButtonStyle())
 
             Spacer()
 
@@ -184,6 +191,7 @@ struct PlayerView: View {
                     .font(.title)
             }
             .foregroundStyle(.primary)
+            .buttonStyle(PressableButtonStyle())
 
             Spacer()
 
@@ -196,6 +204,7 @@ struct PlayerView: View {
                     .contentShape(Rectangle())
             }
             .foregroundStyle(.primary)
+            .buttonStyle(PressableButtonStyle())
 
             Spacer()
 
@@ -206,6 +215,7 @@ struct PlayerView: View {
                     .font(.title)
             }
             .foregroundStyle(.primary)
+            .buttonStyle(PressableButtonStyle())
 
             Spacer()
 
@@ -216,6 +226,7 @@ struct PlayerView: View {
                     .font(.title3)
             }
             .foregroundStyle(audioPlayer.repeatMode.isActive ? Color.orange : Color.secondary)
+            .buttonStyle(PressableButtonStyle())
         }
     }
 
@@ -232,6 +243,7 @@ struct PlayerView: View {
                     .contentShape(Rectangle())
             }
             .foregroundStyle(.secondary)
+            .buttonStyle(PressableButtonStyle())
         }
     }
 
