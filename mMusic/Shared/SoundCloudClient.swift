@@ -44,7 +44,7 @@ enum SoundCloudClient {
     // MARK: - Публичный вход
 
     nonisolated static func resolve(_ link: String) async throws -> Resolved {
-        guard let pageURL = trackURL(from: link) else { throw ClientError.notATrackLink }
+        let pageURL = try await trackURL(from: link)
 
         do {
             return try await resolve(pageURL, clientID: await cache.value(orFetch: fetchClientID))
@@ -156,16 +156,53 @@ enum SoundCloudClient {
 
     // MARK: - Разбор текста
 
-    private nonisolated static func trackURL(from link: String) -> URL? {
-        let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Кнопка «поделиться» в SoundCloud даёт короткую ссылку `on.soundcloud.com/…`
+    /// и часто вместе с текстом вокруг — до адреса трека отсюда ещё надо добраться.
+    private nonisolated static func trackURL(from link: String) async throws -> URL {
+        guard let raw = firstURL(in: link),
+              raw.host()?.contains("soundcloud.com") == true else { throw ClientError.notATrackLink }
 
-        guard let url = URL(string: trimmed),
-              let host = url.host(),
-              host.contains("soundcloud.com"),
+        // Короткая ссылка — это редирект; настоящий адрес узнаём, пройдя по нему.
+        let expanded = isShortLink(raw) ? await expand(raw) : raw
+
+        // ?si=…&utm_source=… приходят от кнопки «поделиться» и API только мешают.
+        var components = URLComponents(url: expanded, resolvingAgainstBaseURL: false)
+        components?.query = nil
+
+        guard let cleaned = components?.url,
               // /артист/трек — минимум два непустых сегмента, иначе это профиль или подборка.
-              url.pathComponents.filter({ $0 != "/" }).count >= 2 else { return nil }
+              cleaned.pathComponents.filter({ $0 != "/" }).count >= 2 else { throw ClientError.notATrackLink }
 
-        return url
+        return cleaned
+    }
+
+    private nonisolated static func isShortLink(_ url: URL) -> Bool {
+        url.host() == "on.soundcloud.com" || url.pathComponents.filter { $0 != "/" }.count < 2
+    }
+
+    /// URLSession сама идёт по редиректам, поэтому конечный адрес лежит в ответе.
+    /// Не получилось — возвращаем исходный: пусть дальше отсеется по числу сегментов.
+    private nonisolated static func expand(_ url: URL) async -> URL {
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.setValue(desktopUserAgent, forHTTPHeaderField: "User-Agent")
+
+        guard let (_, response) = try? await URLSession.shared.data(for: request) else { return url }
+
+        return response.url ?? url
+    }
+
+    /// Вытаскивает первый адрес из вставленного текста — им может оказаться и целое
+    /// «Слушай трек … https://on.soundcloud.com/…».
+    private nonisolated static func firstURL(in text: String) -> URL? {
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let range = NSRange(text.startIndex..., in: text)
+
+        if let match = detector?.firstMatch(in: text, range: range), let url = match.url {
+            return url
+        }
+
+        return URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     private nonisolated static func scriptURLs(in html: String) -> [String] {

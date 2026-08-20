@@ -40,6 +40,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     /// Играли ли мы до звонка. Возобновлять после прерывания нужно только то,
     /// что прервали: иначе музыка сама заиграет там, где её никто не включал.
     private var wasPlayingBeforeInterruption = false
+    /// Засчитан ли текущий трек. Сбрасывается на каждом запуске трека,
+    /// поэтому повтор одного и того же честно считается заново.
+    private var didCountCurrentPlay = false
     private var sessionObservers: [NSObjectProtocol] = []
     
     override init() {
@@ -108,6 +111,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             player?.play()
             
             track.lastPlayedAt = .now
+            didCountCurrentPlay = false
             persistQueue()
             
             isPlaying = true
@@ -241,9 +245,22 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
             guard let self, let player = self.player else { return }
             self.currentTime = player.currentTime
+            self.countPlayIfNeeded()
         }
         RunLoop.main.add(timer, forMode: .common)
         progressTimer = timer
+    }
+
+    /// Прослушиванием считается полминуты звука (или половина трека, если он короче),
+    /// а не факт запуска: иначе перебор очереди накрутил бы счётчик всем подряд.
+    private func countPlayIfNeeded() {
+        guard !didCountCurrentPlay, let track = currentTrack else { return }
+
+        let threshold = duration > 0 ? min(30, duration / 2) : 30
+        guard currentTime >= threshold else { return }
+
+        didCountCurrentPlay = true
+        track.playCount += 1
     }
 
     private func stopProgressTimer() {

@@ -31,6 +31,9 @@ class Track {
     var duration: TimeInterval = 0
     
     var addedAt: Date = Date.now
+    /// Сколько раз трек дослушивали. Считает `AudioPlayer`, а не сам запуск —
+    /// иначе счётчик накручивался бы пролистыванием очереди.
+    var playCount: Int = 0
     /// Когда трек в последний раз ставили играть. nil — ещё ни разу.
     /// На этом держится лента «Recently played» на главной.
     var lastPlayedAt: Date?

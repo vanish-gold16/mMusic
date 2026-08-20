@@ -19,6 +19,8 @@ struct TrackCell: View {
     var track: Track
     var queue: [Track] = []
     var leadingStyle: LeadingStyle = .number
+    /// В обычных списках счётчик — лишний шум, поэтому включается точечно.
+    var showPlayCount: Bool = false
 
     var body: some View {
         HStack {
@@ -68,6 +70,15 @@ struct TrackCell: View {
                     .lineLimit(1)
             }
             Spacer()
+
+            if showPlayCount, track.playCount > 0 {
+                Label("\(track.playCount)", systemImage: "play.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .labelStyle(.titleAndIcon)
+                    .monospacedDigit()
+            }
+
             Menu {
                 ControlGroup {
                     Button {

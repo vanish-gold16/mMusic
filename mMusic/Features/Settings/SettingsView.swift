@@ -81,6 +81,7 @@ struct SettingsView: View {
                     LabeledContent("Albums", value: "\(albums.count)")
                     LabeledContent("Artists", value: "\(artists.count)")
                     LabeledContent("Playlists", value: "\(playlistCount)")
+                    LabeledContent("Plays", value: "\(totalPlays)")
                 }
 
                 Section {
@@ -121,6 +122,10 @@ struct SettingsView: View {
                 Text("Tracks, albums with tracks and playlists are not touched.")
             }
         }
+    }
+
+    private var totalPlays: Int {
+        tracks.reduce(0) { $0 + $1.playCount }
     }
 
     private var playlistCount: Int {

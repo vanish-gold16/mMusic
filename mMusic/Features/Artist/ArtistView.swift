@@ -7,6 +7,26 @@ struct ArtistView: View {
 
     var artist: Artist
 
+    @State private var sortOption: SortOption = .albumOrder
+
+    private enum SortOption: String, CaseIterable, Identifiable {
+        case albumOrder = "Album order"
+        case mostPlayed = "Most played"
+        case name = "Name"
+        case recent = "Recently played"
+
+        var id: String { rawValue }
+
+        var systemImage: String {
+            switch self {
+            case .albumOrder: "square.stack"
+            case .mostPlayed: "play.circle"
+            case .name: "textformat"
+            case .recent: "clock"
+            }
+        }
+    }
+
     private let columns = [GridItem(.flexible(), alignment: .top),
                            GridItem(.flexible(), alignment: .top)]
 
@@ -21,12 +41,30 @@ struct ArtistView: View {
 
     /// Треки альбомов артиста плюс те, где он отмечен лично (обычно `.featured`).
     /// Авторство наследуется от альбома, поэтому одних прямых credits мало.
-    private var tracks: [Track] {
+    private var allTracks: [Track] {
         let fromAlbums = albums.flatMap { $0.tracks.sorted { $0.position < $1.position } }
         let own = artist.credits.compactMap(\.track)
 
         var seen = Set<PersistentIdentifier>()
         return (fromAlbums + own).filter { seen.insert($0.persistentModelID).inserted }
+    }
+
+    /// Порядок по альбомам — исходный, его и оставляем как есть.
+    private var tracks: [Track] {
+        switch sortOption {
+        case .albumOrder:
+            allTracks
+        case .mostPlayed:
+            allTracks.sorted { $0.playCount > $1.playCount }
+        case .name:
+            allTracks.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .recent:
+            allTracks.sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
+        }
+    }
+
+    private var totalPlays: Int {
+        allTracks.reduce(0) { $0 + $1.playCount }
     }
 
     var body: some View {
@@ -50,9 +88,9 @@ struct ArtistView: View {
                 }
 
                 if !tracks.isEmpty {
-                    section("Tracks") {
+                    section("Tracks", trailing: sortMenu) {
                         ForEach(tracks) { track in
-                            TrackCell(track: track, queue: tracks, leadingStyle: .artwork)
+                            TrackCell(track: track, queue: tracks, leadingStyle: .artwork, showPlayCount: true)
                         }
                     }
                 } else {
@@ -84,11 +122,31 @@ struct ArtistView: View {
                 .bold()
                 .multilineTextAlignment(.center)
 
-            Text("\(albums.count) albums • \(tracks.count) tracks")
+            Text(summary)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var summary: String {
+        var parts = ["\(albums.count) albums", "\(allTracks.count) tracks"]
+        if totalPlays > 0 { parts.append("\(totalPlays) plays") }
+
+        return parts.joined(separator: " • ")
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort By", selection: $sortOption) {
+                ForEach(SortOption.allCases) { option in
+                    Label(option.rawValue, systemImage: option.systemImage)
+                        .tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
     }
 
     private var playButtons: some View {
@@ -117,15 +175,21 @@ struct ArtistView: View {
         .padding(.horizontal)
     }
 
-    private func section<Content: View>(
+    private func section<Content: View, Trailing: View>(
         _ title: String,
+        trailing: Trailing = EmptyView(),
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.title2)
-                .bold()
-                .padding(.horizontal)
+            HStack {
+                Text(title)
+                    .font(.title2)
+                    .bold()
+                Spacer()
+                trailing
+            }
+            .padding(.horizontal)
+
             content()
         }
     }
