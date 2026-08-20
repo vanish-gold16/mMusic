@@ -14,13 +14,26 @@ struct AudioPlayerQueueTests {
     /// процесс. Swift Testing создаёт экземпляр набора на каждый тест, так что
     /// база у каждого своя.
     private let container: ModelContainer
+    /// Своё хранилище настроек на каждый тест: плеер сохраняет в него режимы,
+    /// и с общим `UserDefaults.standard` один тест влиял бы на следующий —
+    /// а заодно на настройки установленного приложения.
+    private let defaults: UserDefaults
+    private let suiteName: String
 
     init() throws {
+        suiteName = "mMusicTests-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+        AppSettings.registerDefaults(in: defaults)
+
         container = try ModelContainer(
             for: Track.self, Album.self, Artist.self, Credit.self,
             Playlist.self, TrackPlaylistItem.self, PlayEvent.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
+    }
+
+    private func makePlayer() -> AudioPlayer {
+        AudioPlayer(defaults: defaults)
     }
 
     private func makeTracks(_ count: Int) -> [Track] {
@@ -33,7 +46,7 @@ struct AudioPlayerQueueTests {
 
     @Test func playStartsAtGivenIndex() {
         let tracks = makeTracks(3)
-        let player = AudioPlayer()
+        let player = makePlayer()
 
         player.play(tracks, startingAt: 1)
 
@@ -44,7 +57,7 @@ struct AudioPlayerQueueTests {
 
     @Test func playIgnoresIndexOutsideTheList() {
         let tracks = makeTracks(2)
-        let player = AudioPlayer()
+        let player = makePlayer()
 
         player.play(tracks, startingAt: 5)
 
@@ -54,7 +67,7 @@ struct AudioPlayerQueueTests {
 
     @Test func nextStopsAtTheEndWithoutRepeat() {
         let tracks = makeTracks(2)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.play(tracks, startingAt: 1)
 
         player.playNext()
@@ -64,7 +77,7 @@ struct AudioPlayerQueueTests {
 
     @Test func nextWrapsAroundWithRepeatAll() {
         let tracks = makeTracks(2)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.repeatMode = .all
         player.play(tracks, startingAt: 1)
 
@@ -75,7 +88,7 @@ struct AudioPlayerQueueTests {
 
     @Test func enqueueNextInsertsRightAfterCurrent() {
         let tracks = makeTracks(4)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.play(Array(tracks.prefix(3)), startingAt: 0)
 
         player.enqueueNext([tracks[3]])
@@ -86,7 +99,7 @@ struct AudioPlayerQueueTests {
 
     @Test func enqueueLastAppendsToTheEnd() {
         let tracks = makeTracks(3)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.play(Array(tracks.prefix(2)), startingAt: 0)
 
         player.enqueueLast([tracks[2]])
@@ -96,7 +109,7 @@ struct AudioPlayerQueueTests {
 
     @Test func enqueueOnEmptyQueueStartsPlayback() {
         let tracks = makeTracks(1)
-        let player = AudioPlayer()
+        let player = makePlayer()
 
         player.enqueueNext(tracks)
 
@@ -107,7 +120,7 @@ struct AudioPlayerQueueTests {
     /// предыдущего трека подменяет играющий.
     @Test func forgetKeepsPointingAtTheSameTrack() {
         let tracks = makeTracks(3)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.play(tracks, startingAt: 2)
 
         player.forget(tracks[0])
@@ -118,7 +131,7 @@ struct AudioPlayerQueueTests {
 
     @Test func forgettingCurrentTrackStopsPlayback() {
         let tracks = makeTracks(3)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.play(tracks, startingAt: 1)
 
         player.forget(tracks[1])
@@ -130,7 +143,7 @@ struct AudioPlayerQueueTests {
 
     @Test func shuffleKeepsCurrentTrackAndRestoresOrder() {
         let tracks = makeTracks(6)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.play(tracks, startingAt: 3)
 
         player.toggleShuffle()
@@ -148,7 +161,7 @@ struct AudioPlayerQueueTests {
 
     @Test func movingInQueueFollowsTheCurrentTrack() {
         let tracks = makeTracks(3)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.play(tracks, startingAt: 0)
 
         player.moveInQueue(from: IndexSet(integer: 0), to: 3)
@@ -159,7 +172,7 @@ struct AudioPlayerQueueTests {
 
     @Test func removingFromQueueDoesNotTouchOtherTracks() {
         let tracks = makeTracks(3)
-        let player = AudioPlayer()
+        let player = makePlayer()
         player.play(tracks, startingAt: 2)
 
         player.removeFromQueue(at: IndexSet(integer: 0))
@@ -169,7 +182,7 @@ struct AudioPlayerQueueTests {
     }
 
     @Test func repeatModeCyclesThroughAllStates() {
-        let player = AudioPlayer()
+        let player = makePlayer()
 
         #expect(player.repeatMode == .off)
         player.cycleRepeatMode()

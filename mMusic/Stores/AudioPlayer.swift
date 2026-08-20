@@ -35,6 +35,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     var level: Double = 0
     private let meterFloor: Double = -50
 
+    /// Хранилище настроек внедряется: с жёстким `UserDefaults.standard` тесты писали
+    /// режимы повтора прямо в настройки приложения, а следующий прогон их читал.
+    private let defaults: UserDefaults
+
     private enum Keys {
         static let lastTrack = "lastTrack"
         static let queue = "queue"
@@ -65,10 +69,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private var sleepTask: Task<Void, Never>?
     private var sessionObservers: [NSObjectProtocol] = []
     
-    override init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         super.init()
 
-        let defaults = UserDefaults.standard
         repeatMode = RepeatMode(rawValue: defaults.string(forKey: Keys.repeatMode) ?? "") ?? .off
         // Очередь сохраняется уже перемешанной, а исходный порядок — нет: после перезапуска
         // shuffle остаётся включённым, но выключение его больше ничего не переставит.
@@ -132,7 +136,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             player?.isMeteringEnabled = true
             // enableRate обязателен до play(), иначе rate молча игнорируется.
             player?.enableRate = true
-            player?.rate = Float(UserDefaults.standard.double(forKey: AppSettings.playbackRate))
+            player?.rate = Float(defaults.double(forKey: AppSettings.playbackRate))
             player?.play()
             
             track.lastPlayedAt = .now
@@ -173,7 +177,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             return
         }
 
-        player?.rate = Float(UserDefaults.standard.double(forKey: AppSettings.playbackRate))
+        player?.rate = Float(defaults.double(forKey: AppSettings.playbackRate))
         player?.play()
         isPlaying = true
         startProgressTimer()
@@ -256,7 +260,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     /// Новая скорость должна услышаться сразу, а не со следующего трека.
     func applyPlaybackRate() {
         guard isPlaying else { return }
-        player?.rate = Float(UserDefaults.standard.double(forKey: AppSettings.playbackRate))
+        player?.rate = Float(defaults.double(forKey: AppSettings.playbackRate))
     }
 
     /// Прыжок к треку из экрана очереди.
@@ -588,13 +592,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
     /// Очередь пишется на диск здесь, а зовётся отовсюду, где она меняется.
     private func persistQueue() {
-        UserDefaults.standard.set(currentTrack?.filename, forKey: Keys.lastTrack)
-        UserDefaults.standard.set(queue.map(\.filename), forKey: Keys.queue)
+        defaults.set(currentTrack?.filename, forKey: Keys.lastTrack)
+        defaults.set(queue.map(\.filename), forKey: Keys.queue)
     }
 
     private func persistModes() {
-        UserDefaults.standard.set(repeatMode.rawValue, forKey: Keys.repeatMode)
-        UserDefaults.standard.set(isShuffled, forKey: Keys.isShuffled)
+        defaults.set(repeatMode.rawValue, forKey: Keys.repeatMode)
+        defaults.set(isShuffled, forKey: Keys.isShuffled)
     }
 
     private func observeAudioSession() {
@@ -635,7 +639,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             guard wasPlayingBeforeInterruption else { return }
             wasPlayingBeforeInterruption = false
 
-            guard UserDefaults.standard.bool(forKey: AppSettings.resumeAfterInterruption) else { return }
+            guard defaults.bool(forKey: AppSettings.resumeAfterInterruption) else { return }
 
             // `.shouldResume` — разрешение системы. Без него возобновлять нельзя:
             // поверх нас может до сих пор говорить навигатор.
@@ -654,7 +658,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         guard let raw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: raw),
               reason == .oldDeviceUnavailable,
-              UserDefaults.standard.bool(forKey: AppSettings.pauseOnDisconnect) else { return }
+              defaults.bool(forKey: AppSettings.pauseOnDisconnect) else { return }
 
         pause()
     }

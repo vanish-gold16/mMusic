@@ -10,8 +10,8 @@ enum AppSettings {
 
     /// Без регистрации `bool(forKey:)` вернул бы false для ещё не записанного ключа,
     /// и обе настройки стартовали бы выключенными, хотя в интерфейсе выглядят включёнными.
-    static func registerDefaults() {
-        UserDefaults.standard.register(defaults: [
+    static func registerDefaults(in defaults: UserDefaults = .standard) {
+        defaults.register(defaults: [
             pauseOnDisconnect: true,
             resumeAfterInterruption: true,
             playbackRate: 1.0,
