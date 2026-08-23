@@ -5,6 +5,7 @@ struct AlbumCell: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) var audioPlayer
+    @Environment(ToastCenter.self) private var toasts
 
     @State private var showDeleteConfirmation = false
     @State private var showAddToPlaylist = false
@@ -83,12 +84,14 @@ struct AlbumCell: View {
                 
                 Button {
                     audioPlayer.enqueueNext(sortedTracks)
+                    toasts.enqueuedNext(sortedTracks.count)
                 } label: {
                     Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                 }
                 
                 Button {
                     audioPlayer.enqueueLast(sortedTracks)
+                    toasts.enqueuedLast(sortedTracks.count)
                 } label: {
                     Label("Play After", systemImage: "text.line.last.and.arrowtriangle.forward")
                 }
@@ -124,7 +127,10 @@ struct AlbumCell: View {
             audioPlayer.forget(track)
             AudioFileStore.remove(filename: track.filename)
         }
+
+        let name = album.name
         modelContext.delete(album)
+        toasts.removed("Deleted \(name)")
     }
     
 }

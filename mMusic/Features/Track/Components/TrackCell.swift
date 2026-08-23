@@ -5,6 +5,7 @@ struct TrackCell: View {
     
     @Environment(AudioPlayer.self) private var audioPlayer
     @Environment(\.modelContext) private var modelContext
+    @Environment(ToastCenter.self) private var toasts
     
     @State private var showEditTrack: Bool = false
     @State private var showDeleteConfirmation: Bool = false
@@ -118,11 +119,13 @@ struct TrackCell: View {
 
                 Button {
                     audioPlayer.enqueueNext([track])
+                    toasts.enqueuedNext(1)
                 } label: {
                     Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                 }
                 Button {
                     audioPlayer.enqueueLast([track])
+                    toasts.enqueuedLast(1)
                 } label: {
                     Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
                 }
@@ -140,7 +143,10 @@ struct TrackCell: View {
                 Divider()
 
                 if let onRemoveFromPlaylist {
-                    Button(role: .destructive, action: onRemoveFromPlaylist) {
+                    Button(role: .destructive) {
+                        onRemoveFromPlaylist()
+                        toasts.removed("Removed from the playlist")
+                    } label: {
                         Label("Remove from playlist", systemImage: "minus.circle")
                     }
                 }
@@ -185,9 +191,11 @@ struct TrackCell: View {
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {
+                let name = track.name
                 audioPlayer.forget(track)
                 AudioFileStore.remove(filename: track.filename)
                 modelContext.delete(track)
+                toasts.removed("Deleted \(name)")
             }
             Button("Cancel", role: .cancel) { }
         } message: {

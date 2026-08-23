@@ -8,12 +8,11 @@ struct AddToPlaylistView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(ToastCenter.self) private var toasts
 
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
 
     @State private var newPlaylistName = ""
-    /// Сообщение о том, сколько треков легло, а сколько уже было.
-    @State private var result: String?
 
     private var trimmedName: String {
         newPlaylistName.trimmingCharacters(in: .whitespaces)
@@ -25,7 +24,11 @@ struct AddToPlaylistView: View {
                 Section("new playlist") {
                     HStack {
                         TextField("Name", text: $newPlaylistName)
+                            .submitLabel(.done)
+                            .onSubmit { if !trimmedName.isEmpty { createAndAdd() } }
+
                         Button("Create") { createAndAdd() }
+                            .buttonStyle(.glassProminent)
                             .disabled(trimmedName.isEmpty)
                     }
                 }
@@ -41,14 +44,9 @@ struct AddToPlaylistView: View {
                             Button {
                                 add(to: playlist)
                             } label: {
-                                HStack {
-                                    Text(playlist.name)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    Text("\(playlist.items.count)")
-                                        .foregroundStyle(.secondary)
-                                }
+                                row(for: playlist)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -60,19 +58,71 @@ struct AddToPlaylistView: View {
                     Button("cancel") { dismiss() }
                 }
             }
-            .alert(
-                "Added",
-                isPresented: Binding(
-                    get: { result != nil },
-                    set: { if !$0 { result = nil } }
-                ),
-                presenting: result
-            ) { _ in
-                Button("OK") { dismiss() }
-            } message: { message in
-                Text(message)
+        }
+        // Лист открывается наполовину: список плейлистов короткий, а закрывать
+        // его протяжкой удобнее, чем целиться в «cancel».
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func row(for playlist: Playlist) -> some View {
+        let alreadyThere = countAlreadyThere(in: playlist)
+
+        return HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(.quaternary)
+                .frame(width: 40, height: 40)
+                .overlay {
+                    if let data = playlist.artwork ?? playlist.orderedTracks.first?.displayArtwork,
+                       let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Image(systemName: "music.note.list")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(playlist.name)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                // Про дубли честнее сказать до нажатия, а не после: иначе выбор
+                // выглядит как «нажал — и ничего не произошло».
+                Text(subtitle(count: playlist.items.count, alreadyThere: alreadyThere))
+                    .font(.caption)
+                    .foregroundStyle(alreadyThere > 0 ? Color.orange : Color.secondary)
+            }
+
+            Spacer()
+
+            if alreadyThere == tracks.count {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.orange)
             }
         }
+        .contentShape(Rectangle())
+    }
+
+    private func subtitle(count: Int, alreadyThere: Int) -> String {
+        if alreadyThere == 0 {
+            return count == 1 ? "1 track" : "\(count) tracks"
+        }
+
+        if alreadyThere == tracks.count {
+            return tracks.count == 1 ? "already here" : "all \(tracks.count) already here"
+        }
+
+        return "\(alreadyThere) of \(tracks.count) already here"
+    }
+
+    /// Сколько из выбранных треков уже лежит в плейлисте.
+    private func countAlreadyThere(in playlist: Playlist) -> Int {
+        let existing = Set(playlist.items.map(\.track.persistentModelID))
+        return tracks.filter { existing.contains($0.persistentModelID) }.count
     }
 
     private func createAndAdd() {
@@ -86,7 +136,6 @@ struct AddToPlaylistView: View {
     private func add(to playlist: Playlist) {
         let existing = Set(playlist.items.map(\.track.persistentModelID))
         var position = playlist.items.count
-
         var added = 0
 
         for track in tracks where !existing.contains(track.persistentModelID) {
@@ -95,17 +144,9 @@ struct AddToPlaylistView: View {
             added += 1
         }
 
-        let skipped = tracks.count - added
-
-        // Про пропуски нужно сказать: молчаливое «ничего не произошло» выглядит
-        // как сбой, особенно когда добавляешь альбом целиком.
-        guard skipped > 0 else {
-            dismiss()
-            return
-        }
-
-        result = added == 0
-            ? "All \(skipped) tracks are already in \"\(playlist.name)\"."
-            : "\(added) added, \(skipped) already there."
+        // Раньше про пропуски сообщал алерт с кнопкой «ОК» — он останавливал
+        // на ровном месте. Теперь то же самое говорит плашка, которая гаснет сама.
+        toasts.addedToPlaylist(added: added, skipped: tracks.count - added, playlist: playlist.name)
+        dismiss()
     }
 }

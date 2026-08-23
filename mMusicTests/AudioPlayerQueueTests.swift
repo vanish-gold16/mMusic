@@ -170,6 +170,29 @@ struct AudioPlayerQueueTests {
         #expect(player.currentTrack?.name == "Track 0")
     }
 
+    @Test func clearUpcomingKeepsCurrentAndPlayed() {
+        let tracks = makeTracks(5)
+        let player = makePlayer()
+
+        player.play(tracks, startingAt: 2)
+        player.clearUpcoming()
+
+        #expect(player.queue.count == 3)
+        #expect(player.currentIndex == 2)
+        #expect(player.currentTrack?.name == "Track 2")
+    }
+
+    @Test func clearUpcomingDoesNothingOnTheLastTrack() {
+        let tracks = makeTracks(3)
+        let player = makePlayer()
+
+        player.play(tracks, startingAt: 2)
+        player.clearUpcoming()
+
+        #expect(player.queue.count == 3)
+        #expect(player.currentIndex == 2)
+    }
+
     @Test func removingFromQueueDoesNotTouchOtherTracks() {
         let tracks = makeTracks(3)
         let player = makePlayer()

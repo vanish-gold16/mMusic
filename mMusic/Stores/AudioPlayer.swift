@@ -39,6 +39,22 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     var level: Double = 0
     private let meterFloor: Double = -50
 
+    /// Насколько громко звучит трек прямо сейчас — от 0 (тихое место) до 1 (удар).
+    /// На этом числе «дышит» фон плеера.
+    ///
+    /// Считается здесь, а не на экране: фон показывает не только плеер, но и то,
+    /// что открыто из него, и дышать они должны в такт.
+    private(set) var punch: Double = 0
+
+    /// Сглаженная громкость: тянется за `level`, но лениво, иначе фон мигал бы
+    /// на каждой ноте.
+    private var glow: Double = 0
+    /// Ползучие границы громкости этого трека — подстраиваются сами, чтобы фон
+    /// одинаково хорошо дышал и на тихой записи, и на громкой.
+    private var quiet: Double = 0
+    private var loud: Double = 1
+    private var isRangeCalibrated = false
+
     /// Хранилище настроек внедряется: с жёстким `UserDefaults.standard` тесты писали
     /// режимы повтора прямо в настройки приложения, а следующий прогон их читал.
     private let defaults: UserDefaults
@@ -133,6 +149,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         // До попытки открыть файл: обложка есть и у трека, который не удалось прочитать,
         // а интерфейс всё равно перекрашивается под него.
         refreshAccent()
+
+        // У нового трека своя громкость — коридор ищем заново.
+        isRangeCalibrated = false
 
         do {
             player = try AVAudioPlayer(contentsOf: url)
@@ -361,9 +380,37 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
             let db = Double(player.averagePower(forChannel: 0))
             let normalized = (db - self.meterFloor) / (0 - self.meterFloor)
             self.level = min(max(normalized, 0), 1)
+            self.updatePunch()
         }
         RunLoop.main.add(timer, forMode: .common)
         meterTimer = timer
+    }
+
+    /// Пересчёт «дыхания» по свежему замеру громкости, 30 раз в секунду.
+    private func updatePunch() {
+        // Вспышка мгновенная, гаснет плавно — так удары читаются как удары.
+        if level > glow {
+            glow = level
+        } else {
+            glow += (level - glow) * 0.06
+        }
+
+        if isRangeCalibrated {
+            // Границы мгновенно раздвигаются наружу и медленно сползают внутрь.
+            loud = max(glow, loud + (glow - loud) * 0.004)
+            quiet = min(glow, quiet + (glow - quiet) * 0.004)
+        } else {
+            // Первый замер нового трека задаёт коридор вокруг его реальной громкости.
+            // Без этого стартовые 0...1 несколько секунд врут в сторону максимума.
+            quiet = max(glow - 0.15, 0)
+            loud = min(glow + 0.15, 1)
+            isRangeCalibrated = true
+        }
+
+        // `span` не даёт делить на почти-ноль: на ровном месте фон должен замереть,
+        // а не раздувать микроскопические колебания до полного размаха.
+        let span = max(loud - quiet, 0.12)
+        punch = min(max((glow - quiet) / span, 0), 1)
     }
 
     private func stopMeterTimer() {
@@ -597,6 +644,18 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
 
     /// Очередь пишется на диск здесь, а зовётся отовсюду, где она меняется.
+    /// «Очистить дальше» на экране очереди: сыгранное и текущий трек остаются,
+    /// уходит только то, что ждёт впереди.
+    func clearUpcoming() {
+        guard queue.indices.contains(currentIndex), currentIndex + 1 < queue.count else { return }
+
+        let removedIDs = Set(queue[(currentIndex + 1)...].map(\.id))
+        queue.removeSubrange((currentIndex + 1)...)
+        originalQueue.removeAll { removedIDs.contains($0.id) }
+
+        persistQueue()
+    }
+
     private func persistQueue() {
         defaults.set(currentTrack?.filename, forKey: Keys.lastTrack)
         defaults.set(queue.map(\.filename), forKey: Keys.queue)

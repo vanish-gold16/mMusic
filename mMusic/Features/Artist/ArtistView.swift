@@ -4,6 +4,8 @@ import SwiftUI
 struct ArtistView: View {
 
     @Environment(AudioPlayer.self) private var audioPlayer
+    /// Открыты изнутри плеера — значит, и фон продолжаем его.
+    @Environment(\.isInsidePlayer) private var isInsidePlayer
 
     var artist: Artist
 
@@ -108,6 +110,16 @@ struct ArtistView: View {
         }
         .navigationTitle(artist.name)
         .navigationBarTitleDisplayMode(.inline)
+        // `containerBackground`, а не `background`: у вложенного экрана своя
+        // непрозрачная подложка, и закрасить её можно только фоном контейнера —
+        // зато он ложится и под панель навигации.
+        .containerBackground(for: .navigation) {
+            if isInsidePlayer {
+                PlayerBackground(audioPlayer: audioPlayer)
+            } else {
+                Color(.systemBackground)
+            }
+        }
     }
 
     private var header: some View {

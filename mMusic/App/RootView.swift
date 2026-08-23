@@ -29,6 +29,9 @@ struct RootView: View {
     @State private var audioPlayer = AudioPlayer()
     @State private var isPlayerPresented = false
 
+    /// Общая на всё приложение «плашка о сделанном» — см. `ToastCenter`.
+    @State private var toasts = ToastCenter()
+
     @Namespace private var playerNamespace
     
     var body: some View {
@@ -45,7 +48,11 @@ struct RootView: View {
                 .zIndex(1)
             }
         }
+        // Плашка поверх всего, включая раскрытый плеер: она сообщает о том,
+        // что только что произошло, и прятаться за экранами не должна.
+        .toastOverlay(toasts)
         .environment(audioPlayer)
+        .environment(toasts)
         .task {
             // Плеер живёт в @State и своего контекста не имеет — отдаём ему рабочий.
             audioPlayer.modelContext = modelContext

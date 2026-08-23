@@ -4,6 +4,7 @@ import SwiftUI
 struct LibraryTrackCell: View {
     @Environment(AudioPlayer.self) private var audioPlayer
     @Environment(\.modelContext) private var modelContext
+    @Environment(ToastCenter.self) private var toasts
     
     @State private var showImagePicker = false
     @State private var showEdit = false
@@ -76,9 +77,11 @@ struct LibraryTrackCell: View {
             titleVisibility: .visible
         ) {
             Button("Remove", role: .destructive) {
+                let name = track.name
                 audioPlayer.forget(track)
                 AudioFileStore.remove(filename: track.filename)
                 modelContext.delete(track)
+                toasts.removed("Deleted \(name)")
             }
             Button("Cancel", role: .cancel) { }
         } message: {

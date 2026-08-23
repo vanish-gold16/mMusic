@@ -5,6 +5,7 @@ struct PlaylistView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) var audioPlayer
+    @Environment(ToastCenter.self) private var toasts
     
     @State private var isShowingTrackPicker = false
     @State private var editingPlaylist = false
@@ -194,11 +195,13 @@ struct PlaylistView: View {
                         
                         Button {
                             audioPlayer.enqueueNext(playlist.orderedTracks)
+                            toasts.enqueuedNext(playlist.orderedTracks.count)
                         } label: {
                             Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                         }
                         Button {
                             audioPlayer.enqueueLast(playlist.orderedTracks)
+                            toasts.enqueuedLast(playlist.orderedTracks.count)
                         } label: {
                             Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
                         }
@@ -229,7 +232,9 @@ struct PlaylistView: View {
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {
+                let name = playlist.name
                 modelContext.delete(playlist)
+                toasts.removed("Deleted \(name)")
             }
             Button("Cancel", role: .cancel) { }
         } message: {

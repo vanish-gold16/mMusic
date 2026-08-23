@@ -3,6 +3,7 @@ import SwiftUI
 struct AlbumView: View {
     
     @Environment(AudioPlayer.self) var audioPlayer
+    @Environment(ToastCenter.self) private var toasts
     
     var album: Album
     
@@ -144,11 +145,13 @@ struct AlbumView: View {
 
                     Button {
                         audioPlayer.enqueueNext(sortedTracks)
+                        toasts.enqueuedNext(sortedTracks.count)
                     } label: {
                         Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                     }
                     Button {
                         audioPlayer.enqueueLast(sortedTracks)
+                        toasts.enqueuedLast(sortedTracks.count)
                     } label: {
                         Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
                     }

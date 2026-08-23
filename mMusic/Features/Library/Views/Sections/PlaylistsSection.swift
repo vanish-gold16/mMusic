@@ -7,6 +7,7 @@ struct PlaylistsSection: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) private var audioPlayer
+    @Environment(ToastCenter.self) private var toasts
 
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
 
@@ -50,7 +51,9 @@ struct PlaylistsSection: View {
                 presenting: playlistToDelete
             ) { playlist in
                 Button("Delete", role: .destructive) {
+                    let name = playlist.name
                     modelContext.delete(playlist)
+                    toasts.removed("Deleted \(name)")
                 }
                 Button("Cancel", role: .cancel) { }
             } message: { _ in
@@ -99,11 +102,13 @@ struct PlaylistsSection: View {
 
         Button {
             audioPlayer.enqueueNext(playlist.orderedTracks)
+            toasts.enqueuedNext(playlist.orderedTracks.count)
         } label: {
             Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
         }
         Button {
             audioPlayer.enqueueLast(playlist.orderedTracks)
+            toasts.enqueuedLast(playlist.orderedTracks.count)
         } label: {
             Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
         }

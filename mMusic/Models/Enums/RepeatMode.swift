@@ -27,4 +27,14 @@ enum RepeatMode: String, CaseIterable {
 
     /// Выключенный режим рисуется бледным, включённый — акцентным.
     var isActive: Bool { self != .off }
+
+    /// Подпись для голосового доступа: значок «repeat» сам по себе не говорит,
+    /// повторяется очередь или один трек.
+    var title: String {
+        switch self {
+        case .off: "Repeat off"
+        case .all: "Repeat queue"
+        case .one: "Repeat track"
+        }
+    }
 }
