@@ -24,11 +24,6 @@ struct PlayerView: View {
     @State private var glow: Double = 0
     @State private var artworkWidth: CGFloat = 0
 
-    /// Обложка светлая — значит, текст поверх неё должен быть тёмным.
-    /// Считается один раз на трек в `.task`: `body` пересобирается десятки раз
-    /// в секунду вслед за `glow`, там такому расчёту не место.
-    @State private var isLightBackground = false
-
     /// Ползучие границы громкости этого трека — подстраиваются сами,
     /// чтобы фон одинаково хорошо дышал и на тихой записи, и на громкой.
     @State private var quiet: Double = 0
@@ -67,8 +62,6 @@ struct PlayerView: View {
         .environment(\.colorScheme, isLightBackground ? .light : .dark)
         .onAppear { sliderValue = audioPlayer.currentTime }
         .task(id: audioPlayer.currentTrack?.filename) {
-            isLightBackground = await Self.isLight(artwork: audioPlayer.currentTrack?.displayArtwork)
-
             // Фоновый проход идёт по всей библиотеке подряд; тот трек, что открыт
             // прямо сейчас, ждать своей очереди не должен.
             if let track = audioPlayer.currentTrack {
@@ -459,39 +452,70 @@ struct PlayerView: View {
         return min(max((glow - quiet) / span, 0), 1)
     }
     
+    /// Фон плеера — два цвета обложки. Первый лежит ровным полем и задаёт
+    /// настроение трека, второй «дышит» поверх него: разрастается на громком
+    /// и опадает на тихом.
     @ViewBuilder
     private var artworkBackground: some View {
-        if let data = audioPlayer.currentTrack?.displayArtwork,
-           let uiImage = UIImage(data: data) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .blur(radius: 60)                  // константа — пересчитывается один раз
-                .scaleEffect(1.25 + punch * 0.45)  // на громком фон наплывает
-                .clipped()
-                .saturation(0.9 + punch * 1.6)     // и вспыхивает цветом
-                .brightness(punch * 0.12)
-                .hueRotation(.degrees(punch * 18)) // оттенок ведёт — фон «переливается»
-                .overlay {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.9 - punch * 0.7) // вуаль тончает, обложка проступает
+        if audioPlayer.currentTrack?.displayArtwork != nil {
+            ZStack {
+                // Дно: цвета лежат поверх чёрного, иначе на просвет было бы видно
+                // то, что под плеером.
+                Color.black
+
+                ZStack {
+                    // Не заливка одним тоном: к низу цвет отступает, и экран
+                    // перестаёт выглядеть куском крашеной бумаги.
+                    LinearGradient(
+                        colors: [audioPlayer.accent, audioPlayer.accent.opacity(0.65)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+
+                    // Эллипс, а не круг: он тянется по форме экрана. Радиус задан
+                    // долями кадра, поэтому пятно одинаково на любом устройстве.
+                    EllipticalGradient(
+                        colors: [
+                            audioPlayer.secondaryAccent.opacity(0.35 + punch * 0.6),
+                            audioPlayer.secondaryAccent.opacity(0)
+                        ],
+                        center: .center,
+                        startRadiusFraction: 0,
+                        endRadiusFraction: 0.6
+                    )
+                    .scaleEffect(0.9 + punch * 0.8) // на громком второй цвет наплывает
+                    .blur(radius: 40)               // и растворяется в первом
                 }
+                .saturation(0.9 + punch * 1.1)      // вспыхивает цветом
+                .hueRotation(.degrees(punch * 14))  // оттенок ведёт — фон «переливается»
+
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.9 - punch * 0.7)     // вуаль тончает, цвета проступают
+            }
+            // Анимация привязана к самим цветам: на смене трека они перетекают
+            // друг в друга, а на «дыхании» (оно идёт по `punch`) не срабатывает —
+            // иначе каждый удар громкости тянулся бы полсекунды.
+            .animation(.easeInOut(duration: 0.6), value: audioPlayer.accent)
+            .animation(.easeInOut(duration: 0.6), value: audioPlayer.secondaryAccent)
         } else {
             Color.black
         }
     }
     
-    /// Декодирование обложки — не мгновенная операция, уводим её с главного потока.
-    /// Порог 0.6, а не 0.5: под текстом лежит не сама обложка, а её размытая
-    /// и подсвеченная версия — она заметно светлее оригинала.
-    private static func isLight(artwork data: Data?) async -> Bool {
-        guard let data else { return false }   // нет обложки — фон чёрный, текст белый
+    /// Фон под текстом светлый — значит, сам текст должен быть тёмным.
+    ///
+    /// Раньше ради этого декодировалась обложка, и результат приходилось держать
+    /// в `@State`. Теперь фон красит акцент, и яркость считается прямо из него —
+    /// пара умножений, их не жалко и на каждой перерисовке.
+    private var isLightBackground: Bool {
+        guard audioPlayer.currentTrack?.displayArtwork != nil else { return false } // фон чёрный — текст белый
 
-        return await Task.detached(priority: .utility) {
-            guard let brightness = UIImage(data: data)?.averageBrightness else { return false }
-            return brightness > 0.6
-        }.value
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        UIColor(audioPlayer.accent).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+
+        // Веса неравные: глаз сильнее всего реагирует на зелёный, слабее всего на синий.
+        return 0.299 * red + 0.587 * green + 0.114 * blue > 0.62
     }
 
     private func timeString(_ time: TimeInterval) -> String {

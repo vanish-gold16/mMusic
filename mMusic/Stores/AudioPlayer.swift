@@ -32,6 +32,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     /// Оранжевый остаётся, пока ничего не играет.
     var accent: Color = .orange
 
+    /// Второй цвет той же обложки: им «дышит» фон плеера поверх первого.
+    /// Пара к оранжевому по умолчанию — розовый.
+    var secondaryAccent: Color = .pink
+
     var level: Double = 0
     private let meterFloor: Double = -50
 
@@ -451,20 +455,22 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private func refreshAccent() {
         guard let track = currentTrack, let data = track.displayArtwork else {
             accent = .orange
+            secondaryAccent = .pink
             return
         }
 
         let filename = track.filename
 
         Task { @MainActor in
-            let color = await Task.detached(priority: .utility) {
-                UIImage(data: data)?.dominantColor
+            let colors = await Task.detached(priority: .utility) {
+                UIImage(data: data)?.accentColors
             }.value
 
-            // Пока считали, трек мог смениться — тогда этот цвет уже не к месту.
+            // Пока считали, трек мог смениться — тогда эти цвета уже не к месту.
             guard currentTrack?.filename == filename else { return }
 
-            accent = color.map(Color.init) ?? .orange
+            accent = colors.map { Color($0.primary) } ?? .orange
+            secondaryAccent = colors.map { Color($0.secondary) } ?? .pink
         }
     }
     
