@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) private var audioPlayer
+    @Environment(ToastCenter.self) private var toasts
 
     @AppStorage(AppSettings.pauseOnDisconnect) private var pauseOnDisconnect = true
     @AppStorage(AppSettings.resumeAfterInterruption) private var resumeAfterInterruption = true
@@ -22,6 +23,7 @@ struct SettingsView: View {
     /// это поход в файловую систему, ему не место в `body`.
     @State private var orphanFiles: [String] = []
     @State private var showCleanUpConfirmation = false
+    @State private var isRestoring = false
 
     /// Артист остаётся в базе после удаления его последнего трека — credits каскадно
     /// уходят вместе с треком, а сам артист нет.
@@ -108,6 +110,27 @@ struct SettingsView: View {
                     .disabled(tracks.isEmpty)
                 }
 
+                if !orphanFiles.isEmpty {
+                    Section {
+                        Button {
+                            restore()
+                        } label: {
+                            HStack {
+                                Label("Restore \(orphanFiles.count) tracks", systemImage: "arrow.clockwise")
+                                if isRestoring {
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .disabled(isRestoring)
+                    } header: {
+                        Text("restore")
+                    } footer: {
+                        Text("There are audio files in the app that no track points to. They can be put back into the library: the name, artists, album and genre come from the play history, and the date from the file itself. Playlists and favourites cannot be recovered.")
+                    }
+                }
+
                 Section {
                     LabeledContent("Artists without tracks", value: "\(orphanArtists.count)")
                     LabeledContent("Empty albums", value: "\(emptyAlbums.count)")
@@ -122,7 +145,7 @@ struct SettingsView: View {
                 } header: {
                     Text("clean up")
                 } footer: {
-                    Text("Removes leftovers only: artists nothing credits, albums without tracks, and audio files no track points to.")
+                    Text("Removes leftovers only: artists nothing credits, albums without tracks, and audio files no track points to. Deleting the files is final — if they might still be needed, restore them above first.")
                 }
             }
             .navigationTitle("Settings")
@@ -133,6 +156,11 @@ struct SettingsView: View {
                 }
             }
             .task {
+                orphanFiles = findOrphanFiles()
+            }
+            // Список пересчитывается после восстановления: треков стало больше,
+            // и «ничьих» файлов должно остаться меньше.
+            .onChange(of: tracks.count) { _, _ in
                 orphanFiles = findOrphanFiles()
             }
             .confirmationDialog(
@@ -158,16 +186,25 @@ struct SettingsView: View {
 
     /// Всё, что лежит в Documents, минус то, на что ссылаются треки.
     private func findOrphanFiles() -> [String] {
-        let known = Set(tracks.map(\.filename))
+        LibraryRestore.orphanFiles(known: Set(tracks.map(\.filename)))
+    }
 
-        let contents = (try? FileManager.default.contentsOfDirectory(
-            at: URL.documentsDirectory,
-            includingPropertiesForKeys: nil
-        )) ?? []
+    /// Возвращает в библиотеку файлы, на которые не ссылается ни один трек.
+    private func restore() {
+        isRestoring = true
 
-        return contents
-            .map(\.lastPathComponent)
-            .filter { !known.contains($0) }
+        Task { @MainActor in
+            let result = await LibraryRestore.restore(orphanFiles, in: modelContext)
+            orphanFiles = findOrphanFiles()
+            isRestoring = false
+
+            toasts.show(
+                result.fromHistory > 0
+                    ? "Restored \(result.restored) tracks • \(result.fromHistory) from history"
+                    : "Restored \(result.restored) tracks",
+                systemImage: "arrow.clockwise"
+            )
+        }
     }
 
     private func cleanUp() {
