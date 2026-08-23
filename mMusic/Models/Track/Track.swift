@@ -41,6 +41,16 @@ class Track {
     /// На этом держится лента «Recently played» на главной.
     var lastPlayedAt: Date?
     
+    /// Статический текст трека: слова, перевод, заметка. Открывается в плеере,
+    /// синхронизации со временем нет — см. `Lyrics`.
+    /// Необязательное поле со значением по умолчанию: у треков, добавленных до
+    /// его появления, оно просто окажется пустым, переимпорт не нужен.
+    var lyrics: String?
+    /// Есть ли что показывать в панели текста. Строка из одних пробелов — нет.
+    var hasLyrics: Bool {
+        Lyrics.normalized(lyrics ?? "") != nil
+    }
+
     @Attribute(.externalStorage) var artwork: Data?
     var displayArtwork: Data? {
         artwork ?? album?.artwork

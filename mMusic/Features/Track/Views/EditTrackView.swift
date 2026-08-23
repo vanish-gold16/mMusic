@@ -8,6 +8,7 @@ struct EditTrackView: View {
     @Bindable var track: Track
     
     @State private var showImagePicker = false
+    @State private var showLyricsEditor = false
     
     @State private var drafts: [ArtistDraft] = []
 
@@ -72,6 +73,23 @@ struct EditTrackView: View {
                             }
                         }
                     }
+                    Section("text") {
+                        Button {
+                            showLyricsEditor = true
+                        } label: {
+                            HStack {
+                                Label(track.hasLyrics ? "edit text" : "add text", systemImage: "quote.bubble")
+                                Spacer()
+                                // Первая строка вместо «есть / нет»: по ней сразу
+                                // видно, тот ли это текст.
+                                if let firstLine = track.lyrics?.split(separator: "\n").first {
+                                    Text(firstLine)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                    }
                     Section("release") {
                         Toggle("has release date", isOn: hasRelease)
                         if track.album?.release != nil {
@@ -86,6 +104,9 @@ struct EditTrackView: View {
                             dismiss()
                         }
                     }
+                }
+                .sheet(isPresented: $showLyricsEditor) {
+                    LyricsEditorView(track: track)
                 }
                 .onAppear {
                     drafts = track.credits

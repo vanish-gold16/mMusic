@@ -18,6 +18,9 @@ struct PlayerView: View {
     @State private var isQueuePresented = false
     @State private var isAddingToPlaylist = false
     @State private var isEditingTrack = false
+    /// Обложка уступила место тексту трека.
+    @State private var showsLyrics = false
+    @State private var isEditingLyrics = false
 
     @AppStorage(AppSettings.playbackRate) private var playbackRate = 1.0
     
@@ -56,6 +59,11 @@ struct PlayerView: View {
         .sheet(isPresented: $isEditingTrack) {
             if let track = audioPlayer.currentTrack {
                 EditTrackView(track: track)
+            }
+        }
+        .sheet(isPresented: $isEditingLyrics) {
+            if let track = audioPlayer.currentTrack {
+                LyricsEditorView(track: track)
             }
         }
         // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
@@ -105,107 +113,40 @@ struct PlayerView: View {
     }
 
     private var content: some View {
-        VStack(spacing: 32) {
-            // Concentric — скругление, повторяющее радиус корпуса: обложка перестаёт
-            // выглядеть наклеенной поверх экрана.
-            ConcentricRectangle(corners: .concentric(minimum: .fixed(16)), isUniform: true)
-                .fill(.quaternary)
-                .overlay {
-                    if let data = audioPlayer.currentTrack?.displayArtwork,
-                       let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 64))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .clipShape(ConcentricRectangle(corners: .concentric(minimum: .fixed(16)), isUniform: true))
-                .matchedGeometryEffect(id: PlayerTransition.artwork, in: namespace, isSource: isPresented)
-                .aspectRatio(1, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .onGeometryChange(for: CGFloat.self) { proxy in
-                    proxy.size.width
-                } action: { newWidth in
-                    artworkWidth = newWidth
-                }
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) { location in
-                    if location.x < artworkWidth / 2 {
-                        audioPlayer.playPrevious()
-                    } else {
-                        audioPlayer.playNext()
-                    }
-                }
-                .onTapGesture {
-                    audioPlayer.togglePlayPause()
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 30)
-                        .onEnded { value in
-                            let dx = value.translation.width
-                            let dy = value.translation.height
+        VStack(spacing: showsLyrics ? 20 : 32) {
+            // AnyLayout меняет расстановку, не подменяя сами вьюхи: обложка с
+            // названием не исчезают и не появляются заново, а переезжают из
+            // столбца в строку. Поэтому переход анимируется, а обложка не теряет
+            // связь с мини-плеером.
+            let header = showsLyrics
+                ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
+                : AnyLayout(VStackLayout(alignment: .leading, spacing: 32))
 
-                            // Вертикальная протяжка — не наше дело, это жест шторки.
-                            guard abs(dx) > abs(dy) else { return }
-                            
-                            if dx < 0 {
-                                audioPlayer.playNext()
-                            } else {
-                                audioPlayer.playPrevious()
-                            }
-                        }
-                )
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(audioPlayer.currentTrack?.name ?? "")
-                    .font(.title2)
-                    .bold()
-                    .lineLimit(1)
-                ArtistPillRow(artists: audioPlayer.currentTrack?.artists ?? [])
-                    .font(.subheadline)
+            header {
+                artwork
+                titleBlock
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        
-            VStack(spacing: 4) {
-                Slider(
-                    value: $sliderValue,
-                    in: 0...max(audioPlayer.duration, 0.01)
-                ) { editing in
-                    isScrubbing = editing
-                    if !editing {
-                        audioPlayer.seek(to: sliderValue)
-                    }
-                }
-                .background {
-                    if let waveformSamples {
-                        WaveformView(
-                            samples: waveformSamples,
-                            progress: playedFraction,
-                            played: audioPlayer.accent.opacity(0.35),
-                            upcoming: Color.primary.opacity(0.12)
-                        )
-                        .frame(height: 44)
-                        // Иначе волна перехватывала бы касания у слайдера.
-                        .allowsHitTesting(false)
-                    }
-                }
 
-                HStack {
-                    Text(timeString(sliderValue))
-                    Spacer()
-                    Text("-" + timeString(audioPlayer.duration - sliderValue))
+            if showsLyrics {
+                LyricsPanel(
+                    text: audioPlayer.currentTrack?.lyrics ?? "",
+                    accent: audioPlayer.accent
+                ) {
+                    isEditingLyrics = true
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+                // Текст проступает, а не выпрыгивает вместе с перестроением макета.
+                .transition(.opacity)
             }
+
+            progress
 
             controls
 
-            Spacer()
+            // Пружина внизу нужна, только пока текста нет: с ним свободное место
+            // забирает панель.
+            if !showsLyrics {
+                Spacer()
+            }
 
             bottomRow
         }
@@ -220,7 +161,125 @@ struct PlayerView: View {
             sliderValue = audioPlayer.currentTime
         }
     }
-    
+
+    /// Обложка. Под текстом ужимается до уголка — панели нужна вся высота,
+    /// а что играет, видно и по маленькой.
+    private var artwork: some View {
+        // Concentric — скругление, повторяющее радиус корпуса: обложка перестаёт
+        // выглядеть наклеенной поверх экрана.
+        ConcentricRectangle(corners: .concentric(minimum: .fixed(16)), isUniform: true)
+            .fill(.quaternary)
+            .overlay {
+                if let data = audioPlayer.currentTrack?.displayArtwork,
+                   let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 64))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .clipShape(ConcentricRectangle(corners: .concentric(minimum: .fixed(16)), isUniform: true))
+            .matchedGeometryEffect(id: PlayerTransition.artwork, in: namespace, isSource: isPresented)
+            .aspectRatio(1, contentMode: .fit)
+            .frame(maxWidth: showsLyrics ? 64 : .infinity)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { newWidth in
+                artworkWidth = newWidth
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) { location in
+                if location.x < artworkWidth / 2 {
+                    audioPlayer.playPrevious()
+                } else {
+                    audioPlayer.playNext()
+                }
+            }
+            .onTapGesture {
+                audioPlayer.togglePlayPause()
+            }
+            .gesture(
+                DragGesture(minimumDistance: 30)
+                    .onEnded { value in
+                        let dx = value.translation.width
+                        let dy = value.translation.height
+
+                        // Протяжка вверх по обложке поднимает текст — то же
+                        // движение, что «поднять шторку». Вниз обложка не
+                        // отвечает: вниз закрывается сам плеер.
+                        guard abs(dx) > abs(dy) else {
+                            if dy < 0 { setLyrics(true) }
+                            return
+                        }
+                        
+                        if dx < 0 {
+                            audioPlayer.playNext()
+                        } else {
+                            audioPlayer.playPrevious()
+                        }
+                    }
+            )
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(audioPlayer.currentTrack?.name ?? "")
+                .font(showsLyrics ? .headline : .title2)
+                .bold()
+                .lineLimit(1)
+            ArtistPillRow(artists: audioPlayer.currentTrack?.artists ?? [])
+                .font(.subheadline)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var progress: some View {
+        VStack(spacing: 4) {
+            Slider(
+                value: $sliderValue,
+                in: 0...max(audioPlayer.duration, 0.01)
+            ) { editing in
+                isScrubbing = editing
+                if !editing {
+                    audioPlayer.seek(to: sliderValue)
+                }
+            }
+            .background {
+                if let waveformSamples {
+                    WaveformView(
+                        samples: waveformSamples,
+                        progress: playedFraction,
+                        played: audioPlayer.accent.opacity(0.35),
+                        upcoming: Color.primary.opacity(0.12)
+                    )
+                    .frame(height: 44)
+                    // Иначе волна перехватывала бы касания у слайдера.
+                    .allowsHitTesting(false)
+                }
+            }
+
+            HStack {
+                Text(timeString(sliderValue))
+                Spacer()
+                Text("-" + timeString(audioPlayer.duration - sliderValue))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+        }
+    }
+
+    /// Панель едет пружиной: макет перестраивается целиком, и без анимации
+    /// обложка просто скакнула бы в угол.
+    private func setLyrics(_ shown: Bool) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            showsLyrics = shown
+        }
+    }
+
     /// Кнопки лежат в общем `GlassEffectContainer`: соседние стеклянные фигуры
     /// внутри него сливаются при сближении — ради этого Liquid Glass и сделан.
     /// Центральная тонируется цветом обложки, остальные остаются нейтральными.
@@ -279,7 +338,9 @@ struct PlayerView: View {
     }
 
     private var bottomRow: some View {
-        HStack(spacing: 20) {
+        // Шаг меньше прежнего: кнопок стало на одну больше, и с двадцатью
+        // они не умещались в строку на узком экране.
+        HStack(spacing: 12) {
             Button {
                 audioPlayer.currentTrack?.isFavourite.toggle()
             } label: {
@@ -289,6 +350,19 @@ struct PlayerView: View {
                     .contentShape(Rectangle())
             }
             .foregroundStyle((audioPlayer.currentTrack?.isFavourite ?? false) ? audioPlayer.accent : Color.secondary)
+            .buttonStyle(PressableButtonStyle())
+
+            // Кнопка есть и у трека без текста: открытая пустая панель сама
+            // предложит его добавить — иначе про возможность никто не узнает.
+            Button {
+                setLyrics(!showsLyrics)
+            } label: {
+                Image(systemName: showsLyrics ? "quote.bubble.fill" : "quote.bubble")
+                    .font(.title3)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .foregroundStyle(showsLyrics ? audioPlayer.accent : Color.secondary)
             .buttonStyle(PressableButtonStyle())
 
             Spacer()
@@ -344,6 +418,12 @@ struct PlayerView: View {
                     isEditingTrack = true
                 } label: {
                     Label("Edit track", systemImage: "pencil")
+                }
+
+                Button {
+                    isEditingLyrics = true
+                } label: {
+                    Label(track.hasLyrics ? "Edit text" : "Add text", systemImage: "quote.bubble")
                 }
 
                 Divider()
