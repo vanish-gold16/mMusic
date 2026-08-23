@@ -24,6 +24,7 @@ struct SettingsView: View {
     @State private var orphanFiles: [String] = []
     @State private var showCleanUpConfirmation = false
     @State private var isRestoring = false
+    @State private var isLinkingAlbums = false
 
     /// Артист остаётся в базе после удаления его последнего трека — credits каскадно
     /// уходят вместе с треком, а сам артист нет.
@@ -110,6 +111,27 @@ struct SettingsView: View {
                     .disabled(tracks.isEmpty)
                 }
 
+                if tracksWithoutAlbum > 0 {
+                    Section {
+                        Button {
+                            linkAlbums()
+                        } label: {
+                            HStack {
+                                Label("Link \(tracksWithoutAlbum) tracks to albums", systemImage: "square.stack")
+                                if isLinkingAlbums {
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .disabled(isLinkingAlbums)
+                    } header: {
+                        Text("albums")
+                    } footer: {
+                        Text("Tracks that ended up without an album can be put back into it — the album name comes from the play history or the file tags. Only empty links are filled; the order inside the album has to be fixed by hand.")
+                    }
+                }
+
                 if !orphanFiles.isEmpty {
                     Section {
                         Button {
@@ -187,6 +209,26 @@ struct SettingsView: View {
     /// Всё, что лежит в Documents, минус то, на что ссылаются треки.
     private func findOrphanFiles() -> [String] {
         LibraryRestore.orphanFiles(known: Set(tracks.map(\.filename)))
+    }
+
+    /// Треки без альбома. Считается по уже загруженному запросу, без похода в базу.
+    private var tracksWithoutAlbum: Int {
+        tracks.filter { $0.album == nil }.count
+    }
+
+    /// Дозаполняет альбомы у треков, которые остались без них.
+    private func linkAlbums() {
+        isLinkingAlbums = true
+
+        Task { @MainActor in
+            let linked = await LibraryRestore.linkMissingAlbums(in: modelContext)
+            isLinkingAlbums = false
+
+            toasts.show(
+                linked > 0 ? "Linked \(linked) tracks" : "Nothing to link",
+                systemImage: "square.stack"
+            )
+        }
     }
 
     /// Возвращает в библиотеку файлы, на которые не ссылается ни один трек.

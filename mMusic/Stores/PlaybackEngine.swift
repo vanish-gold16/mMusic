@@ -1,6 +1,5 @@
 import AVFoundation
 import Foundation
-import os
 
 /// Звуковой тракт приложения: файл → скорость и тон → эхо → выход.
 ///
@@ -38,9 +37,14 @@ final class PlaybackEngine {
     /// на следующий.
     private var generation = 0
 
-    /// Громкость последнего куска звука в децибелах. Пишет её аудиопоток, читает
-    /// таймер на главном — отсюда замок, а не просто `var`.
-    private let meter = OSAllocatedUnfairLock(initialState: Double(-160))
+    /// Громкость последнего куска звука в децибелах. Пишет аудиопоток, читает
+    /// таймер на главном.
+    ///
+    /// Без синхронизации намеренно: замок на потоке рендеринга может заставить его
+    /// ждать главный — а тот в это время рисует экран, и звук успевает щёлкнуть.
+    /// Здесь это безопасно: восьмибайтовое число пишется целиком, и потеря одного
+    /// замера из тридцати в секунду ничего не значит.
+    private nonisolated(unsafe) var levelInDecibels: Double = -160
 
     /// Трек доиграл до конца. Зовётся на главном потоке.
     var onFinish: (() -> Void)?
@@ -94,9 +98,7 @@ final class PlaybackEngine {
 
     /// Громкость для «дыхания» фона, в тех же децибелах, что раньше давал
     /// `averagePower(forChannel:)`.
-    var levelDecibels: Double {
-        meter.withLock { $0 }
-    }
+    var levelDecibels: Double { levelInDecibels }
 
     // MARK: - Управление
 
@@ -127,7 +129,14 @@ final class PlaybackEngine {
 
         // Расписание переживает паузу: после неё узел просто продолжает с места,
         // а заново планировать нужно только после загрузки и перемотки.
-        if !hasSchedule { schedule() }
+        if !hasSchedule {
+            // С конца играть нечего, и «play» в этом положении означает «сначала».
+            if let file, startFrame >= file.length {
+                startFrame = 0
+                frozenTime = 0
+            }
+            schedule()
+        }
 
         playerNode.play()
         isPlaying = true
@@ -154,7 +163,7 @@ final class PlaybackEngine {
         frozenTime = 0
         startFrame = 0
         file = nil
-        meter.withLock { $0 = -160 }
+        levelInDecibels = -160
     }
 
     func seek(to time: TimeInterval) {
@@ -185,6 +194,12 @@ final class PlaybackEngine {
         // Тон задаётся в центах: сотая доля полутона.
         timePitch.pitch = Float(remix.effectivePitch * 100)
         reverb.wetDryMix = Float(remix.reverb)
+
+        // Обход, пока ручки в нуле. Растяжение времени — фазовый вокодер: он честно
+        // работает и на скорости 1.0, просто впустую. На устройстве этот холостой
+        // ход отъедает запас у потока рендеринга, и звук начинает заикаться.
+        timePitch.bypass = abs(remix.speed - 1) < 0.005 && abs(remix.effectivePitch) < 0.05
+        reverb.bypass = remix.reverb < 0.5
     }
 
     // MARK: - Граф
@@ -232,6 +247,8 @@ final class PlaybackEngine {
     }
 
     private func finish() {
+        // Встаём ровно на конце: следующий `play()` увидит это и начнёт сначала.
+        startFrame = file?.length ?? startFrame
         frozenTime = duration
         isPlaying = false
         hasSchedule = false
@@ -246,11 +263,7 @@ final class PlaybackEngine {
         let mixer = engine.mainMixerNode
         mixer.removeTap(onBus: 0)
 
-        // Замок захватывается отдельно от self: замыкание зовёт аудиопоток,
-        // и ссылке на весь плеер там делать нечего.
-        let meter = self.meter
-
-        mixer.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
+        mixer.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
             guard let channel = buffer.floatChannelData?[0] else { return }
 
             // Среднеквадратичное: громкость куска, а не случайный отсчёт из него.
@@ -265,9 +278,7 @@ final class PlaybackEngine {
 
             let rms = (sum / Float(frames)).squareRoot()
             // Нижний порог не даёт логарифму уйти в минус бесконечность на тишине.
-            let decibels = 20 * log10(max(Double(rms), 1e-7))
-
-            meter.withLock { $0 = decibels }
+            self?.levelInDecibels = 20 * log10(max(Double(rms), 1e-7))
         }
     }
 

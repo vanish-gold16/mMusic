@@ -49,6 +49,8 @@ enum LibraryRestore {
             // История главнее тегов: в ней лежит то, как трек был назван в самой
             // библиотеке, вместе со всеми правками имени и состава артистов.
             let restored: Track
+            var albumName = albumName(in: events)
+
             if let latest = events.max(by: { $0.playedAt < $1.playedAt }) {
                 restored = Track(
                     name: latest.trackName,
@@ -57,6 +59,12 @@ enum LibraryRestore {
                     filename: filename
                 )
                 result.fromHistory += 1
+
+                // В истории название альбома есть не всегда: событие могло случиться
+                // до того, как трек попал в альбом. Тогда спрашиваем сам файл.
+                if albumName == nil {
+                    albumName = await AudioMetadata.load(from: url).albumName
+                }
             } else {
                 let metadata = await AudioMetadata.load(from: url)
                 let parsed = url.parseMusic()
@@ -68,6 +76,7 @@ enum LibraryRestore {
                     filename: filename
                 )
                 if let artwork = metadata.artwork { restored.artwork = artwork }
+                albumName = metadata.albumName
             }
 
             context.insert(restored)
@@ -82,12 +91,55 @@ enum LibraryRestore {
             }
 
             attachArtists(to: restored, events: events, url: url, in: context)
-            attachAlbum(to: restored, name: events.first?.albumName, in: context)
+            attachAlbum(to: restored, name: albumName, in: context)
 
             result.restored += 1
         }
 
         return result
+    }
+
+    /// Дозаполняет альбомы у треков, которые уже вернулись в библиотеку, но остались
+    /// без него: связь с альбомом хранится у трека, и при потере записи она пропадает,
+    /// хотя сам альбом на месте.
+    ///
+    /// Только заполняет пустое — у трека, который уже лежит в альбоме, ничего не трогает.
+    /// Порядок внутри альбома восстановить неоткуда, треки встают в конец.
+    @MainActor
+    static func linkMissingAlbums(in context: ModelContext) async -> Int {
+        let history = historyByFile(in: context)
+        let orphans = ((try? context.fetch(FetchDescriptor<Track>())) ?? [])
+            .filter { $0.album == nil }
+
+        var linked = 0
+
+        for track in orphans {
+            var name = albumName(in: history[track.filename] ?? [])
+            if name == nil {
+                name = await AudioMetadata.load(from: AudioFileStore.url(for: track.filename)).albumName
+            }
+
+            attachAlbum(to: track, name: name, in: context)
+            if track.album != nil { linked += 1 }
+        }
+
+        return linked
+    }
+
+    /// Сколько треков остались без альбома. По этому числу решается, показывать ли
+    /// кнопку: поход в теги дорогой, а пересчитывать его на каждый кадр незачем.
+    static func tracksWithoutAlbum(in context: ModelContext) -> Int {
+        ((try? context.fetch(FetchDescriptor<Track>())) ?? [])
+            .filter { $0.album == nil }
+            .count
+    }
+
+    /// Название альбома из самого свежего события, где оно вообще записано.
+    private static func albumName(in events: [PlayEvent]) -> String? {
+        events
+            .sorted { $0.playedAt > $1.playedAt }
+            .compactMap(\.albumName)
+            .first
     }
 
     /// Вся история одним проходом: отдельный запрос на файл обошёлся бы в сотни выборок.

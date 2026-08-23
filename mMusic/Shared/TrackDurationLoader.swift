@@ -24,6 +24,10 @@ enum TrackDurationLoader {
             guard seconds.isFinite, seconds > 0 else { continue }
 
             track.duration = seconds
+
+            // Та же передышка, что и у волны: после восстановления библиотеки
+            // сюда попадают все треки разом, а играющая музыка важнее.
+            try? await Task.sleep(for: .milliseconds(60))
         }
     }
 }

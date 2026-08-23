@@ -92,6 +92,63 @@ struct LibraryRestoreTests {
         #expect(restored.playCount == 0)
     }
 
+    /// Трек, оставшийся без альбома, возвращается в него по истории. Название берётся
+    /// из самого свежего события, где оно записано: в старых его может не быть —
+    /// трек тогда ещё не лежал в альбоме.
+    @Test func linksAlbumsForTracksThatLostThem() async throws {
+        let context = container.mainContext
+        let filename = makeFile("lost-album.mp3")
+        defer { cleanUp([filename]) }
+
+        let album = Album(name: "Night Album", type: .LP)
+        context.insert(album)
+
+        let source = Track(name: "Song", credits: [], genre: .pop, filename: filename)
+        context.insert(source)
+
+        let early = PlayEvent(track: source, seconds: 60)
+        early.playedAt = .now.addingTimeInterval(-86_400)
+        early.albumName = nil
+        context.insert(early)
+
+        source.album = album
+        let late = PlayEvent(track: source, seconds: 60)
+        context.insert(late)
+
+        // Связь потерялась, альбом на месте.
+        source.album = nil
+        try context.save()
+
+        let linked = await LibraryRestore.linkMissingAlbums(in: context)
+        #expect(linked == 1)
+        #expect(source.album?.name == "Night Album")
+    }
+
+    /// Трек, который уже лежит в альбоме, проход не трогает.
+    @Test func linkingLeavesTracksThatAlreadyHaveAnAlbum() async throws {
+        let context = container.mainContext
+        let filename = makeFile("has-album.mp3")
+        defer { cleanUp([filename]) }
+
+        let right = Album(name: "Right", type: .LP)
+        let wrong = Album(name: "Wrong", type: .LP)
+        context.insert(right)
+        context.insert(wrong)
+
+        let track = Track(name: "Song", credits: [], genre: .pop, filename: filename)
+        context.insert(track)
+        track.album = right
+
+        let event = PlayEvent(track: track, seconds: 60)
+        event.albumName = "Wrong"
+        context.insert(event)
+        try context.save()
+
+        let linked = await LibraryRestore.linkMissingAlbums(in: context)
+        #expect(linked == 0)
+        #expect(track.album?.name == "Right")
+    }
+
     /// Файлы, на которые уже ссылается трек, восстанавливать нечего.
     @Test func orphansSkipKnownFiles() throws {
         let context = container.mainContext
