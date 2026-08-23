@@ -5,6 +5,9 @@ struct HomeView: View {
 
     @Environment(AudioPlayer.self) private var audioPlayer
     @Environment(\.modelContext) private var modelContext
+    /// Приложение могли не закрывать сутками — тогда о новом дне узнаём только
+    /// по возвращению из фона.
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Только те, что уже играли: у остальных `lastPlayedAt` пуст и в ленте им не место.
     @Query(
@@ -62,7 +65,13 @@ struct HomeView: View {
             // Пересобираем и когда микса ещё нет, и когда библиотека изменилась:
             // иначе предложение остаётся вчерашним, а удалённый трек висит в нём ссылкой.
             refreshMix()
-            birthdays = TrackBirthday.today(in: allTracks, listened: TrackBirthday.listened(in: modelContext))
+            refreshBirthdays()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Полночь наступает и при открытом приложении: без этого вчерашний
+            // именинник висел бы на экране, а сегодняшний не появился бы вовсе.
+            guard phase == .active else { return }
+            refreshBirthdays()
         }
     }
 
@@ -106,6 +115,10 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    private func refreshBirthdays() {
+        birthdays = TrackBirthday.today(in: allTracks, listened: TrackBirthday.listened(in: modelContext))
     }
 
     /// Именинник играет один: ставить за ним всю библиотеку — не то, чего ждёшь

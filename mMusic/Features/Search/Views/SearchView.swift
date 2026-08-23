@@ -25,7 +25,7 @@ struct SearchView: View {
         filtered(artists) { [$0.name] }
     }
     private var matchedPlaylists: [Playlist] {
-        filtered(playlists) { [$0.name, $0.playlistDescription] }
+        filtered(playlists) { [$0.name, $0.playlistDescription] }.byLastPlayed
     }
 
     private var hasResults: Bool {

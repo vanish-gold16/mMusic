@@ -69,7 +69,12 @@ struct BirthdayCard: View {
             }
     }
 
+    /// В подписи видно, от чего считали: «released Aug 2020» или «added Aug 2025».
+    /// Без этого «3 years» у трека, добавленного вчера, выглядели бы ошибкой.
     private var details: String {
-        "\(birthday.summary) • since \(track.addedAt.formatted(.dateTime.month(.abbreviated).year()))"
+        let month = birthday.origin.formatted(.dateTime.month(.abbreviated).year())
+        let since = birthday.kind == .release ? "released \(month)" : "added \(month)"
+
+        return "\(birthday.summary) • \(since)"
     }
 }

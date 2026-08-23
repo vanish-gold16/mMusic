@@ -19,6 +19,11 @@ class Playlist {
     
     @Attribute(.externalStorage) var artwork: Data?
     
+    /// Когда в плейлист последний раз что-то положили.
+    var lastAddedAt: Date? {
+        items.map(\.addedAt).max()
+    }
+
     func markPlayed() {
         lastPlayedAt = .now
     }
@@ -31,4 +36,35 @@ class Playlist {
         self.artwork = artwork
     }
     
+}
+
+extension Array where Element == Playlist {
+
+    /// Порядок для просмотра — библиотека, поиск, всё, где плейлисты листают:
+    /// закреплённые сверху, а внутри каждой группы — по свежести запуска.
+    /// Ни разу не запускавшиеся уходят вниз, при равенстве работает имя.
+    var byLastPlayed: [Playlist] {
+        sorted { left, right in
+            if left.isPinned != right.isPinned { return left.isPinned }
+
+            let leftPlayed = left.lastPlayedAt ?? .distantPast
+            let rightPlayed = right.lastPlayedAt ?? .distantPast
+            if leftPlayed != rightPlayed { return leftPlayed > rightPlayed }
+
+            return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+        }
+    }
+
+    /// Порядок для «куда положить»: сверху тот плейлист, в который недавно
+    /// добавляли трек. Закрепление здесь ни при чём — вопрос не «что слушать»,
+    /// а «куда это обычно кладут».
+    var byLastAdded: [Playlist] {
+        sorted { left, right in
+            let leftAdded = left.lastAddedAt ?? .distantPast
+            let rightAdded = right.lastAddedAt ?? .distantPast
+            if leftAdded != rightAdded { return leftAdded > rightAdded }
+
+            return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+        }
+    }
 }

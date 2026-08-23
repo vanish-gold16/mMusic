@@ -14,14 +14,9 @@ struct PlaylistsSection: View {
     @State private var editedPlaylist: Playlist?
     @State private var playlistToDelete: Playlist?
 
-    /// Закреплённые всегда сверху, внутри каждой группы — по свежести запуска.
-    /// Ни разу не запускавшиеся уходят вниз, а при равенстве работает порядок
-    /// запроса, то есть по имени.
+    /// Тот же порядок, что и на других экранах, где плейлисты листают, — см. `byLastPlayed`.
     private var ordered: [Playlist] {
-        playlists.sorted { left, right in
-            if left.isPinned != right.isPinned { return left.isPinned }
-            return (left.lastPlayedAt ?? .distantPast) > (right.lastPlayedAt ?? .distantPast)
-        }
+        playlists.byLastPlayed
     }
 
     var body: some View {

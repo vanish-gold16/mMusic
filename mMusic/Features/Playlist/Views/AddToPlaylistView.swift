@@ -40,7 +40,7 @@ struct AddToPlaylistView: View {
                     }
                 } else {
                     Section("playlists") {
-                        ForEach(playlists) { playlist in
+                        ForEach(playlists.byLastAdded) { playlist in
                             Button {
                                 add(to: playlist)
                             } label: {

@@ -192,9 +192,14 @@ struct TrackCell: View {
         ) {
             Button("Delete", role: .destructive) {
                 let name = track.name
+                // Номера в альбоме пересчитываются до удаления: после него ссылка
+                // на трек уже невалидна, а дыру в нумерации закрыть нужно.
+                track.album?.renumberTracks(excluding: track)
+
                 audioPlayer.forget(track)
                 AudioFileStore.remove(filename: track.filename)
                 modelContext.delete(track)
+
                 toasts.removed("Deleted \(name)")
             }
             Button("Cancel", role: .cancel) { }

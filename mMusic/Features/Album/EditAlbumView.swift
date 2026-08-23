@@ -297,16 +297,22 @@ struct EditAlbumView: View {
             track.album = nil
         }
 
+        // Альбомы, из которых треки уехали сюда: в них тоже остаются дыры в нумерации.
+        var touched: [Album] = []
+
         for (index, draft) in addedTracks.enumerated() {
             guard let id = draft.sourceTrack,
                   let track = modelContext.model(for: id) as? Track else { continue }
 
             if let previous = track.album, previous.persistentModelID != album.persistentModelID {
                 previous.tracks.removeAll { $0.persistentModelID == id }
+                touched.append(previous)
             }
 
             track.album = album
             track.position = index
         }
+
+        touched.forEach { $0.renumberTracks() }
     }
 }

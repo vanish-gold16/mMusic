@@ -32,11 +32,18 @@ struct TrackBirthdayTests {
         calendar.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
     }
 
-    private func makeTrack(_ name: String, addedAt: Date, plays: Int = 0) -> Track {
+    private func makeTrack(_ name: String, addedAt: Date, plays: Int = 0, released: Date? = nil) -> Track {
         let track = Track(name: name, credits: [], genre: .pop, filename: "\(name).mp3")
         track.addedAt = addedAt
         track.playCount = plays
         container.mainContext.insert(track)
+
+        if let released {
+            let album = Album(name: "\(name) album", type: .single, release: released)
+            container.mainContext.insert(album)
+            track.album = album
+        }
+
         return track
     }
 
@@ -148,6 +155,127 @@ struct TrackBirthdayTests {
         // и в двойку ближайших не попадает.
         #expect(upcoming.map(\.name) == ["September", "October"])
         #expect(upcoming.first?.years == 2)
+    }
+
+    /// Главный случай: годовщина считается от даты выхода, а не от дня импорта.
+    @Test func celebratesTheReleaseAnniversary() {
+        let track = makeTrack("Nightcall", addedAt: date(2026, 8, 1), released: date(2010, 8, 23))
+
+        let birthdays = TrackBirthday.today(
+            in: [track],
+            listened: [:],
+            on: date(2026, 8, 23),
+            calendar: calendar
+        )
+
+        #expect(birthdays.count == 1)
+        #expect(birthdays.first?.kind == .release)
+        #expect(birthdays.first?.years == 16)
+        #expect(birthdays.first?.title == "16 years since release")
+    }
+
+    /// Дата добавления не празднуется, если у трека есть дата релиза.
+    @Test func releaseDateWinsOverTheDayItWasAdded() {
+        let track = makeTrack("Nightcall", addedAt: date(2025, 8, 23), released: date(2010, 3, 1))
+
+        let onAddedDay = TrackBirthday.today(
+            in: [track],
+            listened: [:],
+            on: date(2026, 8, 23),
+            calendar: calendar
+        )
+
+        #expect(onAddedDay.isEmpty)
+    }
+
+    /// Трек без альбома и без даты релиза празднует день, когда попал в библиотеку.
+    @Test func tracksWithoutReleaseDateFallBackToTheLibraryDay() {
+        let track = makeTrack("Homeless", addedAt: date(2025, 8, 23))
+
+        let birthdays = TrackBirthday.today(
+            in: [track],
+            listened: [:],
+            on: date(2026, 8, 23),
+            calendar: calendar
+        )
+
+        #expect(birthdays.first?.kind == .library)
+        #expect(birthdays.first?.title == "1 year in your library")
+    }
+
+    /// Альбом, который ещё не вышел, годовщин не даёт.
+    @Test func futureReleaseIsNotCelebrated() {
+        let track = makeTrack("Unreleased", addedAt: date(2026, 1, 1), released: date(2027, 8, 23))
+
+        let birthdays = TrackBirthday.today(
+            in: [track],
+            listened: [:],
+            on: date(2026, 8, 23),
+            calendar: calendar
+        )
+
+        #expect(birthdays.isEmpty)
+    }
+
+    /// Уведомление говорит о релизе теми же словами, что и плашка.
+    @Test func notificationTextFollowsTheKind() {
+        let released = makeTrack("Nightcall", addedAt: date(2026, 1, 1), plays: 47, released: date(2024, 9, 1))
+
+        let upcoming = TrackBirthday.upcoming(
+            in: [released],
+            listened: ["Nightcall.mp3": 11_520],
+            from: date(2026, 8, 23),
+            calendar: calendar,
+            limit: 5
+        )
+
+        #expect(upcoming.first?.kind == .release)
+        #expect(upcoming.first?.body == "2 years since release • 47 plays • 3 h 12 min")
+    }
+
+    /// Альбом выходит целиком: годовщина у всех его треков одна, а плашка нужна одна.
+    @Test func oneCardPerAlbum() {
+        let release = date(2020, 8, 23)
+        let album = Album(name: "Outrun", type: .LP, release: release)
+        container.mainContext.insert(album)
+
+        let tracks = [("Quiet", 3), ("Loud", 40), ("Middle", 12)].map { name, plays -> Track in
+            let track = makeTrack(name, addedAt: date(2026, 1, 1), plays: plays)
+            track.album = album
+            return track
+        }
+
+        let birthdays = TrackBirthday.today(
+            in: tracks,
+            listened: [:],
+            on: date(2026, 8, 23),
+            calendar: calendar
+        )
+
+        #expect(birthdays.count == 1)
+        #expect(birthdays.first?.track.name == "Loud")
+    }
+
+    @Test func oneNotificationPerAlbum() {
+        let album = Album(name: "Outrun", type: .LP, release: date(2020, 9, 1))
+        container.mainContext.insert(album)
+
+        let tracks = [("Quiet", 3), ("Loud", 40)].map { name, plays -> Track in
+            let track = makeTrack(name, addedAt: date(2026, 1, 1), plays: plays)
+            track.album = album
+            return track
+        }
+
+        let upcoming = TrackBirthday.upcoming(
+            in: tracks,
+            listened: [:],
+            from: date(2026, 8, 23),
+            calendar: calendar,
+            limit: 10
+        )
+
+        #expect(upcoming.count == 1)
+        #expect(upcoming.first?.name == "Loud")
     }
 
     @Test func listenedSumsHistoryByFile() {

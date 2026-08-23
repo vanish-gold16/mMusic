@@ -43,6 +43,25 @@ class Album {
         self.artwork = artwork
     }
     
+    /// Сплошная нумерация треков с нуля.
+    ///
+    /// Вызывать после всего, что вынимает трек из середины альбома: удаления из
+    /// библиотеки, снятия галочки в пикере, переезда в другой альбом. Иначе в номерах
+    /// остаётся дыра (1, 2, 4), а новый трек, которому позицию дают по `tracks.count`,
+    /// встаёт на уже занятое место.
+    ///
+    /// `excluding` — для удаления: пересчитать надо до `delete`, пока ссылка на трек
+    /// ещё жива, а считать его при этом уже не нужно.
+    func renumberTracks(excluding removed: Track? = nil) {
+        let remaining = tracks
+            .filter { $0.persistentModelID != removed?.persistentModelID }
+            .sorted { $0.position < $1.position }
+
+        for (index, track) in remaining.enumerated() {
+            track.position = index
+        }
+    }
+
     enum AlbumType: String, Codable, CaseIterable {
         case single = "single"
         case EP = "EP"
