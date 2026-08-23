@@ -21,6 +21,14 @@ struct AlbumTrackPickCell: View {
 
     private var isPicked: Bool { pickedIndex != nil }
 
+    /// Трек уже лежит в этом альбоме. Выбирать нечего, и убрать его отсюда тоже
+    /// нельзя: лист умеет только добавлять, а убирают трек смахиванием в самом
+    /// альбоме.
+    private var isAlreadyHere: Bool {
+        guard let currentAlbum else { return false }
+        return track.album?.persistentModelID == currentAlbum.persistentModelID
+    }
+
     /// Альбом, из которого трек уедет, если его выбрать. nil — забирать не у кого.
     private var albumToLeave: Album? {
         guard let album = track.album,
@@ -44,6 +52,13 @@ struct AlbumTrackPickCell: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
+                if isAlreadyHere {
+                    Label("Already in this album", systemImage: "checkmark")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
                 // Предупреждение, а не запрет: перенести трек из альбома в альбом
                 // можно, но делать это молча нельзя — в том альбоме он пропадёт.
                 if let albumToLeave {
@@ -65,7 +80,11 @@ struct AlbumTrackPickCell: View {
         // приложение уже говорит этим цветом «вот это».
         .glassEffect(isPicked ? .regular.tint(Color.accentColor.opacity(0.28)) : .regular)
         .padding(.horizontal)
+        // Уже добавленные приглушены и не нажимаются: строка сообщает о состоянии,
+        // а не предлагает действие.
+        .opacity(isAlreadyHere ? 0.5 : 1)
         .onTapGesture {
+            guard !isAlreadyHere else { return }
             withAnimation(.snappy) { swapIsPicked() }
         }
     }
@@ -91,7 +110,12 @@ struct AlbumTrackPickCell: View {
     /// задаётся порядок треков, и это единственное место, где это видно.
     private var indicator: some View {
         Group {
-            if let pickedIndex {
+            if isAlreadyHere {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 26, height: 26)
+            } else if let pickedIndex {
                 Text("\(pickedIndex + 1)")
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()

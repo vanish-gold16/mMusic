@@ -37,6 +37,59 @@ struct AlbumPositionTests {
         album.tracks.sorted { $0.position < $1.position }.map(\.position)
     }
 
+    /// Главное свойство добавления: то, что уже лежало в альбоме, остаётся.
+    /// Раньше состав альбома задавался выбором в листе целиком, и стоило выбору
+    /// не совпасть с содержимым — альбом пустел.
+    @Test func appendingKeepsWhatWasAlreadyThere() {
+        let (album, existing) = makeAlbum(trackCount: 3)
+
+        let newcomer = Track(name: "Newcomer", credits: [], genre: .pop, filename: "new.mp3")
+        container.mainContext.insert(newcomer)
+
+        album.append([newcomer])
+
+        #expect(album.tracks.count == 4)
+        #expect(existing.allSatisfy { $0.album?.persistentModelID == album.persistentModelID })
+        #expect(newcomer.position == 3)
+        #expect(positions(of: album) == [0, 1, 2, 3])
+    }
+
+    /// Трек с чужого альбома переезжает, а в том альбоме номера смыкаются.
+    @Test func appendingMovesTheTrackOutOfItsPreviousAlbum() {
+        let (album, _) = makeAlbum(trackCount: 2)
+
+        let other = Album(name: "Midnight", type: .EP)
+        container.mainContext.insert(other)
+
+        let moving = Track(name: "Moving", credits: [], genre: .pop, filename: "moving.mp3")
+        moving.album = other
+        moving.position = 1
+        container.mainContext.insert(moving)
+
+        let staying = Track(name: "Staying", credits: [], genre: .pop, filename: "staying.mp3")
+        staying.album = other
+        staying.position = 0
+        container.mainContext.insert(staying)
+
+        album.append([moving])
+
+        #expect(moving.album?.persistentModelID == album.persistentModelID)
+        #expect(moving.position == 2)
+        #expect(other.tracks.map(\.persistentModelID) == [staying.persistentModelID])
+        #expect(positions(of: other) == [0])
+    }
+
+    /// Трек, который уже здесь, добавлять некуда: ни дубля, ни переезда в конец.
+    @Test func appendingIgnoresTracksThatAreAlreadyInTheAlbum() {
+        let (album, tracks) = makeAlbum(trackCount: 3)
+        let first = tracks[0]
+
+        album.append([first])
+
+        #expect(album.tracks.count == 3)
+        #expect(first.position == 0)
+    }
+
     @Test func deletingFromTheMiddleClosesTheGap() {
         let (album, tracks) = makeAlbum(trackCount: 4)
 

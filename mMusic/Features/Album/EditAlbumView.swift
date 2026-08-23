@@ -138,26 +138,29 @@ struct EditAlbumView: View {
                     }
                 }
 
-                if !sortedTracks.isEmpty {
-                    Section("tracks") {
-                        ForEach(sortedTracks) { track in
-                            TrackCell(track: track, leadingStyle: .artwork)
-                        }
-                        .onMove { source, destination in
-                            moveTracks(from: source, to: destination)
-                        }
-                        Button {
-                            seedTrackDrafts()
-                            showTrackPicker = true
-                        } label: {
-                            Label("Add Music", systemImage: "plus")
-                        }
+                // Секция показывается и у пустого альбома: раньше кнопка «Add Music»
+                // пряталась вместе со списком, и положить в него первый трек
+                // из библиотеки было нечем.
+                Section("tracks") {
+                    ForEach(sortedTracks) { track in
+                        TrackCell(track: track, leadingStyle: .artwork)
+                    }
+                    .onMove { source, destination in
+                        moveTracks(from: source, to: destination)
+                    }
+                    .onDelete(perform: removeFromAlbum)
+
+                    Button {
+                        addedTracks = []
+                        showTrackPicker = true
+                    } label: {
+                        Label("Add Music", systemImage: "plus")
                     }
                 }
             }
             .navigationTitle("Edit album")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showTrackPicker, onDismiss: applyTrackDrafts) {
+            .sheet(isPresented: $showTrackPicker, onDismiss: addPickedTracks) {
                 AlbumTrackPickerView(album: [album], addedTracks: $addedTracks)
             }
             .toolbar {
@@ -276,43 +279,31 @@ struct EditAlbumView: View {
         }
     }
 
-    /// Заполняет черновики уже добавленными треками, чтобы пикер показывал их выбранными.
-    private func seedTrackDrafts() {
-        addedTracks = sortedTracks.map { track in
-            TrackDraft(
-                name: track.name,
-                genre: track.genre,
-                artists: track.artistNames.map { ArtistDraft(name: $0) },
-                stagedURL: AudioFileStore.url(for: track.filename),
-                sourceTrack: track.persistentModelID
-            )
+    /// Убирает трек из альбома, не трогая сам трек: файл и запись в библиотеке
+    /// остаются, пропадает только принадлежность альбому.
+    ///
+    /// Раньше это делалось снятием галочки в листе добавления — и стоило там
+    /// чему-нибудь не совпасть, как из альбома исчезало всё разом.
+    private func removeFromAlbum(at offsets: IndexSet) {
+        let tracks = sortedTracks
+
+        for index in offsets {
+            tracks[index].album = nil
         }
+
+        album.renumberTracks()
     }
 
-    /// Приводит состав альбома в соответствие с выбором в пикере: добавляет выбранные треки и убирает снятые.
-    private func applyTrackDrafts() {
-        let selectedIDs = Set(addedTracks.compactMap(\.sourceTrack))
+    /// Добавляет выбранное в конец альбома. Сам перенос — в `Album.append`,
+    /// здесь только превращение черновиков обратно в треки.
+    private func addPickedTracks() {
+        defer { addedTracks = [] }
 
-        for track in album.tracks where !selectedIDs.contains(track.persistentModelID) {
-            track.album = nil
+        let picked = addedTracks.compactMap { draft -> Track? in
+            guard let id = draft.sourceTrack else { return nil }
+            return modelContext.model(for: id) as? Track
         }
 
-        // Альбомы, из которых треки уехали сюда: в них тоже остаются дыры в нумерации.
-        var touched: [Album] = []
-
-        for (index, draft) in addedTracks.enumerated() {
-            guard let id = draft.sourceTrack,
-                  let track = modelContext.model(for: id) as? Track else { continue }
-
-            if let previous = track.album, previous.persistentModelID != album.persistentModelID {
-                previous.tracks.removeAll { $0.persistentModelID == id }
-                touched.append(previous)
-            }
-
-            track.album = album
-            track.position = index
-        }
-
-        touched.forEach { $0.renumberTracks() }
+        album.append(picked)
     }
 }

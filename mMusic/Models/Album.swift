@@ -43,6 +43,31 @@ class Album {
         self.artwork = artwork
     }
     
+    /// Кладёт треки в конец альбома.
+    ///
+    /// Только добавляет: то, что уже лежит в альбоме, остаётся на своих местах —
+    /// убирают трек из альбома отдельно. Приехавший из другого альбома оттуда
+    /// уезжает, и в том альбоме закрывается дыра в нумерации: альбом у трека один.
+    func append(_ tracks: [Track]) {
+        var position = self.tracks.count
+        var touched: [Album] = []
+
+        for track in tracks {
+            guard track.album?.persistentModelID != persistentModelID else { continue }
+
+            if let previous = track.album {
+                previous.tracks.removeAll { $0.persistentModelID == track.persistentModelID }
+                touched.append(previous)
+            }
+
+            track.album = self
+            track.position = position
+            position += 1
+        }
+
+        touched.forEach { $0.renumberTracks() }
+    }
+
     /// Сплошная нумерация треков с нуля.
     ///
     /// Вызывать после всего, что вынимает трек из середины альбома: удаления из

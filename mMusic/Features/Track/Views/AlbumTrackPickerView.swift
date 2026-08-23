@@ -105,7 +105,7 @@ struct AlbumTrackPickerView: View {
 
                 Spacer()
 
-                Text(addedTracks.isEmpty ? "Nothing picked" : "\(addedTracks.count) in the album")
+                Text(addedTracks.isEmpty ? "Nothing picked" : "\(addedTracks.count) picked")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
