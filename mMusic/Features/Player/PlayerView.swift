@@ -37,9 +37,13 @@ struct PlayerView: View {
                 grabber
                 content
             }
+            // Фон лежит внутри стека, а не надет на него снаружи: NavigationStack
+            // рисует собственную непрозрачную подложку и перекрывает всё, что под ним.
+            // Рамка нужна, чтобы содержимое заняло весь экран и фону было куда лечь.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background { artworkBackground.ignoresSafeArea() }
             .toolbar(.hidden, for: .navigationBar)
         }
-        .background { artworkBackground }
         .offset(y: dragOffset)
         // Лист заменён оверлеем: matchedGeometryEffect не работает через границу
         // листа — там своя иерархия, и обложке не с чем сопоставляться.
