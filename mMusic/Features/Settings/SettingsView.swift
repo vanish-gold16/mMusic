@@ -25,6 +25,9 @@ struct SettingsView: View {
     @State private var showCleanUpConfirmation = false
     @State private var isRestoring = false
     @State private var isLinkingAlbums = false
+    /// Что нашёл последний проход по альбомам: по нему видно, чего не хватило,
+    /// и появляется ли кнопка «собрать альбомы заново».
+    @State private var linkReport: LibraryRestore.LinkReport?
 
     /// Артист остаётся в базе после удаления его последнего трека — credits каскадно
     /// уходят вместе с треком, а сам артист нет.
@@ -125,10 +128,29 @@ struct SettingsView: View {
                             }
                         }
                         .disabled(isLinkingAlbums)
+
+                        if let linkReport {
+                            if linkReport.linked > 0 {
+                                LabeledContent("Linked", value: "\(linkReport.linked)")
+                            }
+                            if !linkReport.missingAlbums.isEmpty {
+                                LabeledContent("Albums no longer in the library", value: "\(linkReport.missingAlbums.count)")
+
+                                Button {
+                                    linkAlbums(recreatingMissing: true)
+                                } label: {
+                                    Label("Recreate \(linkReport.missingAlbums.count) albums", systemImage: "square.stack.3d.up")
+                                }
+                                .disabled(isLinkingAlbums)
+                            }
+                            if linkReport.withoutName > 0 {
+                                LabeledContent("No album name anywhere", value: "\(linkReport.withoutName)")
+                            }
+                        }
                     } header: {
                         Text("albums")
                     } footer: {
-                        Text("Tracks that ended up without an album can be put back into it — the album name comes from the play history or the file tags. Only empty links are filled; the order inside the album has to be fixed by hand.")
+                        Text("Tracks that ended up without an album can be put back into it — the album name comes from the play history or the file tags. Only empty links are filled; the order inside the album has to be fixed by hand. Tracks with no album name anywhere cannot be sorted out automatically: nothing left in the app remembers where they belonged.")
                     }
                 }
 
@@ -216,16 +238,21 @@ struct SettingsView: View {
         tracks.filter { $0.album == nil }.count
     }
 
-    /// Дозаполняет альбомы у треков, которые остались без них.
-    private func linkAlbums() {
+    /// Дозаполняет альбомы у треков, которые остались без них. Отчёт остаётся на
+    /// экране: «ничего не вышло» — плохой ответ, когда непонятно, чего не хватило.
+    private func linkAlbums(recreatingMissing: Bool = false) {
         isLinkingAlbums = true
 
         Task { @MainActor in
-            let linked = await LibraryRestore.linkMissingAlbums(in: modelContext)
+            let report = await LibraryRestore.linkMissingAlbums(
+                in: modelContext,
+                recreatingMissing: recreatingMissing
+            )
+            linkReport = report
             isLinkingAlbums = false
 
             toasts.show(
-                linked > 0 ? "Linked \(linked) tracks" : "Nothing to link",
+                report.linked > 0 ? "Linked \(report.linked) tracks" : "Nothing to link",
                 systemImage: "square.stack"
             )
         }

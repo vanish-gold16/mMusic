@@ -106,12 +106,23 @@ enum LibraryRestore {
     /// Только заполняет пустое — у трека, который уже лежит в альбоме, ничего не трогает.
     /// Порядок внутри альбома восстановить неоткуда, треки встают в конец.
     @MainActor
-    static func linkMissingAlbums(in context: ModelContext) async -> Int {
+    static func linkMissingAlbums(
+        in context: ModelContext,
+        recreatingMissing: Bool = false
+    ) async -> LinkReport {
         let history = historyByFile(in: context)
         let orphans = ((try? context.fetch(FetchDescriptor<Track>())) ?? [])
             .filter { $0.album == nil }
 
-        var linked = 0
+        // Все альбомы разом и по приведённому имени: отдельный запрос на трек стоил
+        // бы сотни выборок, а точное сравнение спотыкалось о регистр и лишний пробел
+        // в теге.
+        var albums = Dictionary(
+            ((try? context.fetch(FetchDescriptor<Album>())) ?? []).map { (key(for: $0.name), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        var report = LinkReport()
 
         for track in orphans {
             var name = albumName(in: history[track.filename] ?? [])
@@ -119,11 +130,73 @@ enum LibraryRestore {
                 name = await AudioMetadata.load(from: AudioFileStore.url(for: track.filename)).albumName
             }
 
-            attachAlbum(to: track, name: name, in: context)
-            if track.album != nil { linked += 1 }
+            guard let name else {
+                report.withoutName += 1
+                continue
+            }
+
+            if let album = albums[key(for: name)] {
+                attach(track, to: album)
+                report.linked += 1
+                continue
+            }
+
+            guard recreatingMissing else {
+                report.missingAlbums.insert(name)
+                continue
+            }
+
+            // Альбом не пережил потерю треков — например, его убрала чистка пустых.
+            // Тип по числу треков: точнее взять неоткуда, а поправить его руками
+            // куда легче, чем собирать альбом заново.
+            let album = Album(name: name, type: .single)
+            context.insert(album)
+            albums[key(for: name)] = album
+
+            attach(track, to: album)
+            report.linked += 1
+            report.recreated.insert(name)
         }
 
-        return linked
+        if recreatingMissing {
+            for name in report.recreated {
+                guard let album = albums[key(for: name)] else { continue }
+                album.type = albumType(forTrackCount: album.tracks.count)
+            }
+        }
+
+        return report
+    }
+
+    /// Что получилось у прохода по альбомам — и, главное, чего не хватило.
+    struct LinkReport {
+        var linked = 0
+        /// Названия альбомов, которые известны, но которых в библиотеке больше нет.
+        var missingAlbums: Set<String> = []
+        /// Треки, у которых названия альбома нет ни в истории, ни в тегах:
+        /// восстановить его неоткуда, только руками.
+        var withoutName = 0
+        /// Альбомы, созданные заново.
+        var recreated: Set<String> = []
+    }
+
+    private static func attach(_ track: Track, to album: Album) {
+        track.album = album
+        track.position = album.tracks.count
+    }
+
+    private static func albumType(forTrackCount count: Int) -> Album.AlbumType {
+        switch count {
+        case ...1: .single
+        case 2...5: .EP
+        default: .LP
+        }
+    }
+
+    /// Имя альбома без регистра и краевых пробелов: в тегах одно и то же название
+    /// бывает записано по-разному.
+    private static func key(for name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     /// Сколько треков остались без альбома. По этому числу решается, показывать ли
@@ -173,11 +246,11 @@ enum LibraryRestore {
     private static func attachAlbum(to track: Track, name: String?, in context: ModelContext) {
         guard let name else { return }
 
-        let descriptor = FetchDescriptor<Album>(predicate: #Predicate { $0.name == name })
-        guard let album = try? context.fetch(descriptor).first else { return }
+        let wanted = key(for: name)
+        let albums = (try? context.fetch(FetchDescriptor<Album>())) ?? []
+        guard let album = albums.first(where: { key(for: $0.name) == wanted }) else { return }
 
-        track.album = album
-        track.position = album.tracks.count
+        attach(track, to: album)
     }
 
     private static func creationDate(of url: URL) -> Date? {

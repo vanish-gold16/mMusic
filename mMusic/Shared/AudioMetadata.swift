@@ -36,7 +36,34 @@ struct AudioMetadata {
             }
         }
 
+        // Общие ключи покрывают не все файлы: в части mp3 альбом записан только
+        // в родном ID3-теге, а в m4a — в iTunes-овском. Для названия и артиста это
+        // не так важно (их видно по имени файла), а вот альбом больше взять неоткуда.
+        if metadata.albumName == nil {
+            metadata.albumName = await albumFromFormatTags(of: asset)
+        }
+
         return metadata
+    }
+
+    /// Альбом из тегов конкретного формата — там, где общий ключ пуст.
+    private static func albumFromFormatTags(of asset: AVURLAsset) async -> String? {
+        guard let items = try? await asset.load(.metadata) else { return nil }
+
+        let identifiers: [AVMetadataIdentifier] = [
+            .id3MetadataAlbumTitle,
+            .iTunesMetadataAlbum,
+            .quickTimeMetadataAlbum
+        ]
+
+        for identifier in identifiers {
+            let matching = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: identifier)
+            for item in matching {
+                if let value = await string(from: item) { return value }
+            }
+        }
+
+        return nil
     }
 
     private static func string(from item: AVMetadataItem) async -> String? {

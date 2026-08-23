@@ -119,8 +119,8 @@ struct LibraryRestoreTests {
         source.album = nil
         try context.save()
 
-        let linked = await LibraryRestore.linkMissingAlbums(in: context)
-        #expect(linked == 1)
+        let report = await LibraryRestore.linkMissingAlbums(in: context)
+        #expect(report.linked == 1)
         #expect(source.album?.name == "Night Album")
     }
 
@@ -144,9 +144,78 @@ struct LibraryRestoreTests {
         context.insert(event)
         try context.save()
 
-        let linked = await LibraryRestore.linkMissingAlbums(in: context)
-        #expect(linked == 0)
+        let report = await LibraryRestore.linkMissingAlbums(in: context)
+        #expect(report.linked == 0)
         #expect(track.album?.name == "Right")
+    }
+
+    /// Альбом известен по истории, но самого альбома в библиотеке уже нет —
+    /// например, его убрала чистка пустых. Проход честно об этом сообщает,
+    /// а по отдельной просьбе собирает альбом заново.
+    @Test func reportsAndRecreatesAlbumsThatAreGone() async throws {
+        let context = container.mainContext
+        let filename = makeFile("gone-album.mp3")
+        defer { cleanUp([filename]) }
+
+        let album = Album(name: "Gone Album", type: .LP)
+        context.insert(album)
+
+        let track = Track(name: "Song", credits: [], genre: .pop, filename: filename)
+        context.insert(track)
+        track.album = album
+        context.insert(PlayEvent(track: track, seconds: 60))
+
+        // Альбом исчез, трек остался без него.
+        track.album = nil
+        context.delete(album)
+        try context.save()
+
+        let report = await LibraryRestore.linkMissingAlbums(in: context)
+        #expect(report.linked == 0)
+        #expect(report.missingAlbums == ["Gone Album"])
+        #expect(report.withoutName == 0)
+
+        let recreated = await LibraryRestore.linkMissingAlbums(in: context, recreatingMissing: true)
+        #expect(recreated.linked == 1)
+        #expect(track.album?.name == "Gone Album")
+    }
+
+    /// Ни истории, ни тега — восстановить неоткуда, и это должно быть видно.
+    @Test func reportsTracksWithNoAlbumNameAnywhere() async throws {
+        let context = container.mainContext
+        let filename = makeFile("no-clue.mp3")
+        defer { cleanUp([filename]) }
+
+        let track = Track(name: "Song", credits: [], genre: .pop, filename: filename)
+        context.insert(track)
+        try context.save()
+
+        let report = await LibraryRestore.linkMissingAlbums(in: context)
+        #expect(report.linked == 0)
+        #expect(report.withoutName == 1)
+        #expect(track.album == nil)
+    }
+
+    /// Регистр и лишние пробелы в теге не должны мешать найти альбом.
+    @Test func matchesAlbumNameIgnoringCaseAndSpaces() async throws {
+        let context = container.mainContext
+        let filename = makeFile("case.mp3")
+        defer { cleanUp([filename]) }
+
+        let album = Album(name: "Night Album", type: .LP)
+        context.insert(album)
+
+        let track = Track(name: "Song", credits: [], genre: .pop, filename: filename)
+        context.insert(track)
+
+        let event = PlayEvent(track: track, seconds: 60)
+        event.albumName = "  night album "
+        context.insert(event)
+        try context.save()
+
+        let report = await LibraryRestore.linkMissingAlbums(in: context)
+        #expect(report.linked == 1)
+        #expect(track.album?.name == "Night Album")
     }
 
     /// Файлы, на которые уже ссылается трек, восстанавливать нечего.
