@@ -51,6 +51,11 @@ class Track {
         Lyrics.normalized(lyrics ?? "") != nil
     }
 
+    /// Ремикс трека: положения ручек скорости, тона и эха. nil — трек звучит так,
+    /// как записан. Хранятся именно числа, а не второй файл: обработка идёт вживую
+    /// в звуковом тракте, оригинал на диске остаётся нетронутым.
+    var remix: RemixSettings?
+
     @Attribute(.externalStorage) var artwork: Data?
     var displayArtwork: Data? {
         artwork ?? album?.artwork

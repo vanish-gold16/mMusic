@@ -21,8 +21,7 @@ struct PlayerView: View {
     /// Обложка уступила место тексту трека.
     @State private var showsLyrics = false
     @State private var isEditingLyrics = false
-
-    @AppStorage(AppSettings.playbackRate) private var playbackRate = 1.0
+    @State private var isRemixPresented = false
     
     @State private var artworkWidth: CGFloat = 0
     
@@ -60,6 +59,9 @@ struct PlayerView: View {
             if let track = audioPlayer.currentTrack {
                 EditTrackView(track: track)
             }
+        }
+        .sheet(isPresented: $isRemixPresented) {
+            RemixView(audioPlayer: audioPlayer)
         }
         .sheet(isPresented: $isEditingLyrics) {
             if let track = audioPlayer.currentTrack {
@@ -338,9 +340,9 @@ struct PlayerView: View {
     }
 
     private var bottomRow: some View {
-        // Шаг меньше прежнего: кнопок стало на одну больше, и с двадцатью
+        // Шаг меньше прежнего: кнопок стало на две больше, и с двадцатью
         // они не умещались в строку на узком экране.
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Button {
                 audioPlayer.currentTrack?.isFavourite.toggle()
             } label: {
@@ -363,6 +365,20 @@ struct PlayerView: View {
                     .contentShape(Rectangle())
             }
             .foregroundStyle(showsLyrics ? audioPlayer.accent : Color.secondary)
+            .buttonStyle(PressableButtonStyle())
+
+            // Подсвечена, пока трек звучит не так, как записан: иначе про
+            // выкрученные вчера ручки можно забыть и списать странный звук
+            // на саму запись.
+            Button {
+                isRemixPresented = true
+            } label: {
+                Image(systemName: audioPlayer.hasRemix ? "dial.high.fill" : "dial.medium")
+                    .font(.title3)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .foregroundStyle(audioPlayer.hasRemix ? audioPlayer.accent : Color.secondary)
             .buttonStyle(PressableButtonStyle())
 
             Spacer()
@@ -428,7 +444,12 @@ struct PlayerView: View {
 
                 Divider()
 
-                speedMenu
+                Button {
+                    isRemixPresented = true
+                } label: {
+                    Label("Remix", systemImage: "dial.medium")
+                }
+
                 sleepMenu
             }
         } label: {
@@ -438,26 +459,6 @@ struct PlayerView: View {
                 .contentShape(Rectangle())
         }
         .foregroundStyle(.secondary)
-    }
-
-    /// Скорость лежит и в настройках, но менять её на слух удобнее там же, где слушаешь.
-    private var speedMenu: some View {
-        Menu {
-            ForEach([0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
-                Button {
-                    playbackRate = rate
-                    audioPlayer.applyPlaybackRate()
-                    toasts.show(String(format: "Speed %.2f×", rate), systemImage: "speedometer")
-                } label: {
-                    Label(
-                        String(format: "%.2f×", rate),
-                        systemImage: abs(playbackRate - rate) < 0.01 ? "checkmark" : "speedometer"
-                    )
-                }
-            }
-        } label: {
-            Label("Speed", systemImage: "speedometer")
-        }
     }
 
     private var sleepMenu: some View {

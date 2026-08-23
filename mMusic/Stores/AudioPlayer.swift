@@ -8,8 +8,10 @@ import SwiftData
 import SwiftUI
 
 @Observable
-class AudioPlayer: NSObject, AVAudioPlayerDelegate {
-    private var player: AVAudioPlayer?
+class AudioPlayer: NSObject {
+    /// Звук отдан отдельному типу: там граф из скорости, тона и эха, который
+    /// можно крутить на ходу. Здесь остаётся очередь, история и связь с системой.
+    private let engine = PlaybackEngine()
     
     private var meterTimer: Timer?
     private var progressTimer: Timer?
@@ -105,6 +107,10 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         } catch {
             print("Audio session error: \(error)")
         }
+        engine.onFinish = { [weak self] in
+            self?.handleTrackFinished()
+        }
+
         setupRemoteCommands()
         observeAudioSession()
     }
@@ -154,21 +160,19 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         isRangeCalibrated = false
 
         do {
-            player = try AVAudioPlayer(contentsOf: url)
-            player?.delegate = self
-            player?.isMeteringEnabled = true
-            // enableRate обязателен до play(), иначе rate молча игнорируется.
-            player?.enableRate = true
-            player?.rate = Float(defaults.double(forKey: AppSettings.playbackRate))
-            player?.play()
-            
+            try engine.load(url)
+            // Ручки этого трека — до первого звука, иначе первые доли секунды
+            // играли бы с настройками предыдущего.
+            engine.apply(currentRemix)
+            engine.play()
+
             track.lastPlayedAt = .now
             didCountCurrentPlay = false
             currentEvent = nil
             persistQueue()
             
             isPlaying = true
-            duration = player?.duration ?? 0
+            duration = engine.duration
             currentTime = 0
             startProgressTimer()
             startMeterTimer()
@@ -186,7 +190,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     /// «play» или «pause» (наушники, часы, прерывание), и переключатель на них врёт —
     /// команда «play» во время игры ставила музыку на паузу.
     func pause() {
-        player?.pause()
+        engine.pause()
         isPlaying = false
         stopProgressTimer()
         stopMeterTimer()
@@ -194,14 +198,15 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
 
     func resume() {
-        // Плеера нет — значит очередь восстановлена с прошлого запуска и звук ещё не поднимали.
-        guard player != nil else {
+        // Файл не открыт — значит очередь восстановлена с прошлого запуска
+        // и звук ещё не поднимали.
+        guard engine.hasTrack else {
             if currentTrack != nil { playCurrent() }
             return
         }
 
-        player?.rate = Float(defaults.double(forKey: AppSettings.playbackRate))
-        player?.play()
+        engine.apply(currentRemix)
+        engine.play()
         isPlaying = true
         startProgressTimer()
         startMeterTimer()
@@ -210,8 +215,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
     /// Полная остановка: очередь остаётся, звук — нет.
     func stop() {
-        player?.stop()
-        player = nil
+        engine.stop()
         isPlaying = false
         currentTime = 0
         duration = 0
@@ -232,7 +236,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     }
     
     func playPrevious() {
-        if let time = player?.currentTime, time > 3 {
+        if engine.hasTrack, engine.currentTime > 3 {
             seek(to: 0)
             return
         }
@@ -280,10 +284,40 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         sleepEndsAt != nil || stopsAfterCurrentTrack
     }
 
-    /// Новая скорость должна услышаться сразу, а не со следующего трека.
+    /// Общая скорость из настроек — значение по умолчанию для треков, которые
+    /// никто не крутил. У трека со своим ремиксом ручки главнее, поэтому его
+    /// она не трогает.
     func applyPlaybackRate() {
-        guard isPlaying else { return }
-        player?.rate = Float(defaults.double(forKey: AppSettings.playbackRate))
+        guard currentTrack?.remix == nil else { return }
+        engine.apply(currentRemix)
+        refreshNowPlayingProgress()
+    }
+
+    /// Ремикс играющего трека: скорость, тон и эхо.
+    var currentRemix: RemixSettings {
+        currentTrack?.remix ?? RemixSettings(speed: defaults.double(forKey: AppSettings.playbackRate))
+    }
+
+    /// Трек звучит не так, как записан.
+    var hasRemix: Bool {
+        !(currentTrack?.remix ?? .neutral).isNeutral
+    }
+
+    /// Ручку повернули. Значение уходит в звук тем же кадром и остаётся у трека:
+    /// завтра он заиграет так же. Файл при этом не меняется — вся обработка живёт
+    /// в графе и существует, только пока трек играет.
+    func updateRemix(_ settings: RemixSettings) {
+        let settings = settings.clamped()
+        currentTrack?.remix = settings
+        engine.apply(settings)
+        refreshNowPlayingProgress()
+    }
+
+    /// Вернуть трек к тому, как он записан.
+    func resetRemix() {
+        currentTrack?.remix = nil
+        engine.apply(currentRemix)
+        refreshNowPlayingProgress()
     }
 
     /// Прыжок к треку из экрана очереди.
@@ -293,12 +327,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         playCurrent()
     }
 
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        guard flag else {
-            finishPlayback()
-            return
-        }
-
+    /// Файл доиграл до конца. Зовёт `PlaybackEngine`, уже с главного потока.
+    private func handleTrackFinished() {
         // Таймер сна «до конца трека»: дослушали — и тишина, очередь не трогаем.
         if stopsAfterCurrentTrack {
             stopsAfterCurrentTrack = false
@@ -335,8 +365,8 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private func startProgressTimer() {
         stopProgressTimer()
         let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
-            guard let self, let player = self.player else { return }
-            self.currentTime = player.currentTime
+            guard let self, self.engine.hasTrack else { return }
+            self.currentTime = self.engine.currentTime
             self.countPlayIfNeeded()
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -374,10 +404,9 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     private func startMeterTimer() {
         stopMeterTimer()
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
-            guard let self, let player = self.player else { return }
-            player.updateMeters()
+            guard let self, self.engine.hasTrack else { return }
 
-            let db = Double(player.averagePower(forChannel: 0))
+            let db = self.engine.levelDecibels
             let normalized = (db - self.meterFloor) / (0 - self.meterFloor)
             self.level = min(max(normalized, 0), 1)
             self.updatePunch()
@@ -428,9 +457,11 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: track.name,
             MPMediaItemPropertyArtist: track.artistNames.joined(separator: ", "),
-            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
-            MPMediaItemPropertyPlaybackDuration: player?.duration ?? 0,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: player?.currentTime ?? 0
+            // Скорость настоящая: по ней экран блокировки досчитывает время между
+            // обновлениями, и с чужим числом оно поехало бы.
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? currentRemix.speed : 0.0,
+            MPMediaItemPropertyPlaybackDuration: engine.duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: engine.currentTime
         ]
         
         if let artworkData = track.displayArtwork,
@@ -446,6 +477,16 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
     
+    /// Только время и скорость. Полный `updateNowPlayingInfo` заново собирает
+    /// обложку, а ручку крутят десятками кадров в секунду.
+    private func refreshNowPlayingProgress() {
+        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = engine.currentTime
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? currentRemix.speed : 0.0
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
     private func setupRemoteCommands() {
         let commandsCenter = MPRemoteCommandCenter.shared()
         
@@ -486,7 +527,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     
     func seek(to time: TimeInterval) {
         let clamped = min(max(0, time), duration)
-        player?.currentTime = clamped
+        engine.seek(to: clamped)
         currentTime = clamped
         updateNowPlayingInfo()
     }
