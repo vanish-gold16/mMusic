@@ -27,8 +27,8 @@ class AudioPlayer: NSObject {
     var currentTime: TimeInterval = 0
     var duration: TimeInterval = 0
     
-    var repeatMode: RepeatMode = .off { didSet { persistModes() } }
-    var isShuffled = false { didSet { persistModes() } }
+    var repeatMode: RepeatMode = .off { didSet { persistModes(); syncRemoteModes() } }
+    var isShuffled = false { didSet { persistModes(); syncRemoteModes() } }
 
     /// Цвета играющей обложки: ими красится фон плеера и tint всего приложения.
     /// Пока ничего не играет, стоит запасная палитра.
@@ -102,8 +102,6 @@ class AudioPlayer: NSObject {
 
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback)
-            try AVAudioSession.sharedInstance().setActive(true)
-            
         } catch {
             print("Audio session error: \(error)")
         }
@@ -160,6 +158,7 @@ class AudioPlayer: NSObject {
         isRangeCalibrated = false
 
         do {
+            activateSession()
             try engine.load(url)
             // Ручки этого трека — до первого звука, иначе первые доли секунды
             // играли бы с настройками предыдущего.
@@ -205,6 +204,7 @@ class AudioPlayer: NSObject {
             return
         }
 
+        activateSession()
         engine.apply(currentRemix)
         engine.play()
         isPlaying = true
@@ -449,8 +449,11 @@ class AudioPlayer: NSObject {
     }
     
     private func updateNowPlayingInfo() {
+        let center = MPNowPlayingInfoCenter.default()
+
         guard let track = currentTrack else {
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            center.nowPlayingInfo = nil
+            center.playbackState = .stopped
             return
         }
         
@@ -460,8 +463,20 @@ class AudioPlayer: NSObject {
             // Скорость настоящая: по ней экран блокировки досчитывает время между
             // обновлениями, и с чужим числом оно поехало бы.
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? currentRemix.speed : 0.0,
+            // А это — с какой скоростью трек звучит «обычно». Наушники и часы
+            // сравнивают одно с другим: разошлись — значит идёт перемотка, а
+            // перематываемому источнику паузу не шлют. Пока пары не было, любой
+            // ремикс быстрее оригинала запирал кнопки на браслете.
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: currentRemix.speed,
             MPMediaItemPropertyPlaybackDuration: engine.duration,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: engine.currentTime
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: engine.currentTime,
+            // По этой паре внешний экран выбирает, что рисовать: полосу с временем
+            // и перемоткой, а не бесконечный прямой эфир.
+            MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
+            MPNowPlayingInfoPropertyIsLiveStream: false,
+            // Место в очереди: по нему браслет и магнитола пишут «3 из 12».
+            MPNowPlayingInfoPropertyPlaybackQueueIndex: currentIndex,
+            MPNowPlayingInfoPropertyPlaybackQueueCount: queue.count
         ]
         
         if let artworkData = track.displayArtwork,
@@ -474,44 +489,63 @@ class AudioPlayer: NSObject {
             info[MPMediaItemPropertyAlbumTitle] = albumName
         }
         
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        center.nowPlayingInfo = info
+        // Состояние — отдельным свойством и после словаря. Телефону хватает и
+        // нулевой скорости, а часам нужен прямой ответ: играем мы не через
+        // `AVPlayer`, а своим графом, и догадаться про паузу системе не по чему —
+        // на браслете так и оставалась кнопка «пауза» у замершего трека.
+        center.playbackState = isPlaying ? .playing : .paused
+
+        syncRemoteModes()
     }
     
     /// Только время и скорость. Полный `updateNowPlayingInfo` заново собирает
     /// обложку, а ручку крутят десятками кадров в секунду.
     private func refreshNowPlayingProgress() {
-        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+        let center = MPNowPlayingInfoCenter.default()
+        guard var info = center.nowPlayingInfo else { return }
 
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = engine.currentTime
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? currentRemix.speed : 0.0
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = currentRemix.speed
+        center.nowPlayingInfo = info
+        center.playbackState = isPlaying ? .playing : .paused
     }
 
+    /// Кнопки, которые видит всё, что снаружи: экран блокировки, наушники,
+    /// магнитола, часы и фитнес-браслет вроде Mi Band. Отдельного приложения
+    /// для часов не нужно — iOS сама пересказывает им этот набор по Bluetooth,
+    /// но пересказывает буквально: чего здесь нет, того на браслете не будет.
     private func setupRemoteCommands() {
         let commandsCenter = MPRemoteCommandCenter.shared()
         
         commandsCenter.playCommand.addTarget { [weak self] _ in
-            self?.resume()
+            guard let self, self.currentTrack != nil else { return .noSuchContent }
+            self.resume()
             return .success
         }
         
         commandsCenter.pauseCommand.addTarget { [weak self] _ in
-            self?.pause()
+            guard let self, self.currentTrack != nil else { return .noSuchContent }
+            self.pause()
             return .success
         }
         
         commandsCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
-            self?.togglePlayPause()
+            guard let self, self.currentTrack != nil else { return .noSuchContent }
+            self.togglePlayPause()
             return .success
         }
         
         commandsCenter.nextTrackCommand.addTarget { [weak self] _ in
-            self?.playNext()
+            guard let self, self.currentTrack != nil else { return .noSuchContent }
+            self.playNext()
             return .success
         }
         
         commandsCenter.previousTrackCommand.addTarget { [weak self] _ in
-            self?.playPrevious()
+            guard let self, self.currentTrack != nil else { return .noSuchContent }
+            self.playPrevious()
             return .success
         }
         
@@ -523,6 +557,68 @@ class AudioPlayer: NSObject {
             self.seek(to: positionEvent.positionTime)
             return .success
         }
+
+        commandsCenter.changeRepeatModeCommand.addTarget { [weak self] event in
+            guard let self,
+                  let modeEvent = event as? MPChangeRepeatModeCommandEvent else {
+                return .commandFailed
+            }
+            // Снаружи присылают конечный режим, а не «следующий по кругу»:
+            // `cycleRepeatMode` здесь не годится.
+            self.repeatMode = RepeatMode(modeEvent.repeatType)
+            return .success
+        }
+
+        commandsCenter.changeShuffleModeCommand.addTarget { [weak self] event in
+            guard let self,
+                  let modeEvent = event as? MPChangeShuffleModeCommandEvent else {
+                return .commandFailed
+            }
+            // У системы три состояния (треки, альбомы, выкл), у нас два —
+            // всё, что не «выкл», для нас перемешивание.
+            let wanted = modeEvent.shuffleType != .off
+            if wanted != self.isShuffled { self.toggleShuffle() }
+            return .success
+        }
+
+        // Список включённого — явный. Команда, у которой нет обработчика,
+        // остаётся живой кнопкой на чужом экране и молча ничего не делает;
+        // на браслете, где кнопок всего несколько, такая занимает место.
+        let supported: [MPRemoteCommand] = [
+            commandsCenter.playCommand,
+            commandsCenter.pauseCommand,
+            commandsCenter.togglePlayPauseCommand,
+            commandsCenter.nextTrackCommand,
+            commandsCenter.previousTrackCommand,
+            commandsCenter.changePlaybackPositionCommand,
+            commandsCenter.changeRepeatModeCommand,
+            commandsCenter.changeShuffleModeCommand
+        ]
+        let unsupported: [MPRemoteCommand] = [
+            commandsCenter.stopCommand,
+            commandsCenter.seekForwardCommand,
+            commandsCenter.seekBackwardCommand,
+            commandsCenter.skipForwardCommand,
+            commandsCenter.skipBackwardCommand,
+            commandsCenter.changePlaybackRateCommand,
+            commandsCenter.ratingCommand,
+            commandsCenter.likeCommand,
+            commandsCenter.dislikeCommand,
+            commandsCenter.bookmarkCommand
+        ]
+        supported.forEach { $0.isEnabled = true }
+        unsupported.forEach { $0.isEnabled = false }
+
+        syncRemoteModes()
+    }
+
+    /// Повтор и перемешивание — тоже часть «сейчас играет»: по ним внешний
+    /// экран подсвечивает свои кнопки. Без этого там горело бы то, что было
+    /// включено при запуске приложения.
+    private func syncRemoteModes() {
+        let commandsCenter = MPRemoteCommandCenter.shared()
+        commandsCenter.changeRepeatModeCommand.currentRepeatType = repeatMode.remoteType
+        commandsCenter.changeShuffleModeCommand.currentShuffleType = isShuffled ? .items : .off
     }
     
     func seek(to time: TimeInterval) {
@@ -705,6 +801,19 @@ class AudioPlayer: NSObject {
         defaults.set(isShuffled, forKey: Keys.isShuffled)
     }
 
+    /// Право на звук берётся в тот момент, когда действительно начинают играть,
+    /// а не при запуске приложения: иначе mMusic глушил бы чужую музыку просто
+    /// потому, что его открыли. С этого же мгновения телефон считает нас
+    /// источником «сейчас играет» — тем самым, который часы и браслет
+    /// показывают у себя на экране.
+    private func activateSession() {
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Audio session error: \(error)")
+        }
+    }
+
     private func observeAudioSession() {
         let center = NotificationCenter.default
 
@@ -767,4 +876,24 @@ class AudioPlayer: NSObject {
         pause()
     }
     
+}
+
+/// Режим повтора на языке системы: тем же словом его понимают экран блокировки,
+/// магнитола, часы и фитнес-браслет.
+private extension RepeatMode {
+    var remoteType: MPRepeatType {
+        switch self {
+        case .off: .off
+        case .all: .all
+        case .one: .one
+        }
+    }
+
+    init(_ remote: MPRepeatType) {
+        switch remote {
+        case .one: self = .one
+        case .all: self = .all
+        default: self = .off
+        }
+    }
 }
