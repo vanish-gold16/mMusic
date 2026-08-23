@@ -1,62 +1,73 @@
 import SwiftUI
 
-/// Фон играющего трека: два цвета обложки, и второй «дышит» громкостью поверх первого.
+/// Фон играющего трека: два цвета его обложки, из которых второй «дышит» громкостью.
 ///
-/// Вынесен из плеера отдельным типом, потому что показывает его не только плеер:
-/// экран артиста, открытый изнутри плеера, продолжает тот же фон.
+/// Цвета не подбираются под обложку, а берутся из неё (см. `CoverPalette`), поэтому
+/// тёмный альбом даёт тёмный экран, а выцветший — выцветший.
+///
+/// Живёт отдельным типом, потому что показывает его не только плеер: экран артиста,
+/// открытый изнутри плеера, продолжает тот же фон.
 struct PlayerBackground: View {
 
     let audioPlayer: AudioPlayer
 
-    var body: some View {
-        // Обложки нет — красить нечем, остаётся чёрный.
-        if audioPlayer.currentTrack?.displayArtwork == nil {
-            Color.black
-        } else {
-            ZStack {
-                // Дно: цвета лежат поверх чёрного, иначе на просвет было бы видно
-                // то, что под плеером.
-                Color.black
+    private var palette: CoverPalette { audioPlayer.palette }
+    private var punch: Double { audioPlayer.punch }
 
-                ZStack {
-                    // Не заливка одним тоном: к низу цвет отступает, и экран
-                    // перестаёт выглядеть куском крашеной бумаги.
-                    LinearGradient(
-                        colors: [audioPlayer.accent, audioPlayer.accent.opacity(0.65)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+    /// Чем гасить блики: на светлой обложке фон притеняется белым, на тёмной — чёрным.
+    /// Тот же цвет, что и у текста поверх, поэтому вуаль не пачкает оттенок.
+    private var scrim: Color { palette.isLight ? .white : .black }
 
-                    // Эллипс, а не круг: он тянется по форме экрана. Радиус задан
-                    // долями кадра, поэтому пятно одинаково на любом устройстве.
-                    EllipticalGradient(
-                        colors: [
-                            audioPlayer.secondaryAccent.opacity(0.35 + punch * 0.6),
-                            audioPlayer.secondaryAccent.opacity(0)
-                        ],
-                        center: .center,
-                        startRadiusFraction: 0,
-                        endRadiusFraction: 0.6
-                    )
-                    .scaleEffect(0.9 + punch * 0.8) // на громком второй цвет наплывает
-                    .blur(radius: 40)               // и растворяется в первом
-                }
-                .saturation(0.9 + punch * 1.1)      // вспыхивает цветом
-                .hueRotation(.degrees(punch * 14))  // оттенок ведёт — фон «переливается»
+    /// Сколько вуали нужно. Она страхует читаемость текста, а значит, нужна только
+    /// на середине шкалы: на почти чёрном фоне белые буквы видно и так, на почти
+    /// белом — чёрные. Раньше вуаль лежала одинаковой плотной пеленой, и тёмная
+    /// обложка превращалась в чернильную дыру.
+    private var scrimOpacity: Double {
+        let risk = palette.isLight
+            ? max(0.85 - palette.baseLuminance, 0)
+            : max(palette.baseLuminance - 0.12, 0)
 
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.9 - punch * 0.7)     // вуаль тончает, цвета проступают
-            }
-            // Анимация привязана к самим цветам: на смене трека они перетекают
-            // друг в друга, а на «дыхании» не срабатывает — иначе каждый удар
-            // громкости тянулся бы полсекунды.
-            .animation(.easeInOut(duration: 0.6), value: audioPlayer.accent)
-            .animation(.easeInOut(duration: 0.6), value: audioPlayer.secondaryAccent)
-        }
+        // На громком вуаль тончает — цвета вспыхивают.
+        return min(risk * 0.8, 0.34) * (1 - punch * 0.75)
     }
 
-    private var punch: Double { audioPlayer.punch }
+    var body: some View {
+        ZStack {
+            // Главный цвет обложки во весь экран.
+            palette.base
+
+            // Лёгкая глубина к низу: ровная заливка выглядит куском крашеной бумаги.
+            LinearGradient(
+                colors: [scrim.opacity(0), scrim.opacity(0.16)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            // Второй цвет обложки. Эллипс, а не круг: он тянется по форме экрана,
+            // а радиус задан долями кадра — значит, пятно одинаково на любом устройстве.
+            EllipticalGradient(
+                colors: [
+                    palette.secondary.opacity(0.55 + punch * 0.35),
+                    palette.secondary.opacity(0)
+                ],
+                center: .center,
+                startRadiusFraction: 0,
+                endRadiusFraction: 0.6
+            )
+            .scaleEffect(0.9 + punch * 0.8)     // на громком второй цвет наплывает
+            .blur(radius: 40)                   // и растворяется в первом
+            .saturation(1 + punch * 0.9)        // вспыхивает цветом
+            .hueRotation(.degrees(punch * 10))  // оттенок ведёт — фон «переливается»
+
+            // Вуаль ровно на столько, чтобы читался текст. Раньше здесь лежало
+            // толстое матовое стекло, и от цветов обложки оставался серый намёк.
+            scrim.opacity(scrimOpacity)
+        }
+        // Анимация привязана к самой палитре: на смене трека цвета перетекают
+        // друг в друга, а на «дыхании» не срабатывает — иначе каждый удар
+        // громкости тянулся бы полсекунды.
+        .animation(.easeInOut(duration: 0.6), value: palette)
+    }
 }
 
 extension EnvironmentValues {

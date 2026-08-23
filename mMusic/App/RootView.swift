@@ -25,6 +25,7 @@ struct RootView: View {
     @State private var searchPath: NavigationPath = .init()
     
     @AppStorage(AppSettings.appearance) private var appearance = Appearance.system.rawValue
+    @AppStorage(AppSettings.birthdayNotifications) private var birthdayNotifications = true
 
     @State private var audioPlayer = AudioPlayer()
     @State private var isPlayerPresented = false
@@ -73,6 +74,11 @@ struct RootView: View {
 
             audioPlayer.restore(orderedTracks, current: lastTrack)
         }
+        // Перезапускается и при смене настройки: выключили — уведомления снимаются.
+        .task(id: birthdayNotifications) {
+            BirthdayNotifications.startPresentingInForeground()
+            await scheduleBirthdays()
+        }
         .task(id: tracksNeedingDuration.count) {
             await TrackDurationLoader.fill(tracksNeedingDuration)
         }
@@ -115,6 +121,20 @@ struct RootView: View {
         )
     }
     
+    /// Треки берутся разовой выборкой, а не `@Query`: расписание уведомлений
+    /// нужно один раз на запуск, а живое наблюдение за всей библиотекой
+    /// пересобирало бы корневой экран на каждое изменение.
+    private func scheduleBirthdays() async {
+        let tracks = (try? modelContext.fetch(FetchDescriptor<Track>())) ?? []
+        let upcoming = TrackBirthday.upcoming(
+            in: tracks,
+            listened: TrackBirthday.listened(in: modelContext),
+            limit: BirthdayNotifications.limit
+        )
+
+        await BirthdayNotifications.refresh(with: upcoming, enabled: birthdayNotifications)
+    }
+
     private func resetNav(for tab: Tab) {
         switch tab {
         case .home: homePath = NavigationPath()

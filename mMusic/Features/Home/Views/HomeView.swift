@@ -22,6 +22,9 @@ struct HomeView: View {
     @State private var mix: [Track] = []
     /// Один из уже собранных плейлистов — напоминание о том, что лежит в медиатеке.
     @State private var suggestedPlaylist: Playlist?
+    /// Треки, у которых сегодня годовщина. Считаются в `.task`: там поход в историю
+    /// прослушиваний, и делать его на каждой перерисовке незачем.
+    @State private var birthdays: [TrackBirthday] = []
 
     private var recentTracks: [Track] {
         Array(playedTracks.prefix(15))
@@ -59,12 +62,17 @@ struct HomeView: View {
             // Пересобираем и когда микса ещё нет, и когда библиотека изменилась:
             // иначе предложение остаётся вчерашним, а удалённый трек висит в нём ссылкой.
             refreshMix()
+            birthdays = TrackBirthday.today(in: allTracks, listened: TrackBirthday.listened(in: modelContext))
         }
     }
 
     private var content: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                if !birthdays.isEmpty {
+                    birthdaySection
+                }
+
                 if !recentTracks.isEmpty {
                     recentlyPlayed
                 }
@@ -76,6 +84,34 @@ struct HomeView: View {
             }
             .padding(.vertical)
         }
+    }
+
+    /// Праздник — сверху: он бывает редко и живёт один день.
+    private var birthdaySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(birthdays.count == 1 ? "Track birthday" : "Track birthdays")
+
+            if birthdays.count == 1, let birthday = birthdays.first {
+                BirthdayCard(birthday: birthday) { play(birthday.track) }
+                    .padding(.horizontal)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(birthdays) { birthday in
+                            BirthdayCard(birthday: birthday) { play(birthday.track) }
+                                .frame(width: 300)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+
+    /// Именинник играет один: ставить за ним всю библиотеку — не то, чего ждёшь
+    /// от нажатия на плашку про конкретный трек.
+    private func play(_ track: Track) {
+        audioPlayer.play([track])
     }
 
     private var recentlyPlayed: some View {

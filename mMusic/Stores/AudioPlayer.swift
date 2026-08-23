@@ -28,13 +28,13 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     var repeatMode: RepeatMode = .off { didSet { persistModes() } }
     var isShuffled = false { didSet { persistModes() } }
 
-    /// Цвет играющей обложки — на него настроен tint всего приложения.
-    /// Оранжевый остаётся, пока ничего не играет.
-    var accent: Color = .orange
+    /// Цвета играющей обложки: ими красится фон плеера и tint всего приложения.
+    /// Пока ничего не играет, стоит запасная палитра.
+    private(set) var palette: CoverPalette = .fallback
 
-    /// Второй цвет той же обложки: им «дышит» фон плеера поверх первого.
-    /// Пара к оранжевому по умолчанию — розовый.
-    var secondaryAccent: Color = .pink
+    /// Короткие имена для самых частых мест — читаются как раньше.
+    var accent: Color { palette.accent }
+    var secondaryAccent: Color { palette.secondary }
 
     var level: Double = 0
     private let meterFloor: Double = -50
@@ -148,7 +148,7 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
 
         // До попытки открыть файл: обложка есть и у трека, который не удалось прочитать,
         // а интерфейс всё равно перекрашивается под него.
-        refreshAccent()
+        refreshPalette()
 
         // У нового трека своя громкость — коридор ищем заново.
         isRangeCalibrated = false
@@ -494,30 +494,28 @@ class AudioPlayer: NSObject, AVAudioPlayerDelegate {
     func restore(_ tracks: [Track], current filename: String) {
         queue = tracks
         currentIndex = tracks.firstIndex { $0.filename == filename } ?? 0
-        refreshAccent()
+        refreshPalette()
     }
 
     /// Разбор обложки уводится в фоновую задачу: она декодируется и сжимается,
     /// а смена трека не должна ради этого подвисать.
-    private func refreshAccent() {
+    private func refreshPalette() {
         guard let track = currentTrack, let data = track.displayArtwork else {
-            accent = .orange
-            secondaryAccent = .pink
+            palette = .fallback
             return
         }
 
         let filename = track.filename
 
         Task { @MainActor in
-            let colors = await Task.detached(priority: .utility) {
-                UIImage(data: data)?.accentColors
+            let found = await Task.detached(priority: .utility) {
+                UIImage(data: data)?.coverPalette
             }.value
 
             // Пока считали, трек мог смениться — тогда эти цвета уже не к месту.
             guard currentTrack?.filename == filename else { return }
 
-            accent = colors.map { Color($0.primary) } ?? .orange
-            secondaryAccent = colors.map { Color($0.secondary) } ?? .pink
+            palette = found ?? .fallback
         }
     }
     

@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.playbackRate) private var playbackRate = 1.0
     @AppStorage(AppSettings.deleteOriginalAfterImport) private var deleteOriginalAfterImport = true
     @AppStorage(AppSettings.appearance) private var appearance = Appearance.system.rawValue
+    @AppStorage(AppSettings.birthdayNotifications) private var birthdayNotifications = true
 
     @Query private var tracks: [Track]
     @Query private var albums: [Album]
@@ -73,6 +74,14 @@ struct SettingsView: View {
                             if !editing { audioPlayer.applyPlaybackRate() }
                         }
                     }
+                }
+
+                Section {
+                    Toggle("Track birthdays", isOn: $birthdayNotifications)
+                } header: {
+                    Text("notifications")
+                } footer: {
+                    Text("On the day a track turns a year older, the app sends a note with how much you have played it. iOS asks for permission the first time there is something to send.")
                 }
 
                 Section {

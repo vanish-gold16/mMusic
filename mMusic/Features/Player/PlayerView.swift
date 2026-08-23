@@ -438,19 +438,9 @@ struct PlayerView: View {
     }
 
     /// Фон под текстом светлый — значит, сам текст должен быть тёмным.
-    ///
-    /// Раньше ради этого декодировалась обложка, и результат приходилось держать
-    /// в `@State`. Теперь фон красит акцент, и яркость считается прямо из него —
-    /// пара умножений, их не жалко и на каждой перерисовке.
-    private var isLightBackground: Bool {
-        guard audioPlayer.currentTrack?.displayArtwork != nil else { return false } // фон чёрный — текст белый
-
-        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-        UIColor(audioPlayer.accent).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-
-        // Веса неравные: глаз сильнее всего реагирует на зелёный, слабее всего на синий.
-        return 0.299 * red + 0.587 * green + 0.114 * blue > 0.62
-    }
+    /// Решает не яркость обложки и не акцент, а те самые цвета, которыми залит
+    /// экран: их светлота посчитана вместе с палитрой.
+    private var isLightBackground: Bool { audioPlayer.palette.isLight }
 
     private func timeString(_ time: TimeInterval) -> String {
         let total = Int(max(0, time.rounded()))
