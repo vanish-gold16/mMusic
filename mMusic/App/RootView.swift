@@ -79,6 +79,12 @@ struct RootView: View {
             BirthdayNotifications.startPresentingInForeground()
             await scheduleBirthdays()
         }
+        .task {
+            // Разовая починка номеров: у собранной раньше библиотеки нумерация
+            // треков в альбомах могла съехать на единицу. Проход дешёвый и
+            // молчаливый — в исправной библиотеке он ничего не меняет.
+            AlbumNumbering.repair(in: modelContext)
+        }
         .task(id: tracksNeedingDuration.count) {
             await TrackDurationLoader.fill(tracksNeedingDuration)
         }

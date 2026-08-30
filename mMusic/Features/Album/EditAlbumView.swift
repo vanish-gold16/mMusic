@@ -14,6 +14,9 @@ struct EditAlbumView: View {
     @State private var addedTracks: [TrackDraft] = []
     /// Файлы, которые не удалось положить в библиотеку. Пустой список — всё прошло.
     @State private var failedImports: [String] = []
+    /// Артисты альбома, пока лист открыт. В базе они лежат кредитами, а редактор
+    /// работает с плоским списком — переливаем туда и обратно на открытии и закрытии.
+    @State private var artistDrafts: [ArtistDraft] = []
 
     @Bindable var album: Album
 
@@ -71,6 +74,10 @@ struct EditAlbumView: View {
 
                 Section("album name") {
                     TextField(album.name, text: $album.name)
+                }
+
+                Section("artists") {
+                    ArtistsEditor(artists: $artistDrafts)
                 }
 
                 Picker("type", selection: $album.type) {
@@ -160,6 +167,10 @@ struct EditAlbumView: View {
             }
             .navigationTitle("Edit album")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear(perform: loadArtists)
+            // Не по кнопке «done»: лист закрывают и свайпом вниз, а остальные поля
+            // альбома пишутся в базу сразу — артисты не должны быть исключением.
+            .onDisappear(perform: syncArtists)
             .sheet(isPresented: $showTrackPicker, onDismiss: addPickedTracks) {
                 AlbumTrackPickerView(album: [album], addedTracks: $addedTracks)
             }
@@ -189,7 +200,6 @@ struct EditAlbumView: View {
         switch result {
         case .success(let urls):
             let base = album.tracks.count
-            let albumArtistNames = album.artists.map(\.name)
             var imported: [Track] = []
 
             for (offset, url) in urls.enumerated() {
@@ -248,17 +258,16 @@ struct EditAlbumView: View {
 
         let track = Track(
             name: metadata.title ?? file.url.parseMusic().name,
-            album: album,
             credits: [],
             genre: .pop,
             filename: filename,
             artwork: metadata.artwork
         )
-        track.position = album.tracks.count
 
         modelContext.insert(track)
+        // Альбом ставит `append`: он же выдаёт номер. Сам по себе трек номера не знает.
+        album.append([track])
 
-        let albumArtistNames = album.artists.map(\.name)
         let names = metadata.artistNames.filter { name in
             !albumArtistNames.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
         }
@@ -266,6 +275,46 @@ struct EditAlbumView: View {
         for (position, name) in names.enumerated() {
             let artistModel = modelContext.findOrCreateArtist(named: name)
             modelContext.insert(Credit(artist: artistModel, role: .featured, position: position, track: track))
+        }
+    }
+
+    /// Артисты альбома на экране. Пока лист открыт, правда — в черновиках:
+    /// в базу они уезжают на закрытии, а импортировать файл могут раньше, и
+    /// новый альбомный артист не должен попасть ещё и в credits трека.
+    private var albumArtistNames: [String] { artistDrafts.map(\.name) }
+
+    private func loadArtists() {
+        artistDrafts = album.credits
+            .sorted { $0.position < $1.position }
+            .map { ArtistDraft(name: $0.artist.name, role: $0.role) }
+    }
+
+    /// Кредиты альбома пересобираются из черновиков: имя, роль и порядок задаёт
+    /// список на экране, а связь «кто есть кто» ищется по имени, чтобы одного
+    /// артиста не завести дважды.
+    ///
+    /// Пересборка целиком — потому что править нечего: у кредита нет ничего, кроме
+    /// артиста, роли и позиции. Но если ничего не изменилось, не трогаем и их:
+    /// лист закрывают и просто посмотрев, а каждая пересборка — запись в базу.
+    private func syncArtists() {
+        let current = album.credits
+            .sorted { $0.position < $1.position }
+            .map { ($0.artist.name, $0.role) }
+        let edited = artistDrafts.map { ($0.name, $0.role) }
+
+        guard current.count != edited.count
+                || zip(current, edited).contains(where: { $0 != $1 })
+        else { return }
+
+        for credit in Array(album.credits) {
+            modelContext.delete(credit)
+        }
+
+        for (position, draft) in artistDrafts.enumerated() {
+            let artist = modelContext.findOrCreateArtist(named: draft.name)
+            let credit = Credit(artist: artist, role: draft.role, position: position, album: album)
+
+            modelContext.insert(credit)
         }
     }
 

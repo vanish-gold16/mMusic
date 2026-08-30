@@ -136,7 +136,7 @@ enum LibraryRestore {
             }
 
             if let album = albums[key(for: name)] {
-                attach(track, to: album)
+                album.append([track])
                 report.linked += 1
                 continue
             }
@@ -153,7 +153,7 @@ enum LibraryRestore {
             context.insert(album)
             albums[key(for: name)] = album
 
-            attach(track, to: album)
+            album.append([track])
             report.linked += 1
             report.recreated.insert(name)
         }
@@ -178,11 +178,6 @@ enum LibraryRestore {
         var withoutName = 0
         /// Альбомы, созданные заново.
         var recreated: Set<String> = []
-    }
-
-    private static func attach(_ track: Track, to album: Album) {
-        track.album = album
-        track.position = album.tracks.count
     }
 
     private static func albumType(forTrackCount count: Int) -> Album.AlbumType {
@@ -250,7 +245,10 @@ enum LibraryRestore {
         let albums = (try? context.fetch(FetchDescriptor<Album>())) ?? []
         guard let album = albums.first(where: { key(for: $0.name) == wanted }) else { return }
 
-        attach(track, to: album)
+        // Через `append`, а не присваиванием: он один знает, какой номер у трека
+        // должен быть. Если ставить альбом руками, трек попадает в `album.tracks`
+        // сразу же, и номер по их количеству выходит на единицу больше.
+        album.append([track])
     }
 
     private static func creationDate(of url: URL) -> Date? {

@@ -202,11 +202,12 @@ struct SettingView: View {
     /// Трек в существующий альбом. Авторов альбома он наследует, поэтому в его
     /// собственные credits попадают только те, кого в альбоме ещё нет.
     private func addToExisting(_ album: Album, filename: String) {
-        let track = Track(name: name, album: album, credits: [], genre: genre, filename: filename)
-        track.position = album.tracks.count
+        let track = Track(name: name, credits: [], genre: genre, filename: filename)
         track.artwork = artworkData
 
         modelContext.insert(track)
+        // Альбом ставит `append`: он же выдаёт номер. Сам по себе трек номера не знает.
+        album.append([track])
 
         let albumArtistNames = album.artistNames
 

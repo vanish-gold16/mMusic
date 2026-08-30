@@ -94,6 +94,34 @@ struct PlaybackEngineTests {
         #expect(engine.currentTime > 10 && engine.currentTime < 11)
     }
 
+    /// Трек доиграл до конца, и его включают снова. Узел не обнуляет свой счётчик
+    /// сам — без остановки перед новым расписанием позиция считалась бы от конца
+    /// прошлого проигрывания: звук идёт с начала, а ползунок стоит в конце.
+    @Test func replayAfterTheEndStartsFromTheBeginning() async throws {
+        let shortFilename = "engine-test-short-\(UUID().uuidString).wav"
+        try Self.writeTone(to: AudioFileStore.url(for: shortFilename), seconds: 1)
+        defer { AudioFileStore.remove(filename: shortFilename) }
+
+        let engine = PlaybackEngine()
+        defer { engine.stop() }
+        try engine.load(AudioFileStore.url(for: shortFilename))
+
+        var finished = false
+        engine.onFinish = { finished = true }
+
+        engine.play()
+        try await Task.sleep(for: .milliseconds(1500))
+        #expect(finished, "трек не доиграл до конца")
+
+        engine.play()
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(
+            engine.currentTime > 0.1 && engine.currentTime < 0.8,
+            "повторный запуск считает позицию от конца прошлого проигрывания"
+        )
+    }
+
     @Test func pauseFreezesPosition() async throws {
         let engine = try makeEngine()
         defer { engine.stop(); cleanUp() }

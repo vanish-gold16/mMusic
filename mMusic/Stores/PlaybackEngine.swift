@@ -26,7 +26,7 @@ final class PlaybackEngine {
     private var connectedFormat: AVAudioFormat?
 
     /// Кадр, с которого запущено текущее расписание: `playerTime` считает от нуля
-    /// на каждом `scheduleSegment`, а нам нужна позиция в файле.
+    /// с каждого запуска узла, а нам нужна позиция в файле.
     private var startFrame: AVAudioFramePosition = 0
     /// Позиция, замороженная на паузе: у остановленного узла своего времени нет.
     private var frozenTime: TimeInterval = 0
@@ -220,13 +220,21 @@ final class PlaybackEngine {
     private func schedule() {
         guard let file else { return }
 
+        // Узел считает время от собственного старта, а не от начала расписания,
+        // и `pause()` этот счётчик не трогает — обнуляет его только `stop()`.
+        // Доигравший трек оставляет счётчик на своём конце, поэтому перед новым
+        // расписанием узел надо остановить: иначе `currentTime` считал бы позицию
+        // от конца предыдущего проигрывания — звук с начала, ползунок в конце.
+        // Счётчик расписаний растёт до остановки, чтобы её completion был отброшен.
+        generation += 1
+        playerNode.stop()
+
         let frames = AVAudioFrameCount(max(file.length - startFrame, 0))
         guard frames > 0 else {
             finish()
             return
         }
 
-        generation += 1
         let token = generation
 
         playerNode.scheduleSegment(

@@ -4,12 +4,19 @@ import SwiftUI
 struct ArtistView: View {
 
     @Environment(AudioPlayer.self) private var audioPlayer
+    @Environment(\.modelContext) private var modelContext
     /// Открыты изнутри плеера — значит, и фон продолжаем его.
     @Environment(\.isInsidePlayer) private var isInsidePlayer
 
-    var artist: Artist
+    @Bindable var artist: Artist
 
     @State private var sortOption: SortOption = .mostPlayed
+    @State private var showImagePicker = false
+    /// Время с артистом — снимок, а не живой запрос: пока трек играет, история
+    /// пересчитывается пять раз в секунду, и `@Query` перерисовывал бы на каждый
+    /// тик весь список треков. Снимок обновляется, когда играть начинает
+    /// следующий трек, — то есть ровно тогда, когда прошлое число устарело.
+    @State private var listening: ArtistListening?
 
     private enum SortOption: String, CaseIterable, Identifiable {
         case mostPlayed = "Most played"
@@ -77,6 +84,11 @@ struct ArtistView: View {
             LazyVStack(alignment: .leading, spacing: 24) {
                 header
 
+                if let listening, listening.plays > 0 {
+                    ArtistTimeCard(listening: listening)
+                        .padding(.horizontal)
+                }
+
                 if !tracks.isEmpty {
                     playButtons
                 }
@@ -110,6 +122,13 @@ struct ArtistView: View {
         }
         .navigationTitle(artist.name)
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: audioPlayer.currentTrack?.id) {
+            listening = ArtistListening.make(
+                for: artist.name,
+                filenames: Set(allTracks.map(\.filename)),
+                in: modelContext
+            )
+        }
         // `containerBackground`, а не `background`: у вложенного экрана своя
         // непрозрачная подложка, и закрасить её можно только фоном контейнера —
         // зато он ложится и под панель навигации.
@@ -124,13 +143,7 @@ struct ArtistView: View {
 
     private var header: some View {
         VStack(spacing: 12) {
-            Image(systemName: "music.mic")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 50, height: 50)
-                .foregroundStyle(.secondary)
-                .frame(width: 120, height: 120)
-                .background(Color.gray.opacity(0.2), in: Circle())
+            photoMenu
 
             Text(artist.name)
                 .font(.title)
@@ -142,6 +155,42 @@ struct ArtistView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(imageData: $artist.artwork)
+        }
+    }
+
+    /// Фотографию ставят прямо на кружке: другого места у артиста нет — своего
+    /// экрана правки, в отличие от трека и альбома, у него не заведено.
+    private var photoMenu: some View {
+        Menu {
+            Button {
+                showImagePicker = true
+            } label: {
+                Label(artist.artwork == nil ? "Add photo" : "Change photo", systemImage: "photo")
+            }
+
+            if artist.artwork != nil {
+                Button(role: .destructive) {
+                    artist.artwork = nil
+                } label: {
+                    Label("Remove photo", systemImage: "trash")
+                }
+            }
+        } label: {
+            ArtistAvatar(artist: artist, size: 120)
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "camera.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(9)
+                        .background(.thinMaterial, in: Circle())
+                }
+        }
+        .buttonStyle(.plain)
+        // Иначе VoiceOver читает кнопку как «Artist, Camera» — по названиям
+        // символов внутри неё.
+        .accessibilityLabel("Artist photo")
     }
 
     private var summary: String {

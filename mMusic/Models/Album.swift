@@ -68,6 +68,13 @@ class Album {
         touched.forEach { $0.renumberTracks() }
     }
 
+    /// Номера идут подряд с нуля — то, как должно быть всегда.
+    /// По этому же признаку разовая починка находит альбомы, которые пора
+    /// пересчитать: см. `AlbumNumbering`.
+    var isNumberedInOrder: Bool {
+        tracks.map(\.position).sorted() == Array(0..<tracks.count)
+    }
+
     /// Сплошная нумерация треков с нуля.
     ///
     /// Вызывать после всего, что вынимает трек из середины альбома: удаления из
@@ -80,9 +87,17 @@ class Album {
     func renumberTracks(excluding removed: Track? = nil) {
         let remaining = tracks
             .filter { $0.persistentModelID != removed?.persistentModelID }
-            .sorted { $0.position < $1.position }
+            // Дата и имя файла — на случай, когда номер у двух треков одинаковый:
+            // сортировка по одному лишь номеру их не различает и при каждом
+            // пересчёте могла бы менять местами. Имя файла в библиотеке одно,
+            // поэтому порядок выходит один и тот же всегда.
+            .sorted {
+                ($0.position, $0.addedAt, $0.filename) < ($1.position, $1.addedAt, $1.filename)
+            }
 
-        for (index, track) in remaining.enumerated() {
+        // Только там, где номер и правда разъехался: лишняя запись помечает
+        // модель изменённой и тянет за собой сохранение на ровном месте.
+        for (index, track) in remaining.enumerated() where track.position != index {
             track.position = index
         }
     }

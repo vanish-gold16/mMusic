@@ -11,7 +11,15 @@ struct ArtistPill: View {
             ArtistView(artist: artist)
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: "person.fill")
+                // С фотографией капсула становится узнаваемой с одного взгляда,
+                // без неё остаётся прежний значок.
+                if artist.artwork == nil {
+                    Image(systemName: "person.fill")
+                } else {
+                    ArtistAvatar(artist: artist, size: 18)
+                        .padding(.leading, -4)
+                }
+
                 Text(artist.name)
             }
             // Фон от .primary, а не белый: у плеера и альбома схема переворачивается

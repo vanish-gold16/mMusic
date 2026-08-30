@@ -45,15 +45,26 @@ struct EditTrackView: View {
                             .frame(height: 150)
                     }
                     
-                    Button {
-                        showImagePicker = true
-                    } label: {
-                        Label("Pick an image", systemImage: "photo")
+                    // Пока трек в альбоме, обложка у него альбомная — своя всё
+                    // равно не покажется, и предлагать её выбрать было бы
+                    // обманом. Выбранная раньше никуда не делась: она вернётся,
+                    // если трек выйдет из альбома или у альбома не станет обложки.
+                    if let album = track.album, album.artwork != nil {
+                        Text("Cover comes from \"\(album.name)\"")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Button {
+                            showImagePicker = true
+                        } label: {
+                            Label("Pick an image", systemImage: "photo")
+                        }
+                        .buttonStyle(.glassProminent)
                     }
-                    .buttonStyle(.glassProminent)
-                    .sheet(isPresented: $showImagePicker) {
-                        ImagePicker(imageData: $track.artwork)
-                    }
+                }
+                .sheet(isPresented: $showImagePicker) {
+                    ImagePicker(imageData: $track.artwork)
                 }
                 
                 Form {

@@ -124,6 +124,35 @@ struct LibraryRestoreTests {
         #expect(source.album?.name == "Night Album")
     }
 
+    /// Вернувшийся трек встаёт первым номером, а не вторым: на экране альбома
+    /// номер — это `position + 1`, и лишняя единица здесь показывала «2» у
+    /// единственного трека.
+    @Test func linkedTracksAreNumberedFromTheStart() async throws {
+        let context = container.mainContext
+        let names = ["first.mp3", "second.mp3"]
+        let filenames = names.map { makeFile($0) }
+        defer { cleanUp(filenames) }
+
+        let album = Album(name: "Night Album", type: .LP)
+        context.insert(album)
+
+        for filename in filenames {
+            let track = Track(name: filename, credits: [], genre: .pop, filename: filename)
+            context.insert(track)
+
+            let event = PlayEvent(track: track, seconds: 60)
+            event.albumName = "Night Album"
+            context.insert(event)
+        }
+        try context.save()
+
+        let report = await LibraryRestore.linkMissingAlbums(in: context)
+        #expect(report.linked == 2)
+
+        let positions = album.tracks.map(\.position).sorted()
+        #expect(positions == [0, 1])
+    }
+
     /// Трек, который уже лежит в альбоме, проход не трогает.
     @Test func linkingLeavesTracksThatAlreadyHaveAnAlbum() async throws {
         let context = container.mainContext

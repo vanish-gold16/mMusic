@@ -353,12 +353,16 @@ class AudioPlayer: NSObject {
         }
     }
 
-    /// Очередь кончилась: замираем на последнем кадре, не сбрасывая трек.
+    /// Очередь кончилась: ставим паузу и возвращаемся в начало очереди.
     private func finishPlayback() {
+        engine.stop()
         isPlaying = false
         stopProgressTimer()
         stopMeterTimer()
-        currentTime = duration
+        currentIndex = 0
+        currentTime = 0
+        duration = 0
+        refreshPalette()
         updateNowPlayingInfo()
     }
 
