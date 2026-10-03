@@ -25,6 +25,7 @@ enum Genre: String, CaseIterable, Codable {
     case postRock = "Post-Rock"
     case punk = "Punk"
     case postPunk = "Post-Punk"
+    case newWave = "New Wave"
     case emo = "Emo"
     case metal = "Metal"
     case metalcore = "Metalcore"
