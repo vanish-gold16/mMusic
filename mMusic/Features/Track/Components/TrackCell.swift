@@ -22,6 +22,9 @@ struct TrackCell: View {
     var leadingStyle: LeadingStyle = .number
     /// В обычных списках счётчик — лишний шум, поэтому включается точечно.
     var showPlayCount: Bool = false
+    /// Длительность справа — там, где список читается как трек-лист со временем,
+    /// а не как перечень песен альбома.
+    var showDuration: Bool = false
     /// Заполняется только там, где трек показан в составе плейлиста.
     /// Без него в меню нет и пункта — удалять «из плейлиста» на странице альбома нечего.
     var onRemoveFromPlaylist: (() -> Void)?
@@ -86,6 +89,13 @@ struct TrackCell: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .labelStyle(.titleAndIcon)
+                    .monospacedDigit()
+            }
+
+            if showDuration, track.duration > 0 {
+                Text(Duration.seconds(track.duration).formatted(.time(pattern: .minuteSecond)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
 
