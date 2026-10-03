@@ -79,6 +79,7 @@ enum Genre: String, CaseIterable, Codable {
     case country = "Country"
     case reggae = "Reggae"
     case latin = "Latin"
+    case corrido = "Corrido"
     case afrobeats = "Afrobeats"
 
     case other = "Other"
