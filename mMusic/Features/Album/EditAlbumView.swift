@@ -33,10 +33,6 @@ struct EditAlbumView: View {
         )
     }
 
-    private var sortedTracks: [Track] {
-        album.tracks.sorted { $0.position < $1.position }
-    }
-
     var body: some View {
         NavigationStack {
             Form {
@@ -148,20 +144,13 @@ struct EditAlbumView: View {
                 // Секция показывается и у пустого альбома: раньше кнопка «Add Music»
                 // пряталась вместе со списком, и положить в него первый трек
                 // из библиотеки было нечем.
-                Section("tracks") {
-                    ForEach(sortedTracks) { track in
-                        TrackCell(track: track, leadingStyle: .artwork)
-                    }
-                    .onMove { source, destination in
-                        moveTracks(from: source, to: destination)
-                    }
-                    .onDelete(perform: removeFromAlbum)
-
-                    Button {
-                        addedTracks = []
-                        showTrackPicker = true
-                    } label: {
-                        Label("Add Music", systemImage: "plus")
+                Section {
+                    tracksEditor
+                } header: {
+                    Text("tracks")
+                } footer: {
+                    if album.discCount > 1 {
+                        Text("Drag a disc row to change where that disc starts. Deleting it moves its tracks to the previous disc.")
                     }
                 }
             }
@@ -195,14 +184,118 @@ struct EditAlbumView: View {
         }
     }
 
-    /// Импортирует выбранные аудиофайлы в альбом, создавая треки и добавляя их в конец списка.
+    // MARK: - Треки и пластинки
+
+    /// Треки одним списком, а пластинки — границами в нём: перетаскивая границу
+    /// или трек через неё, человек решает, что на какой пластинке. Отдельного
+    /// экрана для пластинок нет — см. `DiscSplit`.
+    @ViewBuilder
+    private var tracksEditor: some View {
+        let split = split
+        let rows = split.rows
+        let tracks = tracksByID
+
+        // Название первой пластинки — над списком: её граница не двигается,
+        // она и есть начало альбома.
+        if album.discCount > 1 {
+            DiscTitleRow(number: 1, title: titleBinding(ofDisc: 0))
+        }
+
+        ForEach(Array(rows.enumerated()), id: \.element) { index, row in
+            switch row {
+            case .track(let id):
+                if let track = tracks[id] {
+                    TrackCell(track: track, leadingStyle: .artwork)
+                }
+            case .boundary(let disc):
+                DiscTitleRow(number: split.number(ofBoundaryAt: index), title: titleBinding(ofDisc: disc))
+            }
+        }
+        .onMove { source, destination in
+            var split = split
+            split.move(fromOffsets: source, toOffset: destination)
+            apply(split)
+        }
+        .onDelete(perform: deleteRows)
+
+        Button {
+            addedTracks = []
+            showTrackPicker = true
+        } label: {
+            Label(album.discCount > 1 ? "Add Music to Disc \(album.discCount)" : "Add Music", systemImage: "plus")
+        }
+
+        Button {
+            var split = split
+            split.appendDisc()
+            apply(split)
+        } label: {
+            Label("Add a Disc", systemImage: "record.circle")
+        }
+    }
+
+    private var split: DiscSplit<PersistentIdentifier> {
+        DiscSplit(discs: album.discs.map { $0.map(\.persistentModelID) }, titles: album.discTitles)
+    }
+
+    private var tracksByID: [PersistentIdentifier: Track] {
+        Dictionary(album.tracks.map { ($0.persistentModelID, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// Раскладка с экрана — в альбом: номера и пластинки треков, названия пластинок.
+    private func apply(_ split: DiscSplit<PersistentIdentifier>) {
+        let tracks = tracksByID
+        album.arrange(split.discs.map { $0.compactMap { tracks[$0] } }, titles: split.titles)
+    }
+
+    private func titleBinding(ofDisc disc: Int) -> Binding<String> {
+        Binding(
+            get: { album.title(ofDisc: disc) },
+            set: { title in
+                var split = split
+                split.setTitle(title, ofDisc: disc)
+                album.discTitles = split.titles
+            }
+        )
+    }
+
+    /// Удаление строк. Трек убирается из альбома, но не из библиотеки: файл
+    /// и запись остаются, пропадает только принадлежность альбому. Граница
+    /// убирает пластинку, а её треки переходят на предыдущую.
+    ///
+    /// Раньше трек убирался снятием галочки в листе добавления — и стоило там
+    /// чему-нибудь не совпасть, как из альбома исчезало всё разом.
+    private func deleteRows(at offsets: IndexSet) {
+        let rows = split.rows
+        let tracks = tracksByID
+
+        var removed = Set<PersistentIdentifier>()
+        for index in offsets {
+            if case .track(let id) = rows[index] { removed.insert(id) }
+        }
+
+        var split = split
+        split.removeBoundaries(atOffsets: offsets)
+        split.removeTracks(removed)
+
+        for id in removed {
+            tracks[id]?.album = nil
+            tracks[id]?.disc = 0
+        }
+
+        apply(split)
+    }
+
+    // MARK: - Импорт
+
+    /// Импортирует выбранные аудиофайлы в альбом, добавляя треки в конец —
+    /// на последнюю пластинку.
     private func handleFileLoading(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            let base = album.tracks.count
             var imported: [Track] = []
 
-            for (offset, url) in urls.enumerated() {
+            for url in urls {
                 let filename: String
                 do {
                     filename = try AudioFileStore.importFile(from: url)
@@ -211,10 +304,11 @@ struct EditAlbumView: View {
                     continue
                 }
 
-                let track = Track(name: url.parseMusic().name, album: album, credits: [], genre: .pop, filename: filename)
-                track.position = base + offset
+                let track = Track(name: url.parseMusic().name, credits: [], genre: .pop, filename: filename)
 
                 modelContext.insert(track)
+                // Альбом ставит `append`: он же выдаёт номер и пластинку.
+                album.append([track])
                 imported.append(track)
 
                 let names = url.parsedArtistNames().filter { name in
@@ -316,31 +410,6 @@ struct EditAlbumView: View {
 
             modelContext.insert(credit)
         }
-    }
-
-    /// Меняет порядок треков в альбоме, пересчитывая их позиции.
-    private func moveTracks(from: IndexSet, to: Int) {
-        var tracks = sortedTracks
-        tracks.move(fromOffsets: from, toOffset: to)
-
-        for (index, track) in tracks.enumerated() {
-            track.position = index
-        }
-    }
-
-    /// Убирает трек из альбома, не трогая сам трек: файл и запись в библиотеке
-    /// остаются, пропадает только принадлежность альбому.
-    ///
-    /// Раньше это делалось снятием галочки в листе добавления — и стоило там
-    /// чему-нибудь не совпасть, как из альбома исчезало всё разом.
-    private func removeFromAlbum(at offsets: IndexSet) {
-        let tracks = sortedTracks
-
-        for index in offsets {
-            tracks[index].album = nil
-        }
-
-        album.renumberTracks()
     }
 
     /// Добавляет выбранное в конец альбома. Сам перенос — в `Album.append`,

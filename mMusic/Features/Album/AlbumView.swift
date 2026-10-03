@@ -11,6 +11,11 @@ import SwiftUI
 /// Ниже — оборот конверта: трек-лист по сторонам A и B с номерами «A1», «B2»
 /// и мелкий текст внизу. С плейлистом общий только шрифт: у того веер карт,
 /// лента и свечение, у альбома — одна пластинка и волны от неё.
+///
+/// Альбом из нескольких пластинок открывается закрытым: в конверте стопка,
+/// а вместо трек-листа — сами пластинки, каждая со своим узором колец.
+/// Выбранная выезжает из конверта, и под ней — её стороны: у второй C и D,
+/// как на двойном виниле.
 struct AlbumView: View {
 
     @Environment(AudioPlayer.self) var audioPlayer
@@ -27,49 +32,82 @@ struct AlbumView: View {
     @State private var cover: UIImage?
     @State private var coverPalette: CoverPalette?
 
+    /// Открытая пластинка альбома из нескольких. nil — альбом закрыт,
+    /// и на экране выбор пластинки.
+    @State private var openDisc: Int?
+    /// Играющую пластинку открываем сами один раз, при первом показе.
+    /// Иначе закрытый альбом открывался бы снова при каждом возврате на экран.
+    @State private var didOpenPlayingDisc = false
+
     private var sortedTracks: [Track] {
         album.tracks.sorted { $0.position < $1.position }
     }
 
-    /// Играет трек этого альбома. Очередь, как у плейлиста, проверять незачем:
-    /// альбом у трека один.
-    private var isCurrent: Bool {
-        guard let current = audioPlayer.currentTrack else { return false }
-        return current.album?.persistentModelID == album.persistentModelID
+    private var isMultiDisc: Bool {
+        album.discCount > 1
+    }
+
+    /// Где играющий трек, если он из этого альбома. Очередь, как у плейлиста,
+    /// проверять незачем: альбом у трека один.
+    private var playing: DiscPosition? {
+        album.position(of: audioPlayer.currentTrack)
     }
 
     /// Пока альбом играет, страница в цветах играющего трека — у трека может
     /// быть своя обложка. В остальное время — в цветах конверта.
     private var pagePalette: CoverPalette? {
-        isCurrent ? audioPlayer.palette : coverPalette
+        playing != nil ? audioPlayer.palette : coverPalette
     }
 
     private var accent: Color {
         pagePalette?.accent ?? audioPlayer.accent
     }
 
+    /// Что на экране и что играют кнопки: у открытой пластинки — она,
+    /// в остальных случаях — весь альбом.
+    private func scope(in discs: [[Track]]) -> [Track] {
+        if isMultiDisc, let openDisc, discs.indices.contains(openDisc) {
+            return discs[openDisc]
+        }
+        return sortedTracks
+    }
+
     var body: some View {
-        let tracks = sortedTracks
+        let discs = album.discs
+        let scope = scope(in: discs)
+        let isClosed = isMultiDisc && openDisc == nil
 
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 AlbumHero(
-                    type: album.type,
-                    tracks: tracks,
+                    album: album,
+                    discs: discs,
+                    openDisc: openDisc,
                     cover: cover,
                     accent: accent,
-                    onTapTrack: { index, fraction in
-                        tapRing(index, fraction, in: tracks)
+                    onTapTrack: { disc, index, fraction in
+                        tapRing(index, fraction, in: discs[disc])
                     }
                 )
                 .padding(.horizontal)
                 .padding(.top, 8)
 
-                titleBlock(tracks: tracks)
+                titleBlock
 
-                if !tracks.isEmpty {
-                    controls(tracks: tracks)
-                    tracklist(tracks: tracks)
+                if isMultiDisc, let openDisc {
+                    discBar(openDisc)
+                }
+
+                if !scope.isEmpty {
+                    controls(scope)
+                }
+
+                if isClosed {
+                    discList(discs)
+                } else if scope.isEmpty, isMultiDisc {
+                    LibraryEmptyState(text: "Nothing on this disc yet")
+                } else {
+                    tracklist(scope, disc: openDisc ?? 0)
                 }
 
                 linerNotes
@@ -138,12 +176,32 @@ struct AlbumView: View {
         .task(id: album.artwork?.count) {
             await loadCover()
         }
+        .onAppear {
+            // Альбом уже играет — его пластинка «на проигрывателе», с неё и начинаем.
+            guard !didOpenPlayingDisc else { return }
+            didOpenPlayingDisc = true
+            if isMultiDisc { openDisc = playing?.disc }
+        }
+        .onChange(of: playing?.disc) { previous, current in
+            // Пластинка доиграла, и пошла следующая: открытая едет за ней.
+            // Если же открыта другая, её не отбираем — человек её смотрит.
+            guard isMultiDisc, let current, openDisc == previous, previous != nil else { return }
+            withAnimation(.spring(duration: 0.55, bounce: 0.2)) {
+                openDisc = current
+            }
+        }
+        .onChange(of: album.discCount) { _, count in
+            // Пластинку убрали в редакторе — открытой больше нет.
+            if let openDisc, openDisc >= count || count == 1 {
+                self.openDisc = nil
+            }
+        }
     }
 
     // MARK: - Шапка
 
     /// Имя, авторы капсулами и паспорт альбома.
-    private func titleBlock(tracks: [Track]) -> some View {
+    private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(album.name)
                 .font(.system(size: 40, weight: .heavy).width(.compressed))
@@ -154,7 +212,7 @@ struct AlbumView: View {
                 ArtistPillRow(artists: album.artists)
             }
 
-            Text(passport(tracks: tracks))
+            Text(passport)
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .tracking(1.2)
@@ -165,9 +223,10 @@ struct AlbumView: View {
         .padding(.horizontal)
     }
 
-    /// «LP  ·  2024  ·  11 TRACKS  ·  43 MIN».
-    private func passport(tracks: [Track]) -> String {
-        var parts = [album.type.rawValue]
+    /// «LP  ·  2024  ·  11 TRACKS  ·  43 MIN», у двойного — «2×LP  ·  …».
+    private var passport: String {
+        let tracks = sortedTracks
+        var parts = [album.formatLabel]
 
         if let release = album.release {
             parts.append(String(Calendar.current.component(.year, from: release)))
@@ -176,7 +235,7 @@ struct AlbumView: View {
             parts.append(tracks.count == 1 ? "1 track" : "\(tracks.count) tracks")
         }
 
-        let minutes = Self.minutes(of: tracks)
+        let minutes = RecordSides.minutes(of: tracks)
         if minutes > 0 {
             parts.append(minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min")
         }
@@ -184,10 +243,11 @@ struct AlbumView: View {
         return parts.joined(separator: "  ·  ").uppercased()
     }
 
-    /// Запуск и перемешивание. Без ленты, как у плейлиста: всё, что она
-    /// показывала бы, уже есть на диске — дорожки, текущий трек и игла.
-    private func controls(tracks: [Track]) -> some View {
-        let isPlayingHere = isCurrent && audioPlayer.isPlaying
+    /// Запуск и перемешивание того, что на экране: весь альбом или открытая
+    /// пластинка. Без ленты, как у плейлиста: всё, что она показывала бы,
+    /// уже есть на диске — дорожки, текущий трек и игла.
+    private func controls(_ tracks: [Track]) -> some View {
+        let isPlayingHere = contains(audioPlayer.currentTrack, in: tracks) && audioPlayer.isPlaying
 
         return HStack(spacing: 12) {
             Button {
@@ -215,20 +275,75 @@ struct AlbumView: View {
         .padding(.horizontal)
     }
 
+    // MARK: - Пластинки
+
+    /// Закрытый альбом: вместо трек-листа — его пластинки.
+    private func discList(_ discs: [[Track]]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CrateDivider(title: "DISCS", detail: "\(discs.count)", size: 22)
+
+            ForEach(discs.indices, id: \.self) { disc in
+                AlbumDiscRow(album: album, disc: disc, tracks: discs[disc], cover: cover, accent: accent) {
+                    withAnimation(.spring(duration: 0.55, bounce: 0.2)) {
+                        openDisc = disc
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    /// Над открытой пластинкой: дорога обратно к выбору и чья это пластинка.
+    private func discBar(_ disc: Int) -> some View {
+        let title = album.title(ofDisc: disc)
+
+        return HStack(spacing: 12) {
+            Button {
+                withAnimation(.spring(duration: 0.55, bounce: 0.2)) {
+                    openDisc = nil
+                }
+            } label: {
+                Label("Discs", systemImage: "chevron.left")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.glass)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("DISC \(disc + 1) OF \(album.discCount)")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .tracking(1.2)
+                    .foregroundStyle(.secondary)
+
+                if !title.isEmpty {
+                    Text(title)
+                        .font(.system(size: 22, weight: .heavy).width(.compressed))
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal)
+    }
+
     // MARK: - Оборот конверта
 
-    /// Трек-лист по сторонам. У сингла и у совсем короткого альбома сторона
-    /// одна — тогда без разделителя и с обычными номерами.
-    private func tracklist(tracks: [Track]) -> some View {
-        let sides = Self.sides(of: tracks, type: album.type)
+    /// Трек-лист одной пластинки по сторонам. У альбома из одной пластинки
+    /// и короткой стороны одна — тогда без разделителя и с обычными номерами;
+    /// у альбома из нескольких номер всегда с буквой: «C3» сразу говорит,
+    /// с какой он пластинки.
+    private func tracklist(_ tracks: [Track], disc: Int) -> some View {
+        let sides = RecordSides.split(tracks, type: album.type)
         let hasSides = sides.count > 1
+        let lettered = hasSides || isMultiDisc
 
         return VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(sides.enumerated()), id: \.offset) { sideIndex, side in
-                let letter = sideIndex == 0 ? "A" : "B"
+                let letter = RecordSides.letter(disc: disc, side: sideIndex)
 
                 if hasSides {
-                    let minutes = Self.minutes(of: side)
+                    let minutes = RecordSides.minutes(of: side)
                     CrateDivider(title: "SIDE \(letter)", detail: minutes > 0 ? "\(minutes) MIN" : "", size: 22)
                         .padding(.horizontal)
                         .padding(.top, sideIndex == 0 ? 0 : 16)
@@ -239,7 +354,7 @@ struct AlbumView: View {
                         track: track,
                         queue: tracks,
                         showDuration: true,
-                        number: hasSides ? "\(letter)\(position + 1)" : nil,
+                        number: lettered ? "\(letter)\(position + 1)" : nil,
                         showsOnlyGuests: true
                     )
                 }
@@ -281,58 +396,26 @@ struct AlbumView: View {
 
     private static let dateStyle = Date.FormatStyle(date: .long, time: .omitted).locale(.interface)
 
-    // MARK: - Стороны
-
-    /// Две стороны, как на виниле: граница там, где время сторон ближе всего
-    /// к поровну. Сторона одна у сингла и у альбома короче четырёх треков —
-    /// делить там нечего.
-    private static func sides(of tracks: [Track], type: Album.AlbumType) -> [[Track]] {
-        guard type != .single, tracks.count >= 4 else { return [tracks] }
-
-        let total = tracks.reduce(0) { $0 + $1.duration }
-
-        // Длительности ещё не прочитаны — делим поровну по числу треков.
-        guard total > 0 else {
-            let middle = (tracks.count + 1) / 2
-            return [Array(tracks[..<middle]), Array(tracks[middle...])]
-        }
-
-        var best = 1
-        var bestDifference = Double.infinity
-        var sideA = 0.0
-
-        for split in 1..<tracks.count {
-            sideA += tracks[split - 1].duration
-            let difference = abs(total - sideA * 2)
-            if difference < bestDifference {
-                bestDifference = difference
-                best = split
-            }
-        }
-
-        return [Array(tracks[..<best]), Array(tracks[best...])]
-    }
-
-    /// Сумма уже прочитанных длительностей, в минутах.
-    private static func minutes(of tracks: [Track]) -> Int {
-        Int((tracks.reduce(0) { $0 + $1.duration } / 60).rounded())
-    }
-
     // MARK: - Воспроизведение
 
-    /// Играет этот альбом — кнопка ставит паузу и снимает её. Играет что-то
-    /// другое — запускает альбом с начала.
+    private func contains(_ track: Track?, in tracks: [Track]) -> Bool {
+        guard let track else { return false }
+        return tracks.contains { $0.id == track.id }
+    }
+
+    /// Играет что-то из этого — кнопка ставит паузу и снимает её. Играет что-то
+    /// другое — запускает это с начала.
     private func playOrPause(_ tracks: [Track]) {
-        if isCurrent {
+        if contains(audioPlayer.currentTrack, in: tracks) {
             audioPlayer.togglePlayPause()
         } else {
             audioPlayer.play(tracks)
         }
     }
 
-    /// Нажатие на кольцо. На играющем треке оно перематывает, как игла,
-    /// опущенная в другое место дорожки; на остальных запускает трек с начала —
-    /// кольца слишком тонкие, чтобы попасть в нужную секунду.
+    /// Нажатие на кольцо выдвинутой пластинки. На играющем треке оно перематывает,
+    /// как игла, опущенная в другое место дорожки; на остальных запускает трек
+    /// с начала — кольца слишком тонкие, чтобы попасть в нужную секунду.
     private func tapRing(_ index: Int, _ fraction: Double, in tracks: [Track]) {
         guard tracks.indices.contains(index) else { return }
 
@@ -376,15 +459,16 @@ private struct AlbumHero: View {
 
     @Environment(AudioPlayer.self) private var audioPlayer
 
-    let type: Album.AlbumType
-    let tracks: [Track]
+    let album: Album
+    let discs: [[Track]]
+    let openDisc: Int?
     let cover: UIImage?
     let accent: Color
-    let onTapTrack: (_ index: Int, _ fraction: Double) -> Void
+    let onTapTrack: (_ disc: Int, _ index: Int, _ fraction: Double) -> Void
 
     var body: some View {
-        let currentIndex = tracks.firstIndex { $0.id == audioPlayer.currentTrack?.id }
-        let isCurrent = currentIndex != nil
+        let playing = album.position(of: audioPlayer.currentTrack)
+        let isCurrent = playing != nil
 
         // Время и пауза читаются только у играющего альбома: открытая страница
         // чужого альбома не должна перерисовываться под чужую музыку.
@@ -392,11 +476,16 @@ private struct AlbumHero: View {
             ? audioPlayer.currentTime / audioPlayer.duration
             : nil
 
+        // Пластинка одна — она выезжает, пока играет. Пластинок несколько —
+        // выезжает та, что открыта: закрытый альбом держит все в конверте.
+        let outDisc = album.discCount > 1 ? openDisc : playing?.disc
+
         AlbumSleeve(
             cover: cover,
-            type: type,
-            durations: tracks.map(\.duration),
-            currentIndex: currentIndex,
+            type: album.type,
+            discs: discs.map { $0.map(\.duration) },
+            outDisc: outDisc,
+            playing: playing,
             isPlaying: isCurrent && audioPlayer.isPlaying,
             accent: accent,
             progress: progress,

@@ -23,9 +23,10 @@ struct AlbumCell: View {
         album.tracks.sorted { $0.position < $1.position }
     }
 
-    /// Паспорт одной строкой: «LP  ·  2024». Год — если дата выхода известна.
+    /// Паспорт одной строкой: «LP  ·  2024», у двойного — «2×LP  ·  2024».
+    /// Год — если дата выхода известна.
     private var passport: String {
-        var parts = [album.type.rawValue]
+        var parts = [album.formatLabel]
         if let release = album.release {
             parts.append(String(Calendar.current.component(.year, from: release)))
         }
@@ -112,11 +113,10 @@ struct AlbumCell: View {
     }
     
     private var label: some View {
-        let tracks = sortedTracks
         // Играет трек из этого альбома. Очередь, как у плейлиста, проверять
-        // незачем: альбом у трека один.
-        let currentIndex = tracks.firstIndex { $0.id == audioPlayer.currentTrack?.id }
-        let isCurrent = currentIndex != nil
+        // незачем: альбом у трека один. Выдвинута та пластинка, что играет.
+        let playing = album.position(of: audioPlayer.currentTrack)
+        let isCurrent = playing != nil
 
         return VStack(alignment: .leading, spacing: 10) {
             // `isPlaying` и акцент читаются только у играющего альбома: иначе
@@ -124,8 +124,9 @@ struct AlbumCell: View {
             AlbumSleeve(
                 cover: cover,
                 type: album.type,
-                durations: tracks.map(\.duration),
-                currentIndex: currentIndex,
+                discs: album.discs.map { $0.map(\.duration) },
+                outDisc: playing?.disc,
+                playing: playing,
                 isPlaying: isCurrent && audioPlayer.isPlaying,
                 accent: isCurrent ? audioPlayer.accent : .clear
             )

@@ -1,13 +1,22 @@
 import SwiftUI
 
+/// Где играющий трек: на какой пластинке альбома и какой он на ней по счёту.
+struct DiscPosition: Equatable {
+    let disc: Int
+    let track: Int
+}
+
 /// Обложка альбома как конверт пластинки, из которого выглядывает сам диск.
 /// У плейлиста веер карт (`CoverFan`): он подборка разного. Альбом — одна вещь
 /// целиком, и у него конверт с пластинкой.
 ///
 /// На диске кольцами лежат треки: первый снаружи, как на настоящем виниле,
 /// и толщина кольца — длительность трека. Узор у каждого альбома свой, как лента
-/// у плейлиста. Пока играет этот альбом, диск выезжает дальше и крутится,
-/// а кольцо текущего трека горит акцентом.
+/// у плейлиста. Выдвинутый диск — тот, что играет (в сетке) или открыт (в шапке
+/// альбома); он выезжает дальше, крутится, а кольцо текущего трека горит акцентом.
+///
+/// У альбома из нескольких пластинок за конвертом стопка: каждая следующая
+/// выглядывает чуть дальше предыдущей, так что двойной альбом видно из сетки.
 ///
 /// Один и тот же конверт стоит в сетке библиотеки и в шапке альбома; в шапке
 /// диск выезжает почти целиком, показывает иглой, сколько сыграно, и отвечает
@@ -16,10 +25,12 @@ struct AlbumSleeve: View {
 
     let cover: UIImage?
     let type: Album.AlbumType
-    /// Длительности треков в порядке альбома. 0 — ещё не прочитана.
-    let durations: [TimeInterval]
-    /// Какой трек играет. nil — альбом не играет, диск задвинут в конверт.
-    let currentIndex: Int?
+    /// Длительности треков по пластинкам, в порядке альбома. 0 — ещё не прочитана.
+    let discs: [[TimeInterval]]
+    /// Какая пластинка выдвинута. nil — все в конверте.
+    let outDisc: Int?
+    /// Где играющий трек. nil — альбом не играет.
+    let playing: DiscPosition?
     let isPlaying: Bool
     let accent: Color
     /// Сколько сыграно у текущего трека, 0...1. nil — иглы нет: в сетке время
@@ -28,40 +39,36 @@ struct AlbumSleeve: View {
     /// На сколько диск выглядывает из конверта — в долях стороны конверта.
     var restingPeek: CGFloat = 0.2
     var playingPeek: CGFloat = 0.32
+    /// На сколько каждая следующая пластинка стопки выглядывает дальше предыдущей.
+    var stagger: CGFloat = 0.06
     /// Волны цвета обложки вокруг диска — на странице альбома.
     var showsRipples = false
-    /// Нажали на кольцо трека `index`, в точку `fraction` (0...1) его длины.
-    /// Без него диск только показывает: в сетке нажатие открывает альбом.
-    var onTapTrack: ((_ index: Int, _ fraction: Double) -> Void)? = nil
+    /// Нажали на кольцо трека `index` выдвинутой пластинки `disc`, в точку
+    /// `fraction` (0...1) его длины. Без него диски только показывают:
+    /// в сетке нажатие открывает альбом.
+    var onTapTrack: ((_ disc: Int, _ index: Int, _ fraction: Double) -> Void)? = nil
 
     /// Ширина к высоте. Место под выехавший диск держится всегда: иначе
     /// играющий вылезал бы на соседнюю ячейку.
     private var aspectRatio: CGFloat { 1 + playingPeek }
 
-    private var isOut: Bool { currentIndex != nil }
-
-    /// Радиус диска в долях стороны конверта. Не настоящие 7" и 12" — с ними
-    /// сингл почти целиком лежал бы снаружи, — но разницу видно с первого взгляда.
-    private var discRadius: CGFloat {
-        switch type {
-        case .single: 0.38
-        case .EP: 0.42
-        case .LP: 0.46
+    /// Какие пластинки видно, спереди назад. За конвертом помещается три;
+    /// выдвинутая видна всегда, даже если она пятая.
+    private var stack: [Int] {
+        var stack = Array(discs.indices.prefix(3))
+        if let outDisc, discs.indices.contains(outDisc), !stack.contains(outDisc) {
+            stack[stack.count - 1] = outDisc
         }
+        return stack
     }
 
-    /// Доля яблока (бумажной наклейки) в радиусе диска: у синглов оно крупнее.
-    private var labelFraction: CGFloat {
-        switch type {
-        case .single: 0.5
-        case .EP: 0.42
-        case .LP: 0.36
-        }
+    /// Глубина пластинки в стопке тех, что в конверте: 0 — передняя.
+    private func depth(of disc: Int) -> Int {
+        stack.filter { $0 != outDisc }.firstIndex(of: disc) ?? 0
     }
 
-    /// Обороты в минуту: синглы — 45, остальное — 33⅓.
-    private var rpm: Double {
-        type == .single ? 45 : 100.0 / 3
+    private func peek(of disc: Int) -> CGFloat {
+        disc == outDisc ? playingPeek : restingPeek + stagger * CGFloat(depth(of: disc))
     }
 
     var body: some View {
@@ -72,40 +79,63 @@ struct AlbumSleeve: View {
                     let side = proxy.size.height
 
                     ZStack(alignment: .leading) {
-                        record(side: side)
+                        ForEach(stack, id: \.self) { disc in
+                            record(disc, side: side)
+                                // Выдвинутая — поверх стопки, остальные — передняя поверх задних.
+                                .zIndex(disc == outDisc ? 100 : Double(10 - depth(of: disc)))
+                        }
+
                         sleeve(side: side)
+                            .zIndex(200)
                     }
+                    // Фоном, а не слоем стопки: волны втрое больше конверта
+                    // и раздули бы её рамку, сдвинув конверт.
+                    .background(alignment: .leading) {
+                        if showsRipples {
+                            ripples(side: side)
+                        }
+                    }
+                    .animation(.spring(duration: 0.55, bounce: 0.25), value: outDisc)
                 }
             }
     }
 
-    private func record(side: CGFloat) -> some View {
-        let radius = side * discRadius
-        let peek = isOut ? playingPeek : restingPeek
+    private func record(_ disc: Int, side: CGFloat) -> some View {
+        let radius = side * type.discRadius
+        let isOut = disc == outDisc
+        let isPlayingHere = playing?.disc == disc
 
         return VinylRecord(
             cover: cover,
-            durations: durations,
-            currentIndex: currentIndex,
-            progress: progress,
-            isSpinning: isOut && isPlaying,
-            rpm: rpm,
-            labelFraction: labelFraction,
+            durations: discs[disc],
+            currentIndex: isPlayingHere ? playing?.track : nil,
+            progress: isPlayingHere ? progress : nil,
+            // Крутится только выдвинутая: в конверте её всё равно не видно.
+            isSpinning: isOut && isPlayingHere && isPlaying,
+            rpm: type.rpm,
+            labelFraction: type.labelFraction,
             accent: accent,
-            onTapTrack: onTapTrack
+            onTapTrack: isOut ? onTapTrack.map { onTap in { onTap(disc, $0, $1) } } : nil
         )
         .frame(width: radius * 2, height: radius * 2)
-        // Волны — фон диска, а не страницы: так они сами едут за ним,
-        // когда он выезжает из конверта.
-        .background {
-            if showsRipples {
-                RecordRipples(accent: accent, breathes: isOut && isPlaying)
-                    .frame(width: radius * RecordRipples.reach * 2, height: radius * RecordRipples.reach * 2)
-            }
-        }
-        // Правый край диска — на `peek` за краем конверта.
-        .offset(x: side * (1 + peek) - radius * 2)
-        .animation(.spring(duration: 0.55, bounce: 0.25), value: isOut)
+        // Правый край диска — на `peek` за краем конверта. Задние чуть выше
+        // передних: вровень стопка читалась бы одним толстым диском.
+        .offset(
+            x: side * (1 + peek(of: disc)) - radius * 2,
+            y: isOut ? 0 : -side * 0.015 * CGFloat(depth(of: disc))
+        )
+    }
+
+    /// Волны расходятся от выдвинутой пластинки, а если все в конверте — от передней.
+    private func ripples(side: CGFloat) -> some View {
+        let radius = side * type.discRadius
+        let source = outDisc ?? stack.first ?? 0
+        let breathes = outDisc != nil && playing?.disc == outDisc && isPlaying
+        let reach = radius * RecordRipples.reach
+
+        return RecordRipples(accent: accent, breathes: breathes)
+            .frame(width: reach * 2, height: reach * 2)
+            .offset(x: side * (1 + peek(of: source)) - radius - reach)
     }
 
     private func sleeve(side: CGFloat) -> some View {
@@ -134,8 +164,36 @@ struct AlbumSleeve: View {
     }
 }
 
-/// Сам диск: кольца треков, канавки, яблоко с обложкой и блик.
-private struct VinylRecord: View {
+extension Album.AlbumType {
+
+    /// Радиус диска в долях стороны конверта. Не настоящие 7" и 12" — с ними
+    /// сингл почти целиком лежал бы снаружи, — но разницу видно с первого взгляда.
+    var discRadius: CGFloat {
+        switch self {
+        case .single: 0.38
+        case .EP: 0.42
+        case .LP: 0.46
+        }
+    }
+
+    /// Доля яблока (бумажной наклейки) в радиусе диска: у синглов оно крупнее.
+    var labelFraction: CGFloat {
+        switch self {
+        case .single: 0.5
+        case .EP: 0.42
+        case .LP: 0.36
+        }
+    }
+
+    /// Обороты в минуту: синглы — 45, остальное — 33⅓.
+    var rpm: Double {
+        self == .single ? 45 : 100.0 / 3
+    }
+}
+
+/// Сам диск: кольца треков, канавки, яблоко с обложкой и блик. Стоит в конверте
+/// и отдельно — в списке пластинок альбома.
+struct VinylRecord: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 

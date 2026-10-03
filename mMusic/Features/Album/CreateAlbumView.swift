@@ -21,6 +21,10 @@ struct CreateAlbumView: View {
     @State private var showSoundCloud = false
     /// Файлы, которые не удалось положить в библиотеку. Пустой список — всё прошло.
     @State private var failedImports: [String] = []
+    /// Названия пластинок будущего альбома. Пусто — пластинка одна.
+    @State private var discTitles: [String] = []
+
+    private var discCount: Int { max(discTitles.count, 1) }
     
     private var hasRelease: Binding<Bool> {
         Binding (
@@ -141,29 +145,18 @@ struct CreateAlbumView: View {
                         addDraft(from: file, metadata: metadata)
                     }
                 }
-                if !trackDrafts.isEmpty {
+                if !trackDrafts.isEmpty || discCount > 1 {
                     Section {
-                        ForEach(Array(trackDrafts.enumerated()), id: \.element.id) { index, draft in
-                            NavigationLink {
-                                TrackDraftEditView(draft: $trackDrafts[index], albumArtists: artists.map(\.name))
-                            } label: {
-                                AlbumTrackDraftCell(draft: draft, position: index + 1)
-                            }
-                        }
-                        .onMove { from, to in
-                            trackDrafts.move(fromOffsets: from, toOffset: to)
-                        }
-                        .onDelete { offsets in
-                            for index in offsets {
-                                discardStagedFile(of: trackDrafts[index])
-                            }
-                            trackDrafts.remove(atOffsets: offsets)
-                        }
+                        tracksEditor
                     } header: {
                         HStack {
                             Text("tracks")
                             Spacer()
                             EditButton()
+                        }
+                    } footer: {
+                        if discCount > 1 {
+                            Text("Drag a disc row to change where that disc starts. Deleting it moves its tracks to the previous disc.")
                         }
                     }
                 }
@@ -172,7 +165,7 @@ struct CreateAlbumView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
-                        Text("Add Music")
+                        Text(discCount > 1 ? "Add Music to Disc \(discCount)" : "Add Music")
                             .tint(.primary)
                     }
                     .font(.headline)
@@ -184,6 +177,21 @@ struct CreateAlbumView: View {
                 .sheet(isPresented: $showTrackPicker) {
                     AlbumTrackPickerView(album: [], addedTracks: $trackDrafts)
                 }
+
+                Button {
+                    var split = split
+                    split.appendDisc()
+                    apply(split)
+                } label: {
+                    Label("Add a Disc", systemImage: "record.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .listRowBackground(Color.clear)
+            }
+            // Новые черновики (из файлов, SoundCloud, библиотеки) приходят без
+            // пластинки — кладём их на последнюю, как `Album.append`.
+            .onChange(of: trackDrafts.map(\.id)) {
+                placeNewDrafts()
             }
             .navigationTitle("New album")
             .navigationBarTitleDisplayMode(.inline)
@@ -214,6 +222,112 @@ struct CreateAlbumView: View {
         }
     }
     
+    // MARK: - Треки и пластинки
+
+    /// Черновики одним списком, а пластинки — границами в нём, как в правке
+    /// альбома. См. `DiscSplit`.
+    @ViewBuilder
+    private var tracksEditor: some View {
+        let split = split
+        let rows = split.rows
+        let numbers = numbersOnDiscs(split)
+
+        if discCount > 1 {
+            DiscTitleRow(number: 1, title: titleBinding(ofDisc: 0))
+        }
+
+        ForEach(Array(rows.enumerated()), id: \.element) { index, row in
+            switch row {
+            case .track(let id):
+                if let draftIndex = trackDrafts.firstIndex(where: { $0.id == id }) {
+                    NavigationLink {
+                        TrackDraftEditView(draft: $trackDrafts[draftIndex], albumArtists: artists.map(\.name))
+                    } label: {
+                        AlbumTrackDraftCell(draft: trackDrafts[draftIndex], position: numbers[id] ?? 0)
+                    }
+                }
+            case .boundary(let disc):
+                DiscTitleRow(number: split.number(ofBoundaryAt: index), title: titleBinding(ofDisc: disc))
+            }
+        }
+        .onMove { source, destination in
+            var split = split
+            split.move(fromOffsets: source, toOffset: destination)
+            apply(split)
+        }
+        .onDelete(perform: deleteRows)
+    }
+
+    private var split: DiscSplit<UUID> {
+        let last = discCount - 1
+        let discs = (0..<discCount).map { disc in
+            trackDrafts.filter { min($0.disc ?? last, last) == disc }.map(\.id)
+        }
+        return DiscSplit(discs: discs, titles: discTitles)
+    }
+
+    /// Раскладка с экрана — в черновики: порядок, пластинки, названия.
+    /// Черновики после этого лежат пластинка за пластинкой — так их и сохраняет `save`.
+    private func apply(_ split: DiscSplit<UUID>) {
+        let drafts = Dictionary(trackDrafts.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+
+        trackDrafts = split.discs.enumerated().flatMap { disc, ids in
+            ids.compactMap { id -> TrackDraft? in
+                guard var draft = drafts[id] else { return nil }
+                draft.disc = disc
+                return draft
+            }
+        }
+        discTitles = split.discs.count > 1 ? split.titles : []
+    }
+
+    private func placeNewDrafts() {
+        guard trackDrafts.contains(where: { $0.disc == nil }) else { return }
+        apply(split)
+    }
+
+    /// Номер трека на своей пластинке, с 1.
+    private func numbersOnDiscs(_ split: DiscSplit<UUID>) -> [UUID: Int] {
+        var numbers: [UUID: Int] = [:]
+        for disc in split.discs {
+            for (index, id) in disc.enumerated() { numbers[id] = index + 1 }
+        }
+        return numbers
+    }
+
+    private func titleBinding(ofDisc disc: Int) -> Binding<String> {
+        Binding(
+            get: { discTitles.indices.contains(disc) ? discTitles[disc] : "" },
+            set: { title in
+                var split = split
+                split.setTitle(title, ofDisc: disc)
+                discTitles = split.titles
+            }
+        )
+    }
+
+    /// Удалённый черновик забирает с собой свой временный файл; удалённая
+    /// граница сливает пластинку с предыдущей.
+    private func deleteRows(at offsets: IndexSet) {
+        let rows = split.rows
+
+        var removed = Set<UUID>()
+        for index in offsets {
+            if case .track(let id) = rows[index] { removed.insert(id) }
+        }
+
+        for draft in trackDrafts where removed.contains(draft.id) {
+            discardStagedFile(of: draft)
+        }
+
+        var split = split
+        split.removeBoundaries(atOffsets: offsets)
+        split.removeTracks(removed)
+        apply(split)
+    }
+
+    // MARK: - Импорт
+
     private func handleFileLoading(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
@@ -298,8 +412,13 @@ struct CreateAlbumView: View {
 
     private func save() {
         let album = Album(name: name, type: type, release: release, artwork: artworkData)
+        album.discTitles = discCount > 1 ? discTitles : []
 
         modelContext.insert(album)
+
+        // Черновики уже лежат пластинка за пластинкой (см. `apply`), поэтому
+        // номер по порядку и пластинка черновика сходятся сами.
+        let lastDisc = discCount - 1
 
         var previousAlbums = Set<Album>()
 
@@ -314,6 +433,7 @@ struct CreateAlbumView: View {
 
                 track.album = album
                 track.position = index
+                track.disc = min(draft.disc ?? lastDisc, lastDisc)
             } else {
                 let filename: String
                 do {
@@ -329,6 +449,7 @@ struct CreateAlbumView: View {
 
                 let track = Track(name: draft.name, album: album, credits: [], genre: draft.genre, filename: filename)
                 track.position = index
+                track.disc = min(draft.disc ?? lastDisc, lastDisc)
 
                 modelContext.insert(track)
 
