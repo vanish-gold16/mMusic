@@ -21,7 +21,8 @@ struct TapeSegment: Identifiable {
 /// низкий. Играющий трек подсвечен, и сыгранная его часть ярче несыгранной.
 ///
 /// Нажатие на чужой трек запускает плейлист с него, нажатие на играющий —
-/// перематывает, как слайдер в плеере.
+/// перематывает, как слайдер в плеере. Без `onTap` лента только показывает:
+/// так она стоит в строке библиотеки, где нажатие должно открывать плейлист.
 ///
 /// Время текущего трека читается здесь, а не в `PlaylistView`: оно меняется
 /// пять раз в секунду, и перерисовываться на каждый тик должна только лента,
@@ -35,7 +36,7 @@ struct PlaylistTape: View {
     let currentIndex: Int?
     let accent: Color
     /// Нажали на трек `index`, в точку `fraction` (0...1) его длины.
-    let onTap: (_ index: Int, _ fraction: Double) -> Void
+    var onTap: ((_ index: Int, _ fraction: Double) -> Void)?
 
     /// Шаг столбиков: 2 pt столбик и 1 pt зазор. Число столбиков задаёт ширина
     /// ленты, а не число треков — поэтому она одинаково читается и на пяти песнях,
@@ -68,9 +69,11 @@ struct PlaylistTape: View {
                 tap(at: location.x, width: proxy.size.width)
             }
         }
+        .allowsHitTesting(onTap != nil)
         .accessibilityElement()
         .accessibilityLabel("Playlist timeline")
-        .accessibilityHidden(segments.isEmpty)
+        // В строке библиотеки лента — украшение: VoiceOver прочтёт имя и паспорт.
+        .accessibilityHidden(segments.isEmpty || onTap == nil)
     }
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
@@ -147,7 +150,7 @@ struct PlaylistTape: View {
 
         for (index, weight) in weights.enumerated() {
             if time < start + weight || index == weights.count - 1 {
-                onTap(index, min(max((time - start) / weight, 0), 1))
+                onTap?(index, min(max((time - start) / weight, 0), 1))
                 return
             }
             start += weight

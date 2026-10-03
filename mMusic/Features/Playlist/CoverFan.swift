@@ -10,14 +10,17 @@ struct CoverFan: View {
     var size: CGFloat = 168
 
     /// На сколько каждая следующая карта выглядывает из-за предыдущей.
-    private let spread: CGFloat = 44
+    /// Всё задано долями `size`: веер один и тот же и в шапке плейлиста,
+    /// и в строке библиотеки, только меньше.
+    private var spread: CGFloat { size * 0.26 }
+    private var cornerRadius: CGFloat { size * 0.085 }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             if covers.isEmpty {
                 card {
                     Image(systemName: "music.note.list")
-                        .font(.system(size: 44))
+                        .font(.system(size: size * 0.26))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -38,16 +41,16 @@ struct CoverFan: View {
         }
         // Ширина с запасом под повёрнутые задние карты: иначе они вылезали бы
         // за рамку, и соседний текст наезжал бы на них.
-        .frame(width: size + spread * 2 + 32, height: size, alignment: .bottomLeading)
+        .frame(width: size + spread * 2 + size * 0.19, height: size, alignment: .bottomLeading)
         .accessibilityHidden(true)
     }
 
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .fill(.quaternary)
             .frame(width: size, height: size)
             .overlay(content: content)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: .black.opacity(0.22), radius: 10, y: 6)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .shadow(color: .black.opacity(0.22), radius: size * 0.06, y: size * 0.035)
     }
 }

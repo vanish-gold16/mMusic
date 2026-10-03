@@ -24,21 +24,10 @@ struct PlaylistView: View {
         playlist.orderedTracks
     }
 
-    /// Складывается из уже прочитанных длительностей — файлы для этого больше не открываются.
-    private var totalDuration: TimeInterval {
-        tracks.reduce(0) { $0 + $1.duration }
-    }
-
-    /// Очередь плеера собрана из этого плейлиста: в ней все его треки, и играет
-    /// один из них. Лишние треки в очереди не мешают — их могли добавить через
-    /// «Play next». От этого зависит, ставит ли кнопка паузу или запускает плейлист заново.
+    /// Играет именно этот плейлист. От этого зависит, ставит ли кнопка паузу
+    /// или запускает плейлист заново.
     private var isSource: Bool {
-        guard let current = audioPlayer.currentTrack, !tracks.isEmpty else { return false }
-
-        let ids = Set(tracks.map(\.id))
-        guard ids.contains(current.id) else { return false }
-
-        return ids.isSubset(of: Set(audioPlayer.queue.map(\.id)))
+        audioPlayer.isQueue(from: tracks)
     }
 
     /// Пока плейлист играет, страница красится в цвета играющего трека и меняет их
@@ -89,7 +78,7 @@ struct PlaylistView: View {
         // Кнопки и подсветка — в цвет страницы. Строго до `.toolbar` и `.sheet`:
         // листы правки остаются в цвете всего приложения.
         .tint(pagePalette?.accent ?? audioPlayer.accent)
-        .task(id: coverSources.map(\.count)) {
+        .task(id: playlist.fanCovers.map(\.count)) {
             await loadCovers()
         }
         .toolbar {
@@ -214,7 +203,7 @@ struct PlaylistView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text(summary)
+                Text(playlist.summary(includingArtists: true))
                     .font(.caption2)
                     .fontWeight(.semibold)
                     .tracking(1.2)
@@ -229,26 +218,6 @@ struct PlaylistView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
         .padding(.bottom, 8)
-    }
-
-    /// Паспорт плейлиста одной строкой. Раньше он стоял в самом низу,
-    /// под всеми треками, где его никто не видел.
-    private var summary: String {
-        guard !tracks.isEmpty else { return "NO TRACKS YET" }
-
-        var parts = [tracks.count == 1 ? "1 track" : "\(tracks.count) tracks"]
-
-        let minutes = Int((totalDuration / 60).rounded())
-        if minutes > 0 {
-            parts.append(minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min")
-        }
-
-        let artists = Set(tracks.flatMap(\.artistNames)).count
-        if artists > 0 {
-            parts.append(artists == 1 ? "1 artist" : "\(artists) artists")
-        }
-
-        return parts.joined(separator: "  ·  ").uppercased()
     }
 
     /// Пульт вместо пары одинаковых капсул Play / Shuffle: запуск, лента всего
@@ -292,23 +261,12 @@ struct PlaylistView: View {
         }
     }
 
-    /// Пустое место в стопке строк — пунктир той же формы, что и строки над ним.
-    /// В пустом плейлисте оно крупнее: кроме него на экране делать нечего.
+    /// Пустое место в конце стопки строк. В пустом плейлисте оно крупнее:
+    /// кроме него на экране делать нечего.
     private var addMusicSlot: some View {
-        Button {
+        DashedSlot(title: tracks.isEmpty ? "Add the first tracks" : "Add music", isLarge: tracks.isEmpty) {
             isShowingTrackPicker = true
-        } label: {
-            Label(tracks.isEmpty ? "Add the first tracks" : "Add music", systemImage: "plus")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: tracks.isEmpty ? 120 : 60)
-                .background {
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .strokeBorder(.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [5, 5]))
-                }
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .padding(.horizontal)
         .padding(.top, 4)
     }
@@ -344,33 +302,14 @@ struct PlaylistView: View {
 
     // MARK: - Обложки
 
-    /// Из чего собирать веер: своя обложка плейлиста, затем обложки треков —
-    /// по одной на альбом, иначе три карты подряд оказались бы одной картинкой.
-    private var coverSources: [Data] {
-        var sources: [Data] = []
-        if let own = playlist.artwork { sources.append(own) }
-
-        var seenAlbums = Set<PersistentIdentifier>()
-        for track in tracks where sources.count < 3 {
-            guard let data = track.displayArtwork else { continue }
-
-            if let album = track.album, album.artwork != nil,
-               !seenAlbums.insert(album.persistentModelID).inserted {
-                continue
-            }
-            sources.append(data)
-        }
-
-        return sources
-    }
-
     /// Декодирование и разбор цветов — в фоне: на главном потоке обложка
     /// в несколько мегабайт подвешивала бы переход на экран.
     private func loadCovers() async {
-        let sources = coverSources
+        let sources = playlist.fanCovers
 
+        // Карта веера — 168 pt, то есть около 500 px на экране @3x.
         let (images, palette) = await Task.detached(priority: .utility) {
-            let images = sources.compactMap(Self.thumbnail(from:))
+            let images = sources.compactMap { UIImage.thumbnail(from: $0, side: 512) }
             return (images, images.first?.coverPalette)
         }.value
 
@@ -379,18 +318,6 @@ struct PlaylistView: View {
 
         covers = images
         coverPalette = palette
-    }
-
-    /// Карта веера — 168 pt, то есть около 500 px на экране @3x. Пропорции
-    /// сохраняются: квадрат вырезает уже сама карта.
-    nonisolated private static func thumbnail(from data: Data) -> UIImage? {
-        guard let image = UIImage(data: data) else { return nil }
-
-        let scale = min(512 / min(image.size.width, image.size.height), 1)
-        return image.preparingThumbnail(of: CGSize(
-            width: image.size.width * scale,
-            height: image.size.height * scale
-        ))
     }
 
     // MARK: - Правка состава

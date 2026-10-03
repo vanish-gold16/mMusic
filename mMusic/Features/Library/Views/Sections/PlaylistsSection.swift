@@ -3,6 +3,9 @@ import SwiftUI
 
 /// Плейлисты одним списком: закреплённые сверху, остальные следом.
 /// Отдельной полки «Pinned» больше нет — она дублировала тот же список.
+///
+/// В конце — пунктирный слот нового плейлиста, как «Add music» в самом плейлисте:
+/// создать его можно и из «+» наверху, но там, где кончается список, — нагляднее.
 struct PlaylistsSection: View {
 
     @Environment(\.modelContext) private var modelContext
@@ -13,6 +16,7 @@ struct PlaylistsSection: View {
 
     @State private var editedPlaylist: Playlist?
     @State private var playlistToDelete: Playlist?
+    @State private var showCreatePlaylist = false
 
     /// Тот же порядок, что и на других экранах, где плейлисты листают, — см. `byLastPlayed`.
     private var ordered: [Playlist] {
@@ -20,40 +24,59 @@ struct PlaylistsSection: View {
     }
 
     var body: some View {
-        if playlists.isEmpty {
-            LibraryEmptyState(text: "No playlists yet")
-        } else {
-            LazyVStack(spacing: 5) {
-                ForEach(ordered) { playlist in
-                    NavigationLink {
-                        PlaylistView(playlist: playlist)
-                    } label: {
-                        PlaylistCell(playlist: playlist)
-                    }
-                    .contextMenu { menu(for: playlist) }
+        Group {
+            if playlists.isEmpty {
+                DashedSlot(title: "Create the first playlist", isLarge: true, cornerRadius: 28) {
+                    showCreatePlaylist = true
                 }
+                .padding(.horizontal)
+            } else {
+                list
             }
-            .sheet(item: $editedPlaylist) { playlist in
-                EditPlaylistView(playlist: playlist)
-            }
-            .confirmationDialog(
-                "Delete \"\(playlistToDelete?.name ?? "")\"?",
-                isPresented: Binding(
-                    get: { playlistToDelete != nil },
-                    set: { if !$0 { playlistToDelete = nil } }
-                ),
-                titleVisibility: .visible,
-                presenting: playlistToDelete
-            ) { playlist in
-                Button("Delete", role: .destructive) {
-                    let name = playlist.name
-                    modelContext.delete(playlist)
-                    toasts.removed("Deleted \(name)")
+        }
+        .sheet(isPresented: $showCreatePlaylist) {
+            CreatePlaylistView()
+        }
+    }
+
+    private var list: some View {
+        LazyVStack(spacing: 10) {
+            ForEach(ordered) { playlist in
+                NavigationLink {
+                    PlaylistView(playlist: playlist)
+                } label: {
+                    PlaylistCell(playlist: playlist)
                 }
-                Button("Cancel", role: .cancel) { }
-            } message: { _ in
-                Text("This playlist will be permanently deleted.")
+                .buttonStyle(.plain)
+                .contextMenu { menu(for: playlist) }
             }
+
+            DashedSlot(title: "New playlist", cornerRadius: 28) {
+                showCreatePlaylist = true
+            }
+            .padding(.top, 4)
+        }
+        .padding(.horizontal)
+        .sheet(item: $editedPlaylist) { playlist in
+            EditPlaylistView(playlist: playlist)
+        }
+        .confirmationDialog(
+            "Delete \"\(playlistToDelete?.name ?? "")\"?",
+            isPresented: Binding(
+                get: { playlistToDelete != nil },
+                set: { if !$0 { playlistToDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: playlistToDelete
+        ) { playlist in
+            Button("Delete", role: .destructive) {
+                let name = playlist.name
+                modelContext.delete(playlist)
+                toasts.removed("Deleted \(name)")
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("This playlist will be permanently deleted.")
         }
     }
 

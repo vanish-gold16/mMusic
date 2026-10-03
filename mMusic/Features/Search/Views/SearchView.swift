@@ -94,6 +94,8 @@ struct SearchView: View {
                             } label: {
                                 PlaylistCell(playlist: playlist)
                             }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal)
                         }
                     }
                 }
