@@ -49,7 +49,10 @@ struct PlaylistView: View {
                     queue: tracks,
                     leadingStyle: .artwork,
                     showDuration: true,
-                    onRemoveFromPlaylist: { remove(track) }
+                    onRemoveFromPlaylist: { remove(track) },
+                    // Без этого плейлист, который запускают с песни, а не кнопкой,
+                    // навсегда оставался «давно не игравшим» и не поднимался в списке.
+                    onPlay: { playlist.markPlayed() }
                 )
             }
             .onMove { source, destination in

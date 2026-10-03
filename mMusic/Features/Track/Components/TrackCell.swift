@@ -28,6 +28,9 @@ struct TrackCell: View {
     /// Заполняется только там, где трек показан в составе плейлиста.
     /// Без него в меню нет и пункта — удалять «из плейлиста» на странице альбома нечего.
     var onRemoveFromPlaylist: (() -> Void)?
+    /// Трек запущен нажатием на строку. Нужен плейлисту: запуск с любой его песни —
+    /// тоже запуск плейлиста, и по нему плейлисты выстраиваются в библиотеке.
+    var onPlay: (() -> Void)?
 
     private var isCurrent: Bool {
         audioPlayer.currentTrack?.id == track.id
@@ -185,6 +188,7 @@ struct TrackCell: View {
             let list = queue.isEmpty ? [track] : queue  // ← подумай, не перепутал ли порядок
             let index = list.firstIndex { $0.id == track.id } ?? 0
             audioPlayer.play(list, startingAt: index)
+            onPlay?()
         }
         .sheet(isPresented: $showEditTrack) {
             EditTrackView(track: track)
