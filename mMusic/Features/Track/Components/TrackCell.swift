@@ -31,6 +31,28 @@ struct TrackCell: View {
     /// Трек запущен нажатием на строку. Нужен плейлисту: запуск с любой его песни —
     /// тоже запуск плейлиста, и по нему плейлисты выстраиваются в библиотеке.
     var onPlay: (() -> Void)?
+    /// Своя подпись вместо номера трека — на странице альбома это «A1», «B2»,
+    /// как на обороте пластинки.
+    var number: String?
+    /// На странице альбома авторы у всех треков одни и те же, и они уже
+    /// написаны в шапке. Под именем остаются только приглашённые.
+    var showsOnlyGuests = false
+
+    /// Строка под именем трека. Пустая — строки нет совсем.
+    private var subtitle: String {
+        guard showsOnlyGuests else {
+            return track.artistNames.joined(separator: ", ")
+        }
+
+        let hosts = Set(track.album?.artistNames ?? [])
+        let guests = track.credits
+            .sorted { $0.position < $1.position }
+            .filter { !hosts.contains($0.artist.name) }
+        guard !guests.isEmpty else { return "" }
+
+        let names = guests.map(\.artist.name).joined(separator: ", ")
+        return guests.allSatisfy { $0.role == .featured } ? "feat. \(names)" : names
+    }
 
     private var isCurrent: Bool {
         audioPlayer.currentTrack?.id == track.id
@@ -45,7 +67,8 @@ struct TrackCell: View {
                         .foregroundStyle(.tint)
                         .frame(width: 40, height: 40)
                 } else {
-                    Text("\(track.position + 1)")
+                    Text(number ?? "\(track.position + 1)")
+                        .monospacedDigit()
                         .frame(width: 40, height: 40)
                 }
             case .artwork:
@@ -75,9 +98,11 @@ struct TrackCell: View {
                 Text(track.name)
                     .bold()
                     .lineLimit(1)
-                Text(track.artistNames.joined(separator: ", "))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer()
 

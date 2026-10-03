@@ -22,8 +22,8 @@ struct ArtistPill: View {
 
                 Text(artist.name)
             }
-            // Фон от .primary, а не белый: у плеера и альбома схема переворачивается
-            // под обложку, и фиксированный цвет на светлой обложке пропал бы.
+            // Фон от .primary, а не белый: у плеера схема переворачивается под
+            // обложку, и фиксированный цвет на светлой обложке пропал бы.
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(Color.primary.opacity(0.15), in: Capsule())

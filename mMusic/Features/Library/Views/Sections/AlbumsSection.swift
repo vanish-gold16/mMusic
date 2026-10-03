@@ -85,7 +85,7 @@ struct AlbumsSection: View {
                             AlbumCell(album: album)
                         }
                     } header: {
-                        CrateDivider(title: crate.title, count: crate.albums.count)
+                        CrateDivider(title: crate.title, detail: "\(crate.albums.count)")
                     }
                 }
             }
@@ -93,17 +93,13 @@ struct AlbumsSection: View {
         }
     }
 
-    /// Интерфейс приложения английский — и месяцы на разделителях тоже,
-    /// иначе «ОКТЯБРЬ» стоял бы над «No albums yet» и «Delete».
-    private static let english = Locale(identifier: "en")
-
     private func crateKey(for album: Album) -> String {
         switch sort {
         case .dateAdded:
             // Год — только у прошлых лет: у текущего он ничего не добавляет.
             let isThisYear = Calendar.current.isDate(album.addedAt, equalTo: .now, toGranularity: .year)
             let style = isThisYear ? Date.FormatStyle().month(.wide) : Date.FormatStyle().month(.wide).year()
-            return album.addedAt.formatted(style.locale(Self.english)).uppercased()
+            return album.addedAt.formatted(style.locale(.interface)).uppercased()
 
         case .release:
             // Десятилетия, а не годы: альбом на год — снова полупустые строки.
@@ -136,36 +132,6 @@ private struct AlbumCrate: Identifiable {
     /// По первому альбому: метка может повториться — «#» бывает и в начале,
     /// и в конце алфавита, если имя начинается с эмодзи.
     var id: PersistentIdentifier { albums[0].persistentModelID }
-}
-
-/// Разделитель в ящике с пластинками: крупная сжатая метка, черта по её
-/// базовой линии до края и число альбомов за разделителем.
-private struct CrateDivider: View {
-
-    let title: String
-    let count: Int
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(title)
-                .font(.system(size: 30, weight: .heavy).width(.compressed))
-
-            // У фигуры нет базовой линии текста, и по ней выравнивается её низ —
-            // черта ложится ровно под буквы.
-            Rectangle()
-                .fill(.quaternary)
-                .frame(height: 1)
-
-            Text("\(count)")
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .tracking(1.2)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.top, 8)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-    }
 }
 
 /// Пустой раздел: короткая строка вместо системной картинки с заголовком —

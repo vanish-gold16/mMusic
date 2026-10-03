@@ -8,6 +8,10 @@ import SwiftUI
 /// и толщина кольца — длительность трека. Узор у каждого альбома свой, как лента
 /// у плейлиста. Пока играет этот альбом, диск выезжает дальше и крутится,
 /// а кольцо текущего трека горит акцентом.
+///
+/// Один и тот же конверт стоит в сетке библиотеки и в шапке альбома; в шапке
+/// диск выезжает почти целиком, показывает иглой, сколько сыграно, и отвечает
+/// на нажатия.
 struct AlbumSleeve: View {
 
     let cover: UIImage?
@@ -18,14 +22,21 @@ struct AlbumSleeve: View {
     let currentIndex: Int?
     let isPlaying: Bool
     let accent: Color
-
+    /// Сколько сыграно у текущего трека, 0...1. nil — иглы нет: в сетке время
+    /// не читается, иначе вся библиотека перерисовывалась бы пять раз в секунду.
+    var progress: Double? = nil
     /// На сколько диск выглядывает из конверта — в долях стороны конверта.
-    private static let restingPeek: CGFloat = 0.2
-    private static let playingPeek: CGFloat = 0.32
+    var restingPeek: CGFloat = 0.2
+    var playingPeek: CGFloat = 0.32
+    /// Волны цвета обложки вокруг диска — на странице альбома.
+    var showsRipples = false
+    /// Нажали на кольцо трека `index`, в точку `fraction` (0...1) его длины.
+    /// Без него диск только показывает: в сетке нажатие открывает альбом.
+    var onTapTrack: ((_ index: Int, _ fraction: Double) -> Void)? = nil
 
     /// Ширина к высоте. Место под выехавший диск держится всегда: иначе
     /// играющий вылезал бы на соседнюю ячейку.
-    static let aspectRatio: CGFloat = 1 + playingPeek
+    private var aspectRatio: CGFloat { 1 + playingPeek }
 
     private var isOut: Bool { currentIndex != nil }
 
@@ -55,7 +66,7 @@ struct AlbumSleeve: View {
 
     var body: some View {
         Color.clear
-            .aspectRatio(Self.aspectRatio, contentMode: .fit)
+            .aspectRatio(aspectRatio, contentMode: .fit)
             .overlay(alignment: .leading) {
                 GeometryReader { proxy in
                     let side = proxy.size.height
@@ -66,23 +77,32 @@ struct AlbumSleeve: View {
                     }
                 }
             }
-            .accessibilityHidden(true)
     }
 
     private func record(side: CGFloat) -> some View {
         let radius = side * discRadius
-        let peek = isOut ? Self.playingPeek : Self.restingPeek
+        let peek = isOut ? playingPeek : restingPeek
 
         return VinylRecord(
             cover: cover,
             durations: durations,
             currentIndex: currentIndex,
+            progress: progress,
             isSpinning: isOut && isPlaying,
             rpm: rpm,
             labelFraction: labelFraction,
-            accent: accent
+            accent: accent,
+            onTapTrack: onTapTrack
         )
         .frame(width: radius * 2, height: radius * 2)
+        // Волны — фон диска, а не страницы: так они сами едут за ним,
+        // когда он выезжает из конверта.
+        .background {
+            if showsRipples {
+                RecordRipples(accent: accent, breathes: isOut && isPlaying)
+                    .frame(width: radius * RecordRipples.reach * 2, height: radius * RecordRipples.reach * 2)
+            }
+        }
         // Правый край диска — на `peek` за краем конверта.
         .offset(x: side * (1 + peek) - radius * 2)
         .animation(.spring(duration: 0.55, bounce: 0.25), value: isOut)
@@ -110,6 +130,7 @@ struct AlbumSleeve: View {
             .clipShape(shape)
             // Тень уходит вправо, на диск: так видно, что он лежит под конвертом.
             .shadow(color: .black.opacity(0.3), radius: side * 0.04, x: side * 0.02, y: side * 0.02)
+            .accessibilityHidden(true)
     }
 }
 
@@ -121,10 +142,15 @@ private struct VinylRecord: View {
     let cover: UIImage?
     let durations: [TimeInterval]
     let currentIndex: Int?
+    let progress: Double?
     let isSpinning: Bool
     let rpm: Double
     let labelFraction: CGFloat
     let accent: Color
+    let onTapTrack: ((_ index: Int, _ fraction: Double) -> Void)?
+
+    /// Размер диска — нужен, чтобы по точке нажатия найти кольцо.
+    @State private var diameter: CGFloat = 0
 
     /// Где кончаются канавки снаружи и начинаются внутри, в долях радиуса.
     /// Между яблоком и последним треком — гладкое поле, как на настоящем диске.
@@ -140,6 +166,17 @@ private struct VinylRecord: View {
         .overlay {
             sheen
         }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            diameter = width
+        }
+        .contentShape(Circle())
+        .onTapGesture { location in
+            tap(at: location)
+        }
+        .allowsHitTesting(onTapTrack != nil)
+        .accessibilityHidden(true)
     }
 
     private var disc: some View {
@@ -222,6 +259,12 @@ private struct VinylRecord: View {
             Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
         }
 
+        func fillRing(from outer: CGFloat, to inner: CGFloat, with color: Color) {
+            var ring = circle(outer)
+            ring.addPath(circle(inner))
+            context.fill(ring, with: .color(color), style: FillStyle(eoFill: true))
+        }
+
         context.fill(circle(radius), with: .color(Color(white: 0.07)))
 
         let outer = radius * grooveOuter
@@ -237,12 +280,17 @@ private struct VinylRecord: View {
                 // Стык треков — гладкая тёмная дорожка, как на настоящей пластинке.
                 // Только там, где кольцу хватает толщины, иначе стыки съедят всё.
                 let gap: CGFloat = width >= 3 ? 1 : 0
+                let bottom = edge - width + gap
 
-                var band = circle(edge)
-                band.addPath(circle(edge - width + gap))
-
-                let color = index == currentIndex ? accent.opacity(0.9) : Color(white: 0.16)
-                context.fill(band, with: .color(color), style: FillStyle(eoFill: true))
+                if index == currentIndex, let progress {
+                    // Игла идёт от края к центру: снаружи сыгранное, внутри — ещё нет.
+                    let needle = edge - (edge - bottom) * min(max(progress, 0), 1)
+                    fillRing(from: edge, to: needle, with: accent)
+                    fillRing(from: needle, to: bottom, with: accent.opacity(0.35))
+                } else {
+                    let color = index == currentIndex ? accent.opacity(0.9) : Color(white: 0.16)
+                    fillRing(from: edge, to: bottom, with: color)
+                }
 
                 edge -= width
             }
@@ -259,5 +307,90 @@ private struct VinylRecord: View {
 
         // Светлый ободок: на тёмной теме без него диск сливался бы с фоном.
         context.stroke(circle(radius - 0.25), with: .color(.white.opacity(0.18)), lineWidth: 0.5)
+    }
+
+    /// Расстояние от центра решает, в какой трек попали: кольца лежат
+    /// снаружи внутрь в порядке альбома. Угол неважен — диск крутится.
+    private func tap(at location: CGPoint) {
+        guard let onTapTrack else { return }
+
+        let weights = weights
+        let total = weights.reduce(0, +)
+        guard total > 0 else { return }
+
+        let radius = diameter / 2
+        guard radius > 0 else { return }
+
+        // Где между внешним краем канавок и внутренним: 0 — первый трек, 1 — конец последнего.
+        let distance = hypot(location.x - radius, location.y - radius) / radius
+        guard distance >= grooveInner, distance <= grooveOuter else { return }
+
+        let time = Double((grooveOuter - distance) / (grooveOuter - grooveInner)) * total
+        var start = 0.0
+
+        for (index, weight) in weights.enumerated() {
+            if time < start + weight || index == weights.count - 1 {
+                onTapTrack(index, min(max((time - start) / weight, 0), 1))
+                return
+            }
+            start += weight
+        }
+    }
+}
+
+/// Волны вокруг пластинки на странице альбома: цвет обложки расходится по
+/// странице кругами, как звук от колонки. Пока альбом играет, они дышат
+/// громкостью — на ударе ярче и шире.
+///
+/// Громкость читается здесь, а не на экране альбома: она меняется 30 раз
+/// в секунду, и перерисовываться должны только волны.
+private struct RecordRipples: View {
+
+    @Environment(AudioPlayer.self) private var audioPlayer
+    @Environment(\.colorScheme) private var colorScheme
+
+    let accent: Color
+    let breathes: Bool
+
+    /// Докуда расходятся волны — в радиусах диска.
+    static let reach: CGFloat = 3.2
+
+    /// На белом цвет заметнее, чем на чёрном, — светлой теме хватает меньшего.
+    private var strength: Double {
+        colorScheme == .dark ? 0.5 : 0.36
+    }
+
+    var body: some View {
+        // `punch` читается только при `breathes`: иначе открытый альбом
+        // перерисовывался бы под чужую музыку.
+        let punch = breathes && audioPlayer.isPlaying ? audioPlayer.punch : 0
+
+        Canvas { context, size in
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let maxRadius = min(size.width, size.height) / 2
+            let discRadius = maxRadius / Self.reach
+            let start = discRadius * 1.1
+            let spacing = discRadius * (0.17 + punch * 0.05)
+
+            var r = start
+            while r < maxRadius {
+                // К краю волны гаснут: у диска они заметны, под текстом — уже нет.
+                let fade = pow(1 - (r - start) / (maxRadius - start), 1.8)
+                let opacity = strength * fade * (0.7 + punch * 0.6)
+                let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+                context.stroke(Path(ellipseIn: rect), with: .color(accent.opacity(opacity)), lineWidth: 1)
+                r += spacing
+            }
+        }
+        .background {
+            EllipticalGradient(
+                colors: [accent.opacity(strength * 0.45 + punch * 0.12), .clear],
+                center: .center,
+                startRadiusFraction: 0,
+                endRadiusFraction: 0.5
+            )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }

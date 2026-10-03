@@ -1,122 +1,85 @@
+import SwiftData
 import SwiftUI
 
+/// Страница альбома — как пластинка, которую достали из ящика и перевернули.
+///
+/// Наверху конверт с диском. Пока альбом играет, диск выезжает почти целиком
+/// и крутится, а на кольце текущего трека игла показывает, сколько сыграно.
+/// По кольцам можно нажимать — как опустить иглу на нужную дорожку. От диска
+/// по странице расходятся волны цвета обложки и дышат под музыку.
+///
+/// Ниже — оборот конверта: трек-лист по сторонам A и B с номерами «A1», «B2»
+/// и мелкий текст внизу. С плейлистом общий только шрифт: у того веер карт,
+/// лента и свечение, у альбома — одна пластинка и волны от неё.
 struct AlbumView: View {
-    
+
     @Environment(AudioPlayer.self) var audioPlayer
     @Environment(ToastCenter.self) private var toasts
-    
-    var album: Album
-    
-    private var sortedTracks: [Track] {
-        album.tracks.sorted {
-            $0.position < $1.position
-        }
-    }
 
-    @State private var backgroundArtwork: UIImage?
+    var album: Album
+
     @State private var editingAlbum = false
     @State private var showAddToPlaylist = false
 
-    /// Обложка светлая — значит, текст поверх неё должен быть тёмным.
-    @State private var isLightBackground = false
+    /// Уменьшенная обложка и её цвета. Считаются один раз в `.task`, а не в `body`:
+    /// полноразмерная обложка весит мегабайты, а `body` пересчитывается на каждой
+    /// смене трека.
+    @State private var cover: UIImage?
+    @State private var coverPalette: CoverPalette?
+
+    private var sortedTracks: [Track] {
+        album.tracks.sorted { $0.position < $1.position }
+    }
+
+    /// Играет трек этого альбома. Очередь, как у плейлиста, проверять незачем:
+    /// альбом у трека один.
+    private var isCurrent: Bool {
+        guard let current = audioPlayer.currentTrack else { return false }
+        return current.album?.persistentModelID == album.persistentModelID
+    }
+
+    /// Пока альбом играет, страница в цветах играющего трека — у трека может
+    /// быть своя обложка. В остальное время — в цветах конверта.
+    private var pagePalette: CoverPalette? {
+        isCurrent ? audioPlayer.palette : coverPalette
+    }
+
+    private var accent: Color {
+        pagePalette?.accent ?? audioPlayer.accent
+    }
 
     var body: some View {
+        let tracks = sortedTracks
+
         ScrollView {
-            VStack {
-                HStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 175, height: 175)
-                        .overlay {
-                            if let data = album.artwork, let uiImage = UIImage(data: data) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .cornerRadius(12)
-                            } else {
-                                Image(systemName: "music.note")
-                            }
-                        }
-                    VStack {
-                        Text(album.name)
-                            .font(.title)
-                            .bold()
-                        ArtistPillRow(artists: album.artists)
-                        Text(album.genres.map(\.rawValue).joined(separator: ", "))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 24) {
+                AlbumHero(
+                    type: album.type,
+                    tracks: tracks,
+                    cover: cover,
+                    accent: accent,
+                    onTapTrack: { index, fraction in
+                        tapRing(index, fraction, in: tracks)
                     }
-                }
-                
-                HStack {
-                    Button {
-                        audioPlayer.play(sortedTracks)
-                    } label: {
-                        Capsule()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .padding(.horizontal)
-                            .overlay {
-                                HStack {
-                                    Image(systemName: "play.fill")
-                                        .tint(.primary)
-                                    Text("Play")
-                                        .tint(.primary)
-                                        .bold()
-                                }
-                            }
-                    }
-                    Button {
-                        audioPlayer.playShuffled(sortedTracks)
-                    } label: {
-                        Capsule()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .padding(.horizontal)
-                            .overlay {
-                                HStack {
-                                    Image(systemName: "shuffle")
-                                        .tint(.primary)
-                                    Text("Shuffle")
-                                        .tint(.primary)
-                                        .bold()
-                                }
-                            }
-                    }
-                }
+                )
                 .padding(.horizontal)
-                
-                Spacer()
-                
-                VStack {
-                    ForEach(sortedTracks) { track in
-                        TrackCell(track: track, queue: sortedTracks)
-                    }
+                .padding(.top, 8)
+
+                titleBlock(tracks: tracks)
+
+                if !tracks.isEmpty {
+                    controls(tracks: tracks)
+                    tracklist(tracks: tracks)
                 }
 
-                Spacer()
-                
-                if let release = album.release {
-                    Text(release.formatted(date: .abbreviated, time: .omitted))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-                }
-                
-                Text(album.type.rawValue)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
+                linerNotes
+                    .padding(.top, 8)
             }
+            .padding(.bottom, 24)
         }
-        .background {
-            artworkBackground
-        }
-        // Строго между фоном и `.toolbar` / `.sheet`: контент и фон переворачиваются
-        // вместе, а панель навигации и лист редактирования остаются в системной теме.
-        .environment(\.colorScheme, isLightBackground ? .light : .dark)
+        // Кнопки, эквалайзер и подсветка — в цвет пластинки. Строго до `.toolbar`
+        // и `.sheet`: листы правки остаются в цвете всего приложения.
+        .tint(accent)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -172,45 +135,275 @@ struct AlbumView: View {
         .sheet(isPresented: $showAddToPlaylist) {
             AddToPlaylistView(tracks: sortedTracks)
         }
-        .task {
-            backgroundArtwork = await Self.makeBackgroundArtwork(from: album.artwork)
-
-            // Считаем по готовой миниатюре 12×12: усреднять уже усреднённое —
-            // то же число, но мгновенно и без второго декодирования обложки.
-            isLightBackground = (backgroundArtwork?.averageBrightness ?? 0) > 0.55
+        .task(id: album.artwork?.count) {
+            await loadCover()
         }
     }
 
-    /// Заливка из цветов обложки. Миниатюра 12×12 растягивается на весь экран, поэтому
-    /// от картинки остаются только цветовые пятна — деталей, дающих резкие светлые и тёмные
-    /// половины, в ней уже нет. Все слои лежат в одном ZStack, чтобы под safe area
-    /// не оставалось полос: `ignoresSafeArea` применяется сразу ко всей стопке.
-    private var artworkBackground: some View {
-        ZStack {
-            Color(.systemBackground)
+    // MARK: - Шапка
 
-            if let backgroundArtwork {
-                Image(uiImage: backgroundArtwork)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .blur(radius: 40, opaque: true)
-                    .saturation(0.45)
-                    .opacity(0.7)
+    /// Имя, авторы капсулами и паспорт альбома.
+    private func titleBlock(tracks: [Track]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(album.name)
+                .font(.system(size: 40, weight: .heavy).width(.compressed))
+                .lineLimit(3)
+                .minimumScaleFactor(0.6)
+
+            if !album.artists.isEmpty {
+                ArtistPillRow(artists: album.artists)
             }
 
-            Rectangle()
-                .fill(.ultraThinMaterial)
+            Text(passport(tracks: tracks))
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .tracking(1.2)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
         }
-        .ignoresSafeArea()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
     }
 
-    /// Уменьшение картинки — не самая дешёвая операция, поэтому уводим её с главного потока.
-    private static func makeBackgroundArtwork(from data: Data?) async -> UIImage? {
-        guard let data else { return nil }
+    /// «LP  ·  2024  ·  11 TRACKS  ·  43 MIN».
+    private func passport(tracks: [Track]) -> String {
+        var parts = [album.type.rawValue]
 
-        return await Task.detached(priority: .utility) {
-            UIImage(data: data)?.preparingThumbnail(of: CGSize(width: 12, height: 12))
+        if let release = album.release {
+            parts.append(String(Calendar.current.component(.year, from: release)))
+        }
+        if album.type != .single || tracks.count > 1 {
+            parts.append(tracks.count == 1 ? "1 track" : "\(tracks.count) tracks")
+        }
+
+        let minutes = Self.minutes(of: tracks)
+        if minutes > 0 {
+            parts.append(minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min")
+        }
+
+        return parts.joined(separator: "  ·  ").uppercased()
+    }
+
+    /// Запуск и перемешивание. Без ленты, как у плейлиста: всё, что она
+    /// показывала бы, уже есть на диске — дорожки, текущий трек и игла.
+    private func controls(tracks: [Track]) -> some View {
+        let isPlayingHere = isCurrent && audioPlayer.isPlaying
+
+        return HStack(spacing: 12) {
+            Button {
+                playOrPause(tracks)
+            } label: {
+                Label(isPlayingHere ? "Pause" : "Play", systemImage: isPlayingHere ? "pause.fill" : "play.fill")
+                    .font(.headline)
+                    .contentTransition(.symbolEffect(.replace))
+                    .padding(.horizontal, 12)
+                    .frame(height: 36)
+            }
+            .buttonStyle(.glassProminent)
+
+            Button {
+                audioPlayer.playShuffled(tracks)
+            } label: {
+                Image(systemName: "shuffle")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .accessibilityLabel("Shuffle")
+        }
+        .padding(.horizontal)
+    }
+
+    // MARK: - Оборот конверта
+
+    /// Трек-лист по сторонам. У сингла и у совсем короткого альбома сторона
+    /// одна — тогда без разделителя и с обычными номерами.
+    private func tracklist(tracks: [Track]) -> some View {
+        let sides = Self.sides(of: tracks, type: album.type)
+        let hasSides = sides.count > 1
+
+        return VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(sides.enumerated()), id: \.offset) { sideIndex, side in
+                let letter = sideIndex == 0 ? "A" : "B"
+
+                if hasSides {
+                    let minutes = Self.minutes(of: side)
+                    CrateDivider(title: "SIDE \(letter)", detail: minutes > 0 ? "\(minutes) MIN" : "", size: 22)
+                        .padding(.horizontal)
+                        .padding(.top, sideIndex == 0 ? 0 : 16)
+                }
+
+                ForEach(Array(side.enumerated()), id: \.element.id) { position, track in
+                    TrackCell(
+                        track: track,
+                        queue: tracks,
+                        showDuration: true,
+                        number: hasSides ? "\(letter)\(position + 1)" : nil,
+                        showsOnlyGuests: true
+                    )
+                }
+            }
+        }
+    }
+
+    /// Мелкий текст внизу конверта: ℗, даты, жанры.
+    private var linerNotes: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Rectangle()
+                .fill(.quaternary)
+                .frame(width: 32, height: 1)
+                .padding(.bottom, 6)
+
+            if let release = album.release {
+                let year = Calendar.current.component(.year, from: release)
+                let artists = album.artistNames.joined(separator: ", ")
+                Text("℗ \(String(year)) \(artists)".trimmingCharacters(in: .whitespaces))
+
+                Text("Released \(release.formatted(Self.dateStyle))")
+            }
+
+            Text("Added \(album.addedAt.formatted(Self.dateStyle))")
+
+            let genres = album.genres.map(\.rawValue)
+            if !genres.isEmpty {
+                Text(genres.joined(separator: "  ·  "))
+            }
+        }
+        .textCase(.uppercase)
+        .font(.caption2)
+        .fontWeight(.semibold)
+        .tracking(1.2)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+    }
+
+    private static let dateStyle = Date.FormatStyle(date: .long, time: .omitted).locale(.interface)
+
+    // MARK: - Стороны
+
+    /// Две стороны, как на виниле: граница там, где время сторон ближе всего
+    /// к поровну. Сторона одна у сингла и у альбома короче четырёх треков —
+    /// делить там нечего.
+    private static func sides(of tracks: [Track], type: Album.AlbumType) -> [[Track]] {
+        guard type != .single, tracks.count >= 4 else { return [tracks] }
+
+        let total = tracks.reduce(0) { $0 + $1.duration }
+
+        // Длительности ещё не прочитаны — делим поровну по числу треков.
+        guard total > 0 else {
+            let middle = (tracks.count + 1) / 2
+            return [Array(tracks[..<middle]), Array(tracks[middle...])]
+        }
+
+        var best = 1
+        var bestDifference = Double.infinity
+        var sideA = 0.0
+
+        for split in 1..<tracks.count {
+            sideA += tracks[split - 1].duration
+            let difference = abs(total - sideA * 2)
+            if difference < bestDifference {
+                bestDifference = difference
+                best = split
+            }
+        }
+
+        return [Array(tracks[..<best]), Array(tracks[best...])]
+    }
+
+    /// Сумма уже прочитанных длительностей, в минутах.
+    private static func minutes(of tracks: [Track]) -> Int {
+        Int((tracks.reduce(0) { $0 + $1.duration } / 60).rounded())
+    }
+
+    // MARK: - Воспроизведение
+
+    /// Играет этот альбом — кнопка ставит паузу и снимает её. Играет что-то
+    /// другое — запускает альбом с начала.
+    private func playOrPause(_ tracks: [Track]) {
+        if isCurrent {
+            audioPlayer.togglePlayPause()
+        } else {
+            audioPlayer.play(tracks)
+        }
+    }
+
+    /// Нажатие на кольцо. На играющем треке оно перематывает, как игла,
+    /// опущенная в другое место дорожки; на остальных запускает трек с начала —
+    /// кольца слишком тонкие, чтобы попасть в нужную секунду.
+    private func tapRing(_ index: Int, _ fraction: Double, in tracks: [Track]) {
+        guard tracks.indices.contains(index) else { return }
+
+        // `duration` пуст, пока звук не подняли (очередь восстановлена с прошлого
+        // запуска), — перематывать там нечего, трек просто запускается.
+        if audioPlayer.currentTrack?.id == tracks[index].id, audioPlayer.duration > 0 {
+            audioPlayer.seek(to: fraction * audioPlayer.duration)
+            return
+        }
+
+        audioPlayer.play(tracks, startingAt: index)
+    }
+
+    // MARK: - Обложка
+
+    /// Конверт в шапке — около 250 pt, это ~750 px на экране @3x. Цвета страницы
+    /// берутся с той же миниатюры: второй раз декодировать обложку незачем.
+    private func loadCover() async {
+        guard let data = album.artwork else {
+            cover = nil
+            coverPalette = nil
+            return
+        }
+
+        let (image, palette) = await Task.detached(priority: .utility) {
+            let image = UIImage.thumbnail(from: data, side: 800)
+            return (image, image?.coverPalette)
         }.value
+
+        guard !Task.isCancelled else { return }
+
+        cover = image
+        coverPalette = palette
+    }
+}
+
+/// Конверт в шапке альбома. Время текущего трека читается здесь, а не в
+/// `AlbumView`: оно меняется пять раз в секунду, и перерисовываться на каждый
+/// тик должна только пластинка, а не весь трек-лист.
+private struct AlbumHero: View {
+
+    @Environment(AudioPlayer.self) private var audioPlayer
+
+    let type: Album.AlbumType
+    let tracks: [Track]
+    let cover: UIImage?
+    let accent: Color
+    let onTapTrack: (_ index: Int, _ fraction: Double) -> Void
+
+    var body: some View {
+        let currentIndex = tracks.firstIndex { $0.id == audioPlayer.currentTrack?.id }
+        let isCurrent = currentIndex != nil
+
+        // Время и пауза читаются только у играющего альбома: открытая страница
+        // чужого альбома не должна перерисовываться под чужую музыку.
+        let progress: Double? = isCurrent && audioPlayer.duration > 0
+            ? audioPlayer.currentTime / audioPlayer.duration
+            : nil
+
+        AlbumSleeve(
+            cover: cover,
+            type: type,
+            durations: tracks.map(\.duration),
+            currentIndex: currentIndex,
+            isPlaying: isCurrent && audioPlayer.isPlaying,
+            accent: accent,
+            progress: progress,
+            restingPeek: 0.28,
+            playingPeek: 0.5,
+            showsRipples: true,
+            onTapTrack: onTapTrack
+        )
     }
 }
