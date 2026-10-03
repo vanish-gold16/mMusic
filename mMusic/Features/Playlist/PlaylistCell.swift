@@ -25,7 +25,7 @@ struct PlaylistCell: View {
 
         // Рамка веера уже оставляет запас под повёрнутые карты — отступ поменьше.
         HStack(spacing: 6) {
-            CoverFan(covers: covers, size: 64)
+            CoverFan(covers: covers, size: 68)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -80,12 +80,12 @@ struct PlaylistCell: View {
         }
     }
 
-    /// Карта веера здесь 64 pt — около 200 px на экране @3x.
+    /// Главная карта веера здесь 68 pt — около 200 px на экране @3x.
     private func loadCovers() async {
         let sources = playlist.fanCovers
 
         let images = await Task.detached(priority: .utility) {
-            sources.compactMap { UIImage.thumbnail(from: $0, side: 200) }
+            sources.compactMap { UIImage.thumbnail(from: $0, side: 210) }
         }.value
 
         guard !Task.isCancelled else { return }

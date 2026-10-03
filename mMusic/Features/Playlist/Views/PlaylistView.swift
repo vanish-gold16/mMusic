@@ -76,7 +76,7 @@ struct PlaylistView: View {
         // `containerBackground`, а не `background`: у экрана в навигации своя
         // непрозрачная подложка, и закрасить её можно только фоном контейнера.
         .containerBackground(for: .navigation) {
-            PlaylistAura(palette: pagePalette, breathes: isSource)
+            CoverAura(palette: pagePalette, breathes: isSource)
         }
         // Кнопки и подсветка — в цвет страницы. Строго до `.toolbar` и `.sheet`:
         // листы правки остаются в цвете всего приложения.
@@ -191,7 +191,7 @@ struct PlaylistView: View {
     /// на которую этот экран не должен быть похож.
     private var header: some View {
         VStack(alignment: .leading, spacing: 20) {
-            CoverFan(covers: covers)
+            CoverFan(covers: covers, size: 190)
                 .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -310,9 +310,9 @@ struct PlaylistView: View {
     private func loadCovers() async {
         let sources = playlist.fanCovers
 
-        // Карта веера — 168 pt, то есть около 500 px на экране @3x.
+        // Главная карта веера — 190 pt, то есть около 570 px на экране @3x.
         let (images, palette) = await Task.detached(priority: .utility) {
-            let images = sources.compactMap { UIImage.thumbnail(from: $0, side: 512) }
+            let images = sources.compactMap { UIImage.thumbnail(from: $0, side: 600) }
             return (images, images.first?.coverPalette)
         }.value
 
