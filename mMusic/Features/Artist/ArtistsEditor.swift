@@ -54,10 +54,13 @@ struct ArtistsEditor: View {
                 newArtistName = ""
                 showAddArtist = true
             } label: {
+                // Того же роста, что капсулы артистов, — иначе строка прыгает.
                 Image(systemName: "plus")
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.gray.opacity(0.2), in: Capsule())
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.tint)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .glassEffect(in: Capsule())
             }
             .buttonStyle(.borderless)
             .fixedSize()
