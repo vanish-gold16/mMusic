@@ -32,14 +32,16 @@ struct TrackArtistCell: View {
                 .foregroundStyle(editable ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
 
             if showDelete {
-                Button(role: .destructive, action: onRemove) {
+                // Без `role: .destructive`: с ней система красит крестик в красный
+                // поверх любого стиля, а убрать имя из списка — не катастрофа.
+                Button(action: onRemove) {
                     Image(systemName: "xmark")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.secondary)
                         .frame(width: 18, height: 18)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .accessibilityLabel("Remove \(name)")
             }
         }

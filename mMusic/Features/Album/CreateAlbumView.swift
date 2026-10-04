@@ -2,10 +2,20 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Сборка нового альбома. Как и форма нового трека, это не таблица полей,
+/// а будущая пластинка: наверху конверт, из которого выезжает диск, и каждый
+/// добавленный трек ложится на него кольцом своей длины. Переключил формат —
+/// диск стал меньше или больше; добавил пластинку — за конвертом появилась
+/// стопка.
+///
+/// Музыку берут из трёх мест — библиотеки, файлов и SoundCloud — тремя
+/// пунктирными слотами под списком треков: это пустые места, куда она ляжет.
+/// Пустой кнопки «From YouTube» больше нет: она ничего не делала.
 struct CreateAlbumView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(AudioPlayer.self) private var audioPlayer
     
     @State private var name = ""
     @State private var trackDrafts: [TrackDraft] = []
@@ -13,187 +23,127 @@ struct CreateAlbumView: View {
     @State private var artists: [ArtistDraft] = []
     @State private var release: Date?
     @State private var type: Album.AlbumType = .single
-    @State private var pickedFile: PickedFile? = nil
     
-    @State private var showImagePicker = false
     @State private var showTrackPicker = false
     @State private var isImporting = false
     @State private var showSoundCloud = false
+    /// Черновик, открытый на правку. Строка — кнопка, а не `NavigationLink`:
+    /// у ссылки в списке свой шеврон, и он вылезал бы за стеклянную капсулу.
+    @State private var editingDraft: UUID?
     /// Файлы, которые не удалось положить в библиотеку. Пустой список — всё прошло.
     @State private var failedImports: [String] = []
     /// Названия пластинок будущего альбома. Пусто — пластинка одна.
     @State private var discTitles: [String] = []
 
+    /// Обложка в превью, уменьшенная в фоне, и цвета, которыми светится форма.
+    @State private var cover: UIImage?
+    @State private var palette: CoverPalette?
+
     private var discCount: Int { max(discTitles.count, 1) }
-    
-    private var hasRelease: Binding<Bool> {
-        Binding (
-            get: { release != nil },
-            set: { release = $0 ? .now : nil }
-        )
+
+    private var accent: Color {
+        palette?.accent ?? audioPlayer.accent
     }
-    private var releaseDate: Binding<Date> {
-        Binding(
-            get: { release ?? .now },
-            set: { release = $0 }
-        )
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    VStack(spacing: 12) {
-                        Group {
-                            if let artworkData, let uiImage = UIImage(data: artworkData) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.2))
-                                    .overlay {
-                                        Image(systemName: "music.note")
-                                            .font(.largeTitle)
-                                            .foregroundStyle(.secondary)
-                                    }
-                            }
-                        }
-                        .frame(width: 150, height: 150)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        
-                        Button {
-                            showImagePicker = true
-                        } label: {
-                            Label("Pick an image", systemImage: "photo")
-                                .foregroundStyle(.primary)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .sheet(isPresented: $showImagePicker) {
-                            ImagePicker(imageData: $artworkData)
-                        }
+            List {
+                header
+                    .bareRow()
+
+                RecordFormSection("Artists", detail: "\(artists.count)") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ArtistsEditor(artists: $artists)
+                        RecordHint("Tap a name to mark a guest")
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal)
                 }
-                .listRowBackground(Color.clear)
-                Section("album name") {
-                    TextField("", text: $name)
+                .padding(.top, 16)
+                .bareRow()
+
+                RecordFormSection("Released") {
+                    ReleaseDateField(date: $release)
+                        .padding(.horizontal)
                 }
-                Section("artists") {
-                    ArtistsEditor(artists: $artists)
-                }
-                Picker("type", selection: $type) {
-                    ForEach(Album.AlbumType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
+                .padding(.top, 16)
+                .bareRow()
+
+                RecordFormSection("Tracks", detail: tracksDetail) {
+                    if !trackDrafts.isEmpty || discCount > 1 {
+                        EditButton()
+                            .font(.subheadline.weight(.semibold))
+                            .buttonStyle(.borderless)
+                    }
+                } content: {
+                    if trackDrafts.isEmpty {
+                        RecordHint("The record is empty — add the first tracks below")
+                            .padding(.horizontal)
                     }
                 }
-                
-                Section("release") {
-                    Toggle("has release date", isOn: hasRelease)
-                    if release != nil {
-                        DatePicker("release date", selection: releaseDate, displayedComponents: .date)
-                    }
+                .padding(.top, 16)
+                .bareRow()
+
+                tracksEditor
+
+                if discCount > 1 {
+                    RecordHint("Drag a disc row to move where it starts. Deleting it merges the disc into the previous one.")
+                        .padding(.horizontal)
+                        .bareRow()
                 }
-                VStack {
-                    HStack(spacing: 16) {
-                        Button {
-                            isImporting = true
-                        } label: {
-                            VStack {
-                                Text("Upload music")
-                                Image(systemName: "square.and.arrow.down")
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 120)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .buttonBorderShape(.roundedRectangle(radius: 15))
-                        .tint(.blue)
-                        Button {
-                            
-                        } label: {
-                            VStack {
-                                Text("From YouTube")
-                                Image(systemName: "video")
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 120)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .buttonBorderShape(.roundedRectangle(radius: 15))
-                        .tint(.red)
-                    }
-                    Button {
-                        showSoundCloud = true
-                    } label: {
-                        VStack {
-                            Text("SoundCloud")
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 120)
-                    }
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 15))
-                .padding(.top)
-                .tint(.orange)
-                .fileImporter(
-                    isPresented: $isImporting,
-                    allowedContentTypes: [.audio],
-                    allowsMultipleSelection: true,
-                    onCompletion: handleFileLoading
-                )
-                .sheet(isPresented: $showSoundCloud) {
-                    SoundCloudImportView { file, metadata in
-                        addDraft(from: file, metadata: metadata)
-                    }
-                }
-                if !trackDrafts.isEmpty || discCount > 1 {
-                    Section {
-                        tracksEditor
-                    } header: {
-                        HStack {
-                            Text("tracks")
-                            Spacer()
-                            EditButton()
-                        }
-                    } footer: {
-                        if discCount > 1 {
-                            Text("Drag a disc row to change where that disc starts. Deleting it moves its tracks to the previous disc.")
-                        }
-                    }
-                }
-                Button {
-                    showTrackPicker = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                        Text(discCount > 1 ? "Add Music to Disc \(discCount)" : "Add Music")
-                            .tint(.primary)
-                    }
-                    .font(.headline)
-                    .foregroundStyle(.tint)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                }
-                .buttonStyle(.glassProminent)
-                .sheet(isPresented: $showTrackPicker) {
-                    AlbumTrackPickerView(album: [], addedTracks: $trackDrafts)
-                }
+
+                sources
+                    .padding(.top, 8)
+                    .bareRow()
 
                 Button {
                     var split = split
                     split.appendDisc()
                     apply(split)
                 } label: {
-                    Label("Add a Disc", systemImage: "record.circle")
-                        .frame(maxWidth: .infinity)
+                    Label("Add a disc", systemImage: "record.circle")
+                        .font(.subheadline.weight(.semibold))
                 }
-                .listRowBackground(Color.clear)
+                .buttonStyle(.borderless)
+                .padding(.horizontal)
+                .padding(.bottom, 24)
+                .bareRow()
+            }
+            .listStyle(.plain)
+            .listRowSpacing(8)
+            .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .bottom) {
+                createButton
+            }
+            .containerBackground(for: .navigation) {
+                CoverAura(palette: palette, breathes: false)
+            }
+            // Всё в цвет обложки. Строго до `.toolbar` и листов: выбор музыки
+            // остаётся в цвете приложения.
+            .tint(accent)
+            .navigationDestination(item: $editingDraft) { id in
+                if let index = trackDrafts.firstIndex(where: { $0.id == id }) {
+                    TrackDraftEditView(draft: $trackDrafts[index], albumArtists: artists.map(\.name))
+                }
             }
             // Новые черновики (из файлов, SoundCloud, библиотеки) приходят без
             // пластинки — кладём их на последнюю, как `Album.append`.
             .onChange(of: trackDrafts.map(\.id)) {
                 placeNewDrafts()
             }
-            .navigationTitle("New album")
+            .task(id: artworkData?.count) {
+                let (image, colors) = await UIImage.coverAndPalette(from: artworkData)
+                guard !Task.isCancelled else { return }
+
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    cover = image
+                    palette = colors
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -202,11 +152,20 @@ struct CreateAlbumView: View {
                         dismiss()
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("save") {
-                        save()
-                    }
+            }
+            .fileImporter(
+                isPresented: $isImporting,
+                allowedContentTypes: [.audio],
+                allowsMultipleSelection: true,
+                onCompletion: handleFileLoading
+            )
+            .sheet(isPresented: $showSoundCloud) {
+                SoundCloudImportView { file, metadata in
+                    addDraft(from: file, metadata: metadata)
                 }
+            }
+            .sheet(isPresented: $showTrackPicker) {
+                AlbumTrackPickerView(album: [], addedTracks: $trackDrafts)
             }
             .alert(
                 "Some files were not imported",
@@ -221,7 +180,169 @@ struct CreateAlbumView: View {
             }
         }
     }
-    
+
+    // MARK: - Шапка
+
+    /// Конверт с диском, имя, паспорт и формат.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            CoverEditMenu(artworkData: $artworkData) {
+                AlbumSleeve(
+                    cover: cover,
+                    type: type,
+                    discs: previewDiscs,
+                    outDisc: previewDiscs.count - 1,
+                    playing: nil,
+                    isPlaying: false,
+                    accent: accent
+                )
+                .frame(width: 250)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                RecordTitleField(placeholder: "Album name", text: $name)
+                RecordPassport(parts: passport)
+            }
+
+            typePicker
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+
+    /// Формат тремя капсулами: выбранный залит цветом обложки, и диск в конверте
+    /// сразу становится своего размера — сингл маленький, LP большой.
+    private var typePicker: some View {
+        HStack(spacing: 8) {
+            ForEach(Album.AlbumType.allCases, id: \.self) { option in
+                let isSelected = option == type
+
+                Button {
+                    withAnimation(.spring(duration: 0.45, bounce: 0.25)) {
+                        type = option
+                    }
+                } label: {
+                    Text(option.rawValue.uppercased())
+                        .font(.system(size: 18, weight: .heavy).width(.compressed))
+                        .tracking(0.8)
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                        .frame(minWidth: 64, minHeight: 38)
+                        .glassEffect(isSelected ? .regular.tint(accent) : .regular, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+
+    /// Пластинки превью: каждый черновик — кольцо своей длины на своей пластинке.
+    private var previewDiscs: [[TimeInterval]] {
+        let drafts = Dictionary(trackDrafts.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+
+        return split.discs.map { ids in
+            ids.compactMap { drafts[$0] }.map(duration(of:))
+        }
+    }
+
+    /// «2×LP  ·  12 TRACKS  ·  43 MIN  ·  2024».
+    private var passport: [String] {
+        var parts = [discCount > 1 ? "\(discCount)×\(type.rawValue)" : type.rawValue]
+
+        switch trackDrafts.count {
+        case 0: parts.append("no tracks yet")
+        case 1: parts.append("1 track")
+        default: parts.append("\(trackDrafts.count) tracks")
+        }
+
+        let minutes = Int((trackDrafts.reduce(0) { $0 + duration(of: $1) } / 60).rounded())
+        if minutes > 0 {
+            parts.append(minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min")
+        }
+
+        if let release {
+            parts.append(String(Calendar.current.component(.year, from: release)))
+        }
+
+        return parts
+    }
+
+    private var tracksDetail: String {
+        discCount > 1 ? "\(discCount) discs" : ""
+    }
+
+    /// У трека из библиотеки длительность уже лежит в нём самом, у файла — в черновике.
+    private func duration(of draft: TrackDraft) -> TimeInterval {
+        if let id = draft.sourceTrack, let track = modelContext.model(for: id) as? Track {
+            return track.duration
+        }
+        return draft.duration
+    }
+
+    // MARK: - Источники и сохранение
+
+    /// Три пустых слота — откуда положить музыку. Пунктир тот же, что у
+    /// «Add music» в плейлисте: по всему приложению так выглядит «сюда можно положить».
+    private var sources: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Куда ляжет музыка, важно, только когда пластинок несколько.
+            if discCount > 1 {
+                RecordHint("Add music to disc \(discCount)")
+            }
+
+            HStack(spacing: 10) {
+                sourceSlot("Library", systemImage: "music.note.list") { showTrackPicker = true }
+                sourceSlot("Files", systemImage: "square.and.arrow.down") { isImporting = true }
+                sourceSlot("SoundCloud", systemImage: "link") { showSoundCloud = true }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func sourceSlot(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+
+        // `.borderless`: в строке списка три кнопки, и без явного стиля нажатие
+        // на любую срабатывало бы как нажатие на всю строку — то есть на все три.
+        return Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.tint)
+
+                // Цвета явные: `.borderless` красит иерархические `.secondary`
+                // в акцент, а пунктир по всему приложению серый.
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 84)
+            .background {
+                shape.strokeBorder(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [5, 5]))
+            }
+            .contentShape(shape)
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private var createButton: some View {
+        Button {
+            save()
+        } label: {
+            Label("Create album", systemImage: "plus")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+        }
+        .buttonStyle(.glassProminent)
+        // Альбом без имени в библиотеке не найти и не отличить от соседей.
+        .disabled(trimmedName.isEmpty)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
+    }
+
     // MARK: - Треки и пластинки
 
     /// Черновики одним списком, а пластинки — границами в нём, как в правке
@@ -234,20 +355,27 @@ struct CreateAlbumView: View {
 
         if discCount > 1 {
             DiscTitleRow(number: 1, title: titleBinding(ofDisc: 0))
+                .padding(.horizontal)
+                .bareRow()
         }
 
         ForEach(Array(rows.enumerated()), id: \.element) { index, row in
             switch row {
             case .track(let id):
-                if let draftIndex = trackDrafts.firstIndex(where: { $0.id == id }) {
-                    NavigationLink {
-                        TrackDraftEditView(draft: $trackDrafts[draftIndex], albumArtists: artists.map(\.name))
+                if let draft = trackDrafts.first(where: { $0.id == id }) {
+                    Button {
+                        editingDraft = id
                     } label: {
-                        AlbumTrackDraftCell(draft: trackDrafts[draftIndex], position: numbers[id] ?? 0)
+                        AlbumTrackDraftCell(draft: draft, position: numbers[id] ?? 0, duration: duration(of: draft))
                     }
+                    .buttonStyle(.plain)
+                    .bareRow()
                 }
             case .boundary(let disc):
                 DiscTitleRow(number: split.number(ofBoundaryAt: index), title: titleBinding(ofDisc: disc))
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                    .bareRow()
             }
         }
         .onMove { source, destination in
@@ -352,9 +480,13 @@ struct CreateAlbumView: View {
                     name: metadata.title ?? url.parseMusic().name,
                     artists: names.map { ArtistDraft(name: $0, role: .featured) },
                     stagedURL: stagedURL,
-                    originalURL: url
+                    originalURL: url,
+                    duration: await TrackDurationLoader.duration(of: stagedURL) ?? 0
                 )
             )
+
+            // Своей обложки у альбома может ещё не быть — берём первую пришедшую.
+            if artworkData == nil { artworkData = metadata.artwork }
         }
     }
 
@@ -363,13 +495,19 @@ struct CreateAlbumView: View {
     private func addDraft(from file: PickedFile, metadata: AudioMetadata) {
         let names = metadata.artistNames.filter { !isAlbumArtist($0) }
 
-        trackDrafts.append(
-            TrackDraft(
-                name: metadata.title ?? file.url.parseMusic().name,
-                artists: names.map { ArtistDraft(name: $0, role: .featured) },
-                stagedURL: file.url
-            )
+        let draft = TrackDraft(
+            name: metadata.title ?? file.url.parseMusic().name,
+            artists: names.map { ArtistDraft(name: $0, role: .featured) },
+            stagedURL: file.url
         )
+        trackDrafts.append(draft)
+
+        // Длительность дочитывается следом: лист SoundCloud отдаёт файл синхронно.
+        Task {
+            guard let seconds = await TrackDurationLoader.duration(of: file.url),
+                  let index = trackDrafts.firstIndex(where: { $0.id == draft.id }) else { return }
+            trackDrafts[index].duration = seconds
+        }
 
         // Своей обложки у альбома может ещё не быть — берём первую пришедшую.
         if artworkData == nil { artworkData = metadata.artwork }
@@ -479,4 +617,15 @@ struct CreateAlbumView: View {
         if failedImports.isEmpty { dismiss() }
     }
 
+}
+
+private extension View {
+
+    /// Строка списка без системного оформления: ни фона, ни разделителя,
+    /// ни отступов — форма рисует всё сама.
+    func bareRow() -> some View {
+        listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+    }
 }

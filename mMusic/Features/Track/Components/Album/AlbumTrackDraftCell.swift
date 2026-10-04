@@ -1,9 +1,15 @@
 import SwiftUI
 
+/// Строка трека в собираемом альбоме — та же, что строка трека на странице
+/// готового альбома: номер на пластинке, имя, приглашённые и длительность
+/// в стеклянной капсуле. Авторов альбома здесь нет: они написаны в шапке.
 struct AlbumTrackDraftCell: View {
     var draft: TrackDraft
     var position: Int
-    
+    /// Длительность — у трека из библиотеки она берётся из самого трека,
+    /// поэтому приходит снаружи, а не из черновика.
+    var duration: TimeInterval = 0
+
     private var featuredNames: [String] {
         var names: [String] = []
         for artist in draft.artists {
@@ -13,25 +19,44 @@ struct AlbumTrackDraftCell: View {
         }
         return names
     }
-    
+
     var body: some View {
         HStack {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.gray.opacity(0.2))
+            Text("\(position)")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
                 .frame(width: 40, height: 40)
-                .overlay {
-                    Text("\(position)")
-                }
+
             VStack(alignment: .leading) {
                 Text(draft.name)
                     .bold()
                     .lineLimit(1)
                 if !featuredNames.isEmpty {
-                    Text(featuredNames.joined(separator: ", "))
+                    Text("feat. \(featuredNames.joined(separator: ", "))")
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
+
+            Spacer()
+
+            if duration > 0 {
+                Text(Duration.seconds(duration).formatted(.time(pattern: .minuteSecond)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            // Строку открывают, чтобы поправить трек, — шеврон об этом говорит.
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .frame(width: 28)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .glassEffect()
+        .padding(.horizontal)
     }
 }

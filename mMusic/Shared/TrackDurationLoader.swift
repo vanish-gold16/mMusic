@@ -8,6 +8,19 @@ import Foundation
 /// только те треки, у которых её ещё нет.
 enum TrackDurationLoader {
 
+    /// Длительность файла, которого ещё нет в библиотеке, — для превью в формах
+    /// импорта. nil — не прочиталась. Доступ security-scoped: файл может лежать
+    /// в «Файлах», куда без него не пускают.
+    static func duration(of url: URL) async -> TimeInterval? {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+
+        guard let time = try? await AVURLAsset(url: url).load(.duration) else { return nil }
+
+        let seconds = CMTimeGetSeconds(time)
+        return seconds.isFinite && seconds > 0 ? seconds : nil
+    }
+
     /// Заполняет длительность по одному треку за раз: файлов может быть много,
     /// а спешить некуда — экран уже показан.
     static func fill(_ tracks: [Track]) async {

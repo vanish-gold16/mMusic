@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 import SwiftData
 
@@ -16,8 +15,6 @@ struct SettingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) private var audioPlayer
 
-    @State private var showImagePicker = false
-    
     @State private var name = ""
     @State private var artists: [ArtistDraft] = []
     @State private var genre: Genre = .pop
@@ -35,8 +32,6 @@ struct SettingView: View {
     @State private var palette: CoverPalette?
     /// Длительность из самого файла — ей задаётся толщина кольца на диске.
     @State private var duration: TimeInterval = 0
-
-    @FocusState private var isNameFocused: Bool
 
     /// Свежие слева: трек обычно докладывают в недавно добавленный альбом.
     @Query(sort: \Album.addedAt, order: .reverse) private var albums: [Album]
@@ -60,6 +55,18 @@ struct SettingView: View {
         destinationAlbum?.artwork ?? artworkData
     }
 
+    /// Дата выхода одним полем: в состоянии она хранится парой «есть / какая»,
+    /// а `ReleaseDateField` нужно одно необязательное значение.
+    private var releaseBinding: Binding<Date?> {
+        Binding(
+            get: { hasReleaseOn ? release : nil },
+            set: { date in
+                if let date { release = date }
+                hasReleaseOn = date != nil
+            }
+        )
+    }
+
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -70,34 +77,30 @@ struct SettingView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     header
 
-                    section("Artists", detail: "\(artists.count)") {
+                    RecordFormSection("Artists", detail: "\(artists.count)") {
                         VStack(alignment: .leading, spacing: 10) {
                             ArtistsEditor(artists: $artists)
 
                             // Роль переключается нажатием на капсулу — без подсказки
                             // до этого не догадаться.
-                            Text("TAP A NAME TO MARK A GUEST")
-                                .font(.caption2)
-                                .fontWeight(.semibold)
-                                .tracking(1.2)
-                                .foregroundStyle(.tertiary)
+                            RecordHint("Tap a name to mark a guest")
                         }
                         .padding(.horizontal)
                     }
 
-                    section("Album", detail: destinationAlbum?.formatLabel ?? "New single") {
+                    RecordFormSection("Album", detail: destinationAlbum?.formatLabel ?? "New single") {
                         AlbumDestinationStrip(albums: albums, selection: $destinationAlbum)
                     }
 
-                    section("Genre") {
-                        genreMenu
+                    RecordFormSection("Genre") {
+                        GenreMenu(genre: $genre)
                             .padding(.horizontal)
                     }
 
                     // У существующего альбома свои обложка и дата — трек их наследует.
                     if destinationAlbum == nil {
-                        section("Released") {
-                            releaseRow
+                        RecordFormSection("Released") {
+                            ReleaseDateField(date: releaseBinding)
                                 .padding(.horizontal)
                         }
                     }
@@ -135,9 +138,6 @@ struct SettingView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showImagePicker) {
-                ImagePicker(imageData: $artworkData)
-            }
             .task {
                 await loadMetadata()
             }
@@ -170,26 +170,8 @@ struct SettingView: View {
             sleeve
 
             VStack(alignment: .leading, spacing: 6) {
-                // Имя правится прямо в шапке, тем же шрифтом, каким будет стоять
-                // на странице альбома: что видишь, то и получишь.
-                TextField("Track name", text: $name, axis: .vertical)
-                    .font(.system(size: 40, weight: .heavy).width(.compressed))
-                    .lineLimit(1...3)
-                    .focused($isNameFocused)
-                    .submitLabel(.done)
-                    .onChange(of: name) { _, newValue in
-                        // В многострочном поле Return вставляет перенос — а имени
-                        // трека перенос не нужен, Return здесь значит «готово».
-                        guard newValue.contains("\n") else { return }
-                        name = newValue.replacingOccurrences(of: "\n", with: "")
-                        isNameFocused = false
-                    }
-
-                Text(passport)
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .tracking(1.2)
-                    .foregroundStyle(.secondary)
+                RecordTitleField(placeholder: "Track name", text: $name)
+                RecordPassport(parts: passport)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -213,33 +195,7 @@ struct SettingView: View {
         .animation(.spring(duration: 0.5, bounce: 0.2), value: destinationAlbum?.persistentModelID)
 
         if destinationAlbum == nil {
-            Menu {
-                Button {
-                    showImagePicker = true
-                } label: {
-                    Label(artworkData == nil ? "Add cover" : "Change cover", systemImage: "photo")
-                }
-
-                if artworkData != nil {
-                    Button(role: .destructive) {
-                        artworkData = nil
-                    } label: {
-                        Label("Remove cover", systemImage: "trash")
-                    }
-                }
-            } label: {
-                preview
-                    .overlay(alignment: .bottomLeading) {
-                        Image(systemName: "camera.fill")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .padding(9)
-                            .background(.thinMaterial, in: Circle())
-                            .padding(10)
-                    }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Cover")
+            CoverEditMenu(artworkData: $artworkData) { preview }
         } else {
             preview
         }
@@ -262,7 +218,7 @@ struct SettingView: View {
     }
 
     /// «NEW SINGLE  ·  3:41» или «LP  ·  TRACK 8  ·  3:41».
-    private var passport: String {
+    private var passport: [String] {
         var parts: [String] = []
 
         if let album = destinationAlbum {
@@ -276,76 +232,10 @@ struct SettingView: View {
             parts.append(Duration.seconds(duration).formatted(.time(pattern: .minuteSecond)))
         }
 
-        return parts.joined(separator: "  ·  ").uppercased()
+        return parts
     }
 
-    // MARK: - Разделы
-
-    private func section<Content: View>(
-        _ title: String,
-        detail: String = "",
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CrateDivider(title: title.uppercased(), detail: detail.uppercased(), size: 22)
-                .padding(.horizontal)
-
-            content()
-        }
-    }
-
-    /// Жанр — крупным словом в стеклянной капсуле, а не строкой таблицы.
-    /// Вариантов шесть десятков, поэтому выбор — системным меню, где их видно столбцом.
-    private var genreMenu: some View {
-        Menu {
-            Picker("Genre", selection: $genre) {
-                ForEach(Genre.allCases, id: \.self) { genre in
-                    Text(genre.rawValue).tag(genre)
-                }
-            }
-        } label: {
-            HStack(spacing: 10) {
-                Text(genre.rawValue)
-                    .font(.system(size: 26, weight: .heavy).width(.compressed))
-                    .foregroundStyle(Color.primary)
-
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 20)
-            .frame(height: 50)
-            .glassEffect()
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Дата выхода сингла. Её может и не быть — тогда на её месте пустой
-    /// пунктирный слот, как у всех «сюда можно что-то положить».
-    @ViewBuilder
-    private var releaseRow: some View {
-        if hasReleaseOn {
-            HStack(spacing: 8) {
-                DatePicker("Release date", selection: $release, displayedComponents: .date)
-                    .labelsHidden()
-
-                Button {
-                    hasReleaseOn = false
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove release date")
-            }
-        } else {
-            DashedSlot(title: "Add release date", systemImage: "calendar", cornerRadius: 26) {
-                hasReleaseOn = true
-            }
-            .frame(maxWidth: 220)
-        }
-    }
+    // MARK: - Низ формы
 
     /// Откуда трек — мелко внизу, как выходные данные на обороте конверта.
     private var linerNotes: some View {
@@ -426,28 +316,13 @@ struct SettingView: View {
     /// Длительность — для толщины кольца в превью. В библиотеку её запишет
     /// `TrackDurationLoader`, как и всем трекам.
     private func loadDuration() async {
-        let url = file.url
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-
-        guard let time = try? await AVURLAsset(url: url).load(.duration) else { return }
-
-        let seconds = CMTimeGetSeconds(time)
-        if seconds.isFinite, seconds > 0 {
+        if let seconds = await TrackDurationLoader.duration(of: file.url) {
             duration = seconds
         }
     }
 
-    /// Обложку превью и её цвета считаем в фоне: картинка из тегов бывает
-    /// в несколько мегабайт.
     private func loadCover() async {
-        let data = previewArtwork
-
-        let (image, colors) = await Task.detached(priority: .utility) {
-            let image = data.flatMap { UIImage.thumbnail(from: $0, side: 600) }
-            return (image, image?.coverPalette)
-        }.value
-
+        let (image, colors) = await UIImage.coverAndPalette(from: previewArtwork)
         guard !Task.isCancelled else { return }
 
         withAnimation(.easeInOut(duration: 0.3)) {
