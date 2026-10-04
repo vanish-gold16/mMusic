@@ -95,9 +95,16 @@ struct CreateAlbumView: View {
                         .bareRow()
                 }
 
-                sources
-                    .padding(.top, 8)
-                    .bareRow()
+                // Куда ляжет музыка, важно, только когда пластинок несколько.
+                MusicSourceSlots(
+                    hint: discCount > 1 ? "Add music to disc \(discCount)" : nil,
+                    onLibrary: { showTrackPicker = true },
+                    onFiles: { isImporting = true },
+                    onSoundCloud: { showSoundCloud = true }
+                )
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .bareRow()
 
                 Button {
                     var split = split
@@ -204,36 +211,11 @@ struct CreateAlbumView: View {
                 RecordPassport(parts: passport)
             }
 
-            typePicker
+            AlbumTypePicker(type: $type, accent: accent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
         .padding(.top, 8)
-    }
-
-    /// Формат тремя капсулами: выбранный залит цветом обложки, и диск в конверте
-    /// сразу становится своего размера — сингл маленький, LP большой.
-    private var typePicker: some View {
-        HStack(spacing: 8) {
-            ForEach(Album.AlbumType.allCases, id: \.self) { option in
-                let isSelected = option == type
-
-                Button {
-                    withAnimation(.spring(duration: 0.45, bounce: 0.25)) {
-                        type = option
-                    }
-                } label: {
-                    Text(option.rawValue.uppercased())
-                        .font(.system(size: 18, weight: .heavy).width(.compressed))
-                        .tracking(0.8)
-                        .foregroundStyle(isSelected ? Color.white : Color.primary)
-                        .frame(minWidth: 64, minHeight: 38)
-                        .glassEffect(isSelected ? .regular.tint(accent) : .regular, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-            }
-        }
     }
 
     /// Пластинки превью: каждый черновик — кольцо своей длины на своей пластинке.
@@ -279,53 +261,7 @@ struct CreateAlbumView: View {
         return draft.duration
     }
 
-    // MARK: - Источники и сохранение
-
-    /// Три пустых слота — откуда положить музыку. Пунктир тот же, что у
-    /// «Add music» в плейлисте: по всему приложению так выглядит «сюда можно положить».
-    private var sources: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Куда ляжет музыка, важно, только когда пластинок несколько.
-            if discCount > 1 {
-                RecordHint("Add music to disc \(discCount)")
-            }
-
-            HStack(spacing: 10) {
-                sourceSlot("Library", systemImage: "music.note.list") { showTrackPicker = true }
-                sourceSlot("Files", systemImage: "square.and.arrow.down") { isImporting = true }
-                sourceSlot("SoundCloud", systemImage: "link") { showSoundCloud = true }
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    private func sourceSlot(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-
-        // `.borderless`: в строке списка три кнопки, и без явного стиля нажатие
-        // на любую срабатывало бы как нажатие на всю строку — то есть на все три.
-        return Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.tint)
-
-                // Цвета явные: `.borderless` красит иерархические `.secondary`
-                // в акцент, а пунктир по всему приложению серый.
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity, minHeight: 84)
-            .background {
-                shape.strokeBorder(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [5, 5]))
-            }
-            .contentShape(shape)
-        }
-        .buttonStyle(.borderless)
-    }
+    // MARK: - Сохранение
 
     private var createButton: some View {
         Button {
@@ -617,15 +553,4 @@ struct CreateAlbumView: View {
         if failedImports.isEmpty { dismiss() }
     }
 
-}
-
-private extension View {
-
-    /// Строка списка без системного оформления: ни фона, ни разделителя,
-    /// ни отступов — форма рисует всё сама.
-    func bareRow() -> some View {
-        listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets())
-    }
 }

@@ -1,78 +1,88 @@
 import SwiftData
 import SwiftUI
 
+/// Правка плейлиста — его же страница, только всё в ней меняется: веер
+/// с главной обложкой, имя, описание и список треков, из которого их смахивают.
+/// Изменения пишутся сразу, «done» просто закрывает лист.
 struct EditPlaylistView: View {
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    
-    @State private var showImagePicker = false
+    @Environment(AudioPlayer.self) private var audioPlayer
+
+    @State private var showTrackPicker = false
+    /// Цвета передней обложки — их отдаёт шапка, когда разберёт веер.
+    @State private var palette: CoverPalette?
     
     @Bindable var playlist: Playlist
     
     var body: some View {
+        let tracks = playlist.orderedTracks
+
         NavigationStack {
-            Form {
-                Section {
-                    HStack {
-                        if let artworkData = playlist.artwork, let uiImage = UIImage(data: artworkData) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 150)
-                        } else {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.2))
-                                .overlay {
-                                    Image(systemName: "music.note")
-                                }
-                                .scaledToFit()
-                                .frame(height: 150)
-                        }
-                        
-                        Spacer()
-                        
-                        Button {
-                            showImagePicker = true
-                        } label: {
-                            Label("Pick an image", systemImage: "photo")
-                                .labelStyle(.titleAndIcon)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .sheet(isPresented: $showImagePicker) {
-                            ImagePicker(imageData: $playlist.artwork)
-                        }
+            List {
+                PlaylistFormHeader(
+                    artworkData: $playlist.artwork,
+                    name: $playlist.name,
+                    description: $playlist.playlistDescription,
+                    fanSources: playlist.fanCovers,
+                    passport: playlist.summary(includingArtists: true),
+                    palette: $palette
+                )
+                .padding(.top, 8)
+                .bareRow()
+
+                RecordFormSection("Tracks", detail: tracks.isEmpty ? "" : "\(tracks.count)") {
+                    if !tracks.isEmpty {
+                        RecordHint("Swipe a track to take it out")
+                            .padding(.horizontal)
                     }
                 }
-                
-                Section("playlist name") {
-                    TextField(playlist.name, text: $playlist.name)
+                .padding(.top, 16)
+                .bareRow()
+
+                ForEach(tracks) { track in
+                    TrackCell(
+                        track: track,
+                        queue: tracks,
+                        leadingStyle: .artwork,
+                        showDuration: true,
+                        onRemoveFromPlaylist: { remove(track) }
+                    )
+                    .bareRow()
                 }
-                Section("description") {
-                    TextField(playlist.playlistDescription, text: $playlist.playlistDescription)
+                .onDelete { offsets in
+                    removeTracks(at: offsets)
                 }
-                
-                if !playlist.orderedTracks.isEmpty {
-                    Section("tracks") {
-                        ForEach(playlist.orderedTracks) { track in
-                            TrackCell(
-                                track: track,
-                                leadingStyle: .artwork,
-                                onRemoveFromPlaylist: { remove(track) }
-                            )
-                        }
-                        .onDelete { offsets in
-                            removeTracks(at: offsets)
-                        }
-                    }
+
+                DashedSlot(title: tracks.isEmpty ? "Add the first tracks" : "Add music", isLarge: tracks.isEmpty) {
+                    showTrackPicker = true
                 }
+                .padding(.horizontal)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
+                .bareRow()
             }
+            .listStyle(.plain)
+            .listRowSpacing(8)
+            .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+            .containerBackground(for: .navigation) {
+                CoverAura(palette: palette, breathes: false)
+            }
+            // Всё в цвет обложки. Строго до `.toolbar` и листов: выбор музыки
+            // остаётся в цвете приложения.
+            .tint(palette?.accent ?? audioPlayer.accent)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("done") {
                         dismiss()
                     }
                 }
+            }
+            .sheet(isPresented: $showTrackPicker) {
+                TrackPickerView(playlist: playlist)
             }
         }
     }

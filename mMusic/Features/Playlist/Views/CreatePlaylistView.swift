@@ -1,107 +1,101 @@
 import SwiftUI
 import SwiftData
 
+/// Новый плейлист — его будущая страница: веер, в котором главную карту
+/// выбирают нажатием, а за ней выглядывают обложки добавленных треков; имя,
+/// описание, треки и пунктирный слот «Add music». Создаётся кнопкой внизу.
 struct CreatePlaylistView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(AudioPlayer.self) private var audioPlayer
     
-    @State private var showImagePicker = false
     @State private var showTrackPicker = false
 
     @State private var playlist = Playlist(name: "", items: [])
     @State private var artworkData: Data?
+    /// Цвета передней обложки — их отдаёт шапка, когда разберёт веер.
+    @State private var palette: CoverPalette?
+
+    /// Своя обложка ещё лежит отдельно от плейлиста — до создания он не в базе.
+    private var fanSources: [Data] {
+        Array(([artworkData].compactMap { $0 } + playlist.fanCovers).prefix(3))
+    }
+
+    private var trimmedName: String {
+        playlist.name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
+        let tracks = playlist.orderedTracks
+
         NavigationStack {
-            Form {
-                Section {
-                    VStack(spacing: 12) {
-                        Group {
-                            if let artworkData, let uiImage = UIImage(data: artworkData) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.gray.opacity(0.2))
-                                    .overlay {
-                                        Image(systemName: "music.note")
-                                            .font(.largeTitle)
-                                            .foregroundStyle(.secondary)
-                                    }
-                            }
-                        }
-                        .frame(width: 150, height: 150)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    PlaylistFormHeader(
+                        artworkData: $artworkData,
+                        name: $playlist.name,
+                        description: $playlist.playlistDescription,
+                        fanSources: fanSources,
+                        passport: playlist.summary(includingArtists: true),
+                        palette: $palette
+                    )
+                    .padding(.top, 8)
 
-                        Button {
-                            showImagePicker = true
-                        } label: {
-                            Label("Pick an image", systemImage: "photo")
-                                .foregroundStyle(.primary)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .sheet(isPresented: $showImagePicker) {
-                            ImagePicker(imageData: $artworkData)
-                        }
+                    RecordFormSection("Tracks", detail: tracks.isEmpty ? "" : "\(tracks.count)") {
+                        EmptyView()
                     }
-                    .frame(maxWidth: .infinity)
-                }
-                .listRowBackground(Color.clear)
+                    .padding(.top, 24)
 
-                Section("playlist name") {
-                    TextField("", text: $playlist.name)
-                }
-                Section("description") {
-                    TextField("", text: $playlist.playlistDescription)
-                }
-
-                if !playlist.items.isEmpty {
-                    Section {
-                        ForEach(playlist.orderedTracks) { track in
-                            TrackCell(track: track, leadingStyle: .artwork)
-                        }
+                    ForEach(tracks) { track in
+                        TrackCell(track: track, queue: tracks, leadingStyle: .artwork, showDuration: true)
                     }
-                }
 
-                Section {
-                    Button {
+                    DashedSlot(title: tracks.isEmpty ? "Add the first tracks" : "Add music", isLarge: tracks.isEmpty) {
                         showTrackPicker = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus")
-                            Text("Add Music")
-                                .tint(.primary)
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.tint)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
                     }
-                    .buttonStyle(.glassProminent)
-                    .sheet(isPresented: $showTrackPicker) {
-                        TrackPickerView(playlist: playlist)
-                    }
+                    .padding(.horizontal)
+                    .padding(.top, 4)
                 }
-                .listRowBackground(Color.clear)
+                .padding(.bottom, 24)
             }
+            .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .bottom) {
+                createButton
+            }
+            .containerBackground(for: .navigation) {
+                CoverAura(palette: palette, breathes: false)
+            }
+            // Всё в цвет обложки. Строго до `.toolbar` и листов: выбор музыки
+            // остаётся в цвете приложения.
+            .tint(palette?.accent ?? audioPlayer.accent)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("cancel") {
                         dismiss()
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("save") {
-                        create()
-                    }
-                }
+            }
+            .sheet(isPresented: $showTrackPicker) {
+                TrackPickerView(playlist: playlist)
             }
         }
     }
 
-    private func addTrack() {
-        
+    private var createButton: some View {
+        Button {
+            create()
+        } label: {
+            Label("Create playlist", systemImage: "plus")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+        }
+        .buttonStyle(.glassProminent)
+        // Плейлист без имени в библиотеке не найти и не отличить от соседей.
+        .disabled(trimmedName.isEmpty)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
     }
 
     private func create() {

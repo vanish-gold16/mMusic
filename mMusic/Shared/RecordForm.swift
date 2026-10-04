@@ -206,6 +206,103 @@ struct CoverEditMenu<Label: View>: View {
     }
 }
 
+/// Формат тремя капсулами: выбранный залит цветом обложки, и диск в конверте
+/// сразу становится своего размера — сингл маленький, LP большой.
+struct AlbumTypePicker: View {
+
+    @Binding var type: Album.AlbumType
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(Album.AlbumType.allCases, id: \.self) { option in
+                let isSelected = option == type
+
+                Button {
+                    withAnimation(.spring(duration: 0.45, bounce: 0.25)) {
+                        type = option
+                    }
+                } label: {
+                    Text(option.rawValue.uppercased())
+                        .font(.system(size: 18, weight: .heavy).width(.compressed))
+                        .tracking(0.8)
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                        .frame(minWidth: 64, minHeight: 38)
+                        .glassEffect(isSelected ? .regular.tint(accent) : .regular, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+}
+
+/// Три пустых слота — откуда положить музыку в альбом: библиотека, файлы,
+/// SoundCloud. Пунктир тот же, что у «Add music» в плейлисте: по всему
+/// приложению так выглядит «сюда можно положить».
+struct MusicSourceSlots: View {
+
+    /// Подпись над слотами — «Add music to disc 2», когда пластинок несколько.
+    var hint: String?
+    let onLibrary: () -> Void
+    let onFiles: () -> Void
+    let onSoundCloud: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let hint {
+                RecordHint(hint)
+            }
+
+            HStack(spacing: 10) {
+                slot("Library", systemImage: "music.note.list", action: onLibrary)
+                slot("Files", systemImage: "square.and.arrow.down", action: onFiles)
+                slot("SoundCloud", systemImage: "link", action: onSoundCloud)
+            }
+        }
+    }
+
+    private func slot(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+
+        // `.borderless`: в строке списка три кнопки, и без явного стиля нажатие
+        // на любую срабатывало бы как нажатие на всю строку — то есть на все три.
+        return Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.tint)
+
+                // Цвета явные: `.borderless` красит иерархические `.secondary`
+                // в акцент, а пунктир по всему приложению серый.
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 84)
+            .background {
+                shape.strokeBorder(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [5, 5]))
+            }
+            .contentShape(shape)
+        }
+        .buttonStyle(.borderless)
+    }
+}
+
+extension View {
+
+    /// Строка списка без системного оформления: ни фона, ни разделителя,
+    /// ни отступов — форма рисует всё сама. Список, а не `ScrollView`, там,
+    /// где строки переставляют и смахивают.
+    func bareRow() -> some View {
+        listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+    }
+}
+
 extension UIImage {
 
     /// Обложка формы и её цвета — одним заходом в фоне: картинка из тегов

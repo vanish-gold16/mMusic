@@ -175,14 +175,36 @@ struct CellFramePreferenceKey: PreferenceKey {
 /// Раскладывает капсулы в строку, перенося на следующую, когда не влезают по ширине.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
-    
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
+        arrange(subviews, width: proposal.width).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+        // Переносим тем же расчётом и по той же ширине, что при замере, а не по bounds.
+        // bounds — это замеренная ширина строки впритык, а правый край здесь
+        // складывался в другом порядке, и дробные ширины («Adaro» + «LP»)
+        // расходились в последнем знаке. Последняя капсула «не влезала»,
+        // уезжала на новую строку — ниже посчитанной высоты, поверх соседей.
+        let frames = arrange(subviews, width: proposal.width).frames
+        for (subview, frame) in zip(subviews, frames) {
+            subview.place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(frame.size)
+            )
+        }
+    }
+
+    /// Рамки капсул относительно левого верхнего угла и общий размер потока.
+    private func arrange(_ subviews: Subviews, width: CGFloat?) -> (frames: [CGRect], size: CGSize) {
+        let maxWidth = width ?? .infinity
+        var frames: [CGRect] = []
         var currentX: CGFloat = 0
         var currentY: CGFloat = 0
         var rowHeight: CGFloat = 0
         var totalWidth: CGFloat = 0
-        
+
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
             if currentX + size.width > maxWidth, currentX > 0 {
@@ -190,28 +212,11 @@ struct FlowLayout: Layout {
                 currentY += rowHeight + spacing
                 rowHeight = 0
             }
+            frames.append(CGRect(origin: CGPoint(x: currentX, y: currentY), size: size))
             currentX += size.width + spacing
             rowHeight = max(rowHeight, size.height)
             totalWidth = max(totalWidth, currentX - spacing)
         }
-        return CGSize(width: totalWidth, height: currentY + rowHeight)
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
-        var currentX = bounds.minX
-        var currentY = bounds.minY
-        var rowHeight: CGFloat = 0
-        
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > bounds.maxX, currentX > bounds.minX {
-                currentX = bounds.minX
-                currentY += rowHeight + spacing
-                rowHeight = 0
-            }
-            subview.place(at: CGPoint(x: currentX, y: currentY), anchor: .topLeading, proposal: ProposedViewSize(size))
-            currentX += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
+        return (frames, CGSize(width: totalWidth, height: currentY + rowHeight))
     }
 }

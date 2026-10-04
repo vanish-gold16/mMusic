@@ -2,6 +2,9 @@ import SwiftUI
 
 /// Правка статического текста трека. Открывается листом и из плеера, и из
 /// редактора трека — поэтому свой `NavigationStack` носит с собой.
+///
+/// Сверху — имя трека крупно, как в остальных формах, и счёт строк: длинный
+/// текст видно и без прокрутки до конца.
 struct LyricsEditorView: View {
 
     let track: Track
@@ -14,6 +17,13 @@ struct LyricsEditorView: View {
     /// Клавиатура поднимается сама, когда текста ещё нет: пустой экран открывают,
     /// чтобы писать, а не чтобы смотреть.
     @FocusState private var isFocused: Bool
+
+    /// «TEXT  ·  24 LINES». Пустые строки между куплетами не считаются.
+    private var passport: [String] {
+        let lines = draft.split(separator: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count
+        guard lines > 0 else { return ["text", "empty"] }
+        return ["text", lines == 1 ? "1 line" : "\(lines) lines"]
+    }
 
     var body: some View {
         NavigationStack {
@@ -34,7 +44,17 @@ struct LyricsEditorView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .navigationTitle(track.name)
+                .safeAreaInset(edge: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(track.name)
+                            .font(.system(size: 32, weight: .heavy).width(.compressed))
+                            .lineLimit(2)
+                        RecordPassport(parts: passport)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
