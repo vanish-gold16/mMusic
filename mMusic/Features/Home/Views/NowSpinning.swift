@@ -55,7 +55,7 @@ struct NowSpinning: View {
                 titleBlock
             }
 
-            Text(passport(index: index, in: tracks))
+            Text(passport)
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .tracking(1.2)
@@ -106,7 +106,7 @@ struct NowSpinning: View {
     /// «NOW SPINNING  ·  A3  ·  2:14 LEFT», на паузе — «PAUSED  ·  A3  ·  1:02 IN».
     /// Если звук ещё не поднимали (очередь восстановлена с прошлого запуска),
     /// времени нет — тогда пишется, когда трек ставили.
-    private func passport(index: Int, in tracks: [Track]) -> String {
+    private var passport: String {
         var parts: [String] = []
 
         if audioPlayer.isPlaying {
@@ -117,7 +117,7 @@ struct NowSpinning: View {
             parts.append("where you left off")
         }
 
-        if let number = number(index: index, in: tracks) {
+        if let number = track.album?.recordNumber(of: track) {
             parts.append(number)
         }
 
@@ -131,26 +131,6 @@ struct NowSpinning: View {
         }
 
         return parts.joined(separator: "  ·  ").uppercased()
-    }
-
-    /// Номер, как на обороте пластинки: «A3», если у неё две стороны, иначе
-    /// просто «TRACK 3». У пластинки из одного трека номера нет.
-    private func number(index: Int, in tracks: [Track]) -> String? {
-        guard tracks.count > 1 else { return nil }
-        guard let album = track.album else { return "track \(index + 1)" }
-
-        let sides = RecordSides.split(tracks, type: album.type)
-        guard sides.count > 1 else { return "track \(index + 1)" }
-
-        var start = 0
-        for (side, tracksOnSide) in sides.enumerated() {
-            if index < start + tracksOnSide.count {
-                let letter = RecordSides.letter(disc: album.clampedDisc(of: track), side: side)
-                return "\(letter)\(index - start + 1)"
-            }
-            start += tracksOnSide.count
-        }
-        return nil
     }
 
     private static func clock(_ seconds: TimeInterval) -> String {

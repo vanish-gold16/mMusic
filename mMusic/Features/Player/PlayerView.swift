@@ -1,5 +1,16 @@
 import SwiftUI
 
+/// Плеер — дека, через которую проходит музыка.
+///
+/// Сверху обложка, под ней паспорт трека — где он лежит на своей пластинке —
+/// и имя крупным сжатым шрифтом, как на остальных экранах. Главное ниже: лента,
+/// по которой трек идёт формой своей волны мимо неподвижной головки (см.
+/// `PlayheadTape`), — видно не только сколько сыграно, но и что прозвучит
+/// в ближайшие секунды. Под лентой — клавиши деки: включённое «залипает»
+/// и зажигает лампу. В самом низу — панель с подписями вместо значков.
+///
+/// Тонкой полоски прогресса и ряда одинаковых круглых кнопок, по которым узнаются
+/// чужие плееры, здесь нет: время — это сама музыка на ленте, кнопки — клавиши.
 struct PlayerView: View {
     let audioPlayer: AudioPlayer
     /// Общее пространство имён с мини-плеером: по нему обложка перетекает
@@ -12,9 +23,7 @@ struct PlayerView: View {
 
     /// Смещение при протягивании вниз — заменяет собой закрытие листа.
     @State private var dragOffset: CGFloat = 0
-    
-    @State private var sliderValue: TimeInterval = 0
-    @State private var isScrubbing = false
+
     @State private var isQueuePresented = false
     @State private var isAddingToPlaylist = false
     @State private var isEditingTrack = false
@@ -22,9 +31,11 @@ struct PlayerView: View {
     @State private var showsLyrics = false
     @State private var isEditingLyrics = false
     @State private var isRemixPresented = false
-    
+
     @State private var artworkWidth: CGFloat = 0
-    
+
+    private var accent: Color { audioPlayer.accent }
+
     var body: some View {
         // Стек нужен ради перехода на артиста.
         NavigationStack {
@@ -71,10 +82,10 @@ struct PlayerView: View {
         // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
         // обложке вуаль становится светлой, а `.primary` / `.secondary` — тёмными.
         .environment(\.colorScheme, isLightBackground ? .light : .dark)
-        .onAppear { sliderValue = audioPlayer.currentTime }
         .task(id: audioPlayer.currentTrack?.filename) {
             // Фоновый проход идёт по всей библиотеке подряд; тот трек, что открыт
-            // прямо сейчас, ждать своей очереди не должен.
+            // прямо сейчас, ждать своей очереди не должен — по его волне лента
+            // рисуется, пока считается подробная.
             if let track = audioPlayer.currentTrack {
                 await TrackWaveformLoader.fill(track)
             }
@@ -90,78 +101,95 @@ struct PlayerView: View {
             .padding(.bottom, 4)
     }
 
-    /// Горизонтальные протяжки принадлежат обложке (следующий и предыдущий трек),
-    /// поэтому закрытие реагирует только на явно вертикальное движение.
+    /// Горизонтальные протяжки принадлежат обложке (следующий и предыдущий трек)
+    /// и ленте (перемотка), поэтому закрытие реагирует только на явно вертикальное
+    /// движение.
     private var dismissGesture: some Gesture {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
-                guard abs(value.translation.height) > abs(value.translation.width) else { return }
-                dragOffset = max(0, value.translation.height)
+                dismissDragChanged(value.translation)
             }
             .onEnded { value in
-                guard abs(value.translation.height) > abs(value.translation.width) else { return }
-
-                if value.translation.height > 120 {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                        isPresented = false
-                    }
-                    dragOffset = 0
-                } else {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        dragOffset = 0
-                    }
-                }
+                dismissDragEnded(value.translation)
             }
     }
 
+    /// Закрытие вынесено из жеста, потому что зовут его и обложка с лентой. У них
+    /// свои протяжки, а вложенный жест забирает касание целиком — и с двух самых
+    /// больших мест экрана плеер не закрывался. Теперь они передают вертикальное
+    /// движение сюда.
+    private func dismissDragChanged(_ translation: CGSize) {
+        guard abs(translation.height) > abs(translation.width) else { return }
+        dragOffset = max(0, translation.height)
+    }
+
+    private func dismissDragEnded(_ translation: CGSize) {
+        if abs(translation.height) > abs(translation.width), translation.height > 120 {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                isPresented = false
+            }
+            dragOffset = 0
+        } else if dragOffset != 0 {
+            // Палец мог уйти вбок посреди протяжки — плеер всё равно возвращается
+            // на место, а не остаётся висеть съехавшим.
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                dragOffset = 0
+            }
+        }
+    }
+
     private var content: some View {
-        VStack(spacing: showsLyrics ? 20 : 32) {
+        VStack(alignment: .leading, spacing: 0) {
             // AnyLayout меняет расстановку, не подменяя сами вьюхи: обложка с
             // названием не исчезают и не появляются заново, а переезжают из
             // столбца в строку. Поэтому переход анимируется, а обложка не теряет
             // связь с мини-плеером.
             let header = showsLyrics
                 ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
-                : AnyLayout(VStackLayout(alignment: .leading, spacing: 32))
+                : AnyLayout(VStackLayout(alignment: .leading, spacing: 20))
 
             header {
                 artwork
                 titleBlock
             }
+            .padding(.horizontal, 24)
 
             if showsLyrics {
                 LyricsPanel(
                     text: audioPlayer.currentTrack?.lyrics ?? "",
-                    accent: audioPlayer.accent
+                    accent: accent
                 ) {
                     isEditingLyrics = true
                 }
+                .padding(.horizontal, 24)
                 // Текст проступает, а не выпрыгивает вместе с перестроением макета.
                 .transition(.opacity)
+            } else {
+                // Свободное место — между шапкой и декой: дека прижата к низу,
+                // под большой палец, а шапка — к верху.
+                Spacer(minLength: 12)
             }
 
-            progress
-
-            controls
-
-            // Пружина внизу нужна, только пока текста нет: с ним свободное место
-            // забирает панель.
-            if !showsLyrics {
-                Spacer()
+            // Лента — от края до края экрана: она тянется дальше, чем видно.
+            PlayheadTape(audioPlayer: audioPlayer) { translation, isFinished in
+                if isFinished {
+                    dismissDragEnded(translation)
+                } else {
+                    dismissDragChanged(translation)
+                }
             }
+            .padding(.top, showsLyrics ? 8 : 0)
 
-            bottomRow
+            DeckKeys(audioPlayer: audioPlayer)
+                .padding(.horizontal, 24)
+                .padding(.top, 10)
+
+            panel
+                .padding(.horizontal, 24)
+                .padding(.top, 4)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
-        .onChange(of: audioPlayer.currentTime) { _, newValue in
-            guard !isScrubbing else { return }
-            sliderValue = newValue
-        }
-        .onChange(of: audioPlayer.currentIndex) { _, _ in
-            isScrubbing = false
-            sliderValue = audioPlayer.currentTime
-        }
+        .padding(.top, 12)
+        .padding(.bottom, 6)
     }
 
     /// Обложка. Под текстом ужимается до уголка — панели нужна вся высота,
@@ -187,6 +215,8 @@ struct PlayerView: View {
             .matchedGeometryEffect(id: PlayerTransition.artwork, in: namespace, isSource: isPresented)
             .aspectRatio(1, contentMode: .fit)
             .frame(maxWidth: showsLyrics ? 64 : .infinity)
+            // Обложка лежит на фоне, а не нарисована на нём.
+            .shadow(color: .black.opacity(showsLyrics ? 0 : 0.28), radius: 24, y: 12)
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.width
             } action: { newWidth in
@@ -204,19 +234,30 @@ struct PlayerView: View {
                 audioPlayer.togglePlayPause()
             }
             .gesture(
-                DragGesture(minimumDistance: 30)
+                DragGesture(minimumDistance: 12)
+                    .onChanged { value in
+                        // Вниз закрывается сам плеер — обложка передаёт ему движение.
+                        if value.translation.height > 0 {
+                            dismissDragChanged(value.translation)
+                        }
+                    }
                     .onEnded { value in
                         let dx = value.translation.width
                         let dy = value.translation.height
 
                         // Протяжка вверх по обложке поднимает текст — то же
-                        // движение, что «поднять шторку». Вниз обложка не
-                        // отвечает: вниз закрывается сам плеер.
+                        // движение, что «поднять шторку».
                         guard abs(dx) > abs(dy) else {
-                            if dy < 0 { setLyrics(true) }
+                            if dy < 0 {
+                                setLyrics(true)
+                            } else {
+                                dismissDragEnded(value.translation)
+                            }
                             return
                         }
-                        
+
+                        dismissDragEnded(value.translation)
+
                         if dx < 0 {
                             audioPlayer.playNext()
                         } else {
@@ -226,52 +267,114 @@ struct PlayerView: View {
             )
     }
 
+    /// Паспорт, имя и авторы. Под текстом остаются только имя и авторы:
+    /// паспорт — подробность, а место отдано тексту.
     private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(audioPlayer.currentTrack?.name ?? "")
-                .font(showsLyrics ? .headline : .title2)
-                .bold()
-                .lineLimit(1)
+        VStack(alignment: .leading, spacing: showsLyrics ? 4 : 6) {
+            if !showsLyrics, let passport {
+                Text(passport)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .tracking(1.2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            HStack(alignment: .center, spacing: 8) {
+                Text(audioPlayer.currentTrack?.name ?? "")
+                    .font(.system(size: showsLyrics ? 22 : 40, weight: .heavy).width(.compressed))
+                    .lineLimit(showsLyrics ? 1 : 2)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                favouriteButton
+            }
+
             ArtistPillRow(artists: audioPlayer.currentTrack?.artists ?? [])
                 .font(.subheadline)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var progress: some View {
-        VStack(spacing: 4) {
-            Slider(
-                value: $sliderValue,
-                in: 0...max(audioPlayer.duration, 0.01)
-            ) { editing in
-                isScrubbing = editing
-                if !editing {
-                    audioPlayer.seek(to: sliderValue)
-                }
-            }
-            .background {
-                if let waveformSamples {
-                    WaveformView(
-                        samples: waveformSamples,
-                        progress: playedFraction,
-                        played: audioPlayer.accent.opacity(0.35),
-                        upcoming: Color.primary.opacity(0.12)
-                    )
-                    .frame(height: 44)
-                    // Иначе волна перехватывала бы касания у слайдера.
-                    .allowsHitTesting(false)
-                }
+    /// «A3  ·  NEVERMIND  ·  1991» — где трек лежит на своей пластинке, как на
+    /// обороте конверта. У сингла имя альбома совпадает с именем трека, поэтому
+    /// вместо него — формат: «SINGLE  ·  2024».
+    private var passport: String? {
+        guard let track = audioPlayer.currentTrack, let album = track.album else { return nil }
+
+        var parts: [String] = []
+
+        if let number = album.recordNumber(of: track) {
+            parts.append(number)
+        }
+
+        if album.name.caseInsensitiveCompare(track.name) == .orderedSame {
+            parts.append(album.type == .single ? "single" : album.type.rawValue)
+        } else {
+            parts.append(album.name)
+        }
+
+        if let release = album.release {
+            parts.append(String(Calendar.current.component(.year, from: release)))
+        }
+
+        return parts.joined(separator: "  ·  ").uppercased()
+    }
+
+    private var favouriteButton: some View {
+        let isFavourite = audioPlayer.currentTrack?.isFavourite ?? false
+
+        return Button {
+            audioPlayer.currentTrack?.isFavourite.toggle()
+        } label: {
+            Image(systemName: isFavourite ? "star.fill" : "star")
+                .font(.title3)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .foregroundStyle(isFavourite ? AnyShapeStyle(accent) : AnyShapeStyle(.secondary))
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(isFavourite ? "Remove from favourites" : "Add to favourites")
+    }
+
+    /// Панель под клавишами. Подписи вместо значков: «TEXT» и «REMIX» понятны
+    /// без угадывания, а у очереди рядом сразу видно, сколько в ней впереди.
+    private var panel: some View {
+        HStack(spacing: 18) {
+            // Кнопка есть и у трека без текста: открытая пустая панель сама
+            // предложит его добавить — иначе про возможность никто не узнает.
+            PanelSwitch(title: "Text", isOn: showsLyrics, accent: accent) {
+                setLyrics(!showsLyrics)
             }
 
-            HStack {
-                Text(timeString(sliderValue))
-                Spacer()
-                Text("-" + timeString(audioPlayer.duration - sliderValue))
+            // Лампа горит, пока трек звучит не так, как записан: иначе про
+            // выкрученные вчера ручки можно забыть и списать странный звук
+            // на саму запись.
+            PanelSwitch(title: "Remix", isOn: audioPlayer.hasRemix, accent: accent) {
+                isRemixPresented = true
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .monospacedDigit()
+
+            PanelSwitch(title: queueTitle, accent: accent) {
+                isQueuePresented = true
+            }
+
+            Spacer(minLength: 0)
+
+            RoutePickerButton(
+                tint: UIColor(Color.secondary),
+                activeTint: UIColor(accent)
+            )
+            .frame(width: 36, height: 44)
+
+            trackMenu
         }
+    }
+
+    /// «QUEUE 12» — сколько ещё впереди. Пустая очередь — просто «QUEUE».
+    private var queueTitle: String {
+        let upcoming = max(audioPlayer.queue.count - audioPlayer.currentIndex - 1, 0)
+        return upcoming > 0 ? "Queue \(upcoming)" : "Queue"
     }
 
     /// Панель едет пружиной: макет перестраивается целиком, и без анимации
@@ -279,128 +382,6 @@ struct PlayerView: View {
     private func setLyrics(_ shown: Bool) {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             showsLyrics = shown
-        }
-    }
-
-    /// Кнопки лежат в общем `GlassEffectContainer`: соседние стеклянные фигуры
-    /// внутри него сливаются при сближении — ради этого Liquid Glass и сделан.
-    /// Центральная тонируется цветом обложки, остальные остаются нейтральными.
-    private var controls: some View {
-        GlassEffectContainer(spacing: 14) {
-            HStack(spacing: 14) {
-                circleButton("shuffle", size: 48, active: audioPlayer.isShuffled) {
-                    audioPlayer.toggleShuffle()
-                }
-
-                circleButton("backward.fill", size: 56) {
-                    audioPlayer.playPrevious()
-                }
-
-                Button {
-                    audioPlayer.togglePlayPause()
-                } label: {
-                    Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title)
-                        .foregroundStyle(.primary)
-                        .frame(width: 76, height: 76)
-                }
-                .glassEffect(.regular.tint(audioPlayer.accent.opacity(0.35)).interactive(), in: .circle)
-                .buttonStyle(PressableButtonStyle())
-
-                circleButton("forward.fill", size: 56) {
-                    audioPlayer.playNext()
-                }
-
-                circleButton(audioPlayer.repeatMode.systemImage, size: 48, active: audioPlayer.repeatMode.isActive) {
-                    audioPlayer.cycleRepeatMode()
-                }
-            }
-        }
-    }
-
-    /// Включённый режим подсвечивается самим стеклом, а не только цветом значка —
-    /// так состояние видно, пока смотришь на кнопку, а не приглядываешься к оттенку.
-    private func circleButton(
-        _ systemImage: String,
-        size: CGFloat,
-        active: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(size > 50 ? .title3 : .subheadline)
-                .foregroundStyle(active ? audioPlayer.accent : Color.primary)
-                .frame(width: size, height: size)
-        }
-        .glassEffect(
-            active ? .regular.tint(audioPlayer.accent.opacity(0.25)).interactive() : .regular.interactive(),
-            in: .circle
-        )
-        .buttonStyle(PressableButtonStyle())
-    }
-
-    private var bottomRow: some View {
-        // Шаг меньше прежнего: кнопок стало на две больше, и с двадцатью
-        // они не умещались в строку на узком экране.
-        HStack(spacing: 8) {
-            Button {
-                audioPlayer.currentTrack?.isFavourite.toggle()
-            } label: {
-                Image(systemName: (audioPlayer.currentTrack?.isFavourite ?? false) ? "star.fill" : "star")
-                    .font(.title3)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .foregroundStyle((audioPlayer.currentTrack?.isFavourite ?? false) ? audioPlayer.accent : Color.secondary)
-            .buttonStyle(PressableButtonStyle())
-
-            // Кнопка есть и у трека без текста: открытая пустая панель сама
-            // предложит его добавить — иначе про возможность никто не узнает.
-            Button {
-                setLyrics(!showsLyrics)
-            } label: {
-                Image(systemName: showsLyrics ? "quote.bubble.fill" : "quote.bubble")
-                    .font(.title3)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .foregroundStyle(showsLyrics ? audioPlayer.accent : Color.secondary)
-            .buttonStyle(PressableButtonStyle())
-
-            // Подсвечена, пока трек звучит не так, как записан: иначе про
-            // выкрученные вчера ручки можно забыть и списать странный звук
-            // на саму запись.
-            Button {
-                isRemixPresented = true
-            } label: {
-                Image(systemName: audioPlayer.hasRemix ? "dial.high.fill" : "dial.medium")
-                    .font(.title3)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .foregroundStyle(audioPlayer.hasRemix ? audioPlayer.accent : Color.secondary)
-            .buttonStyle(PressableButtonStyle())
-
-            Spacer()
-
-            RoutePickerButton(
-                tint: UIColor(Color.secondary),
-                activeTint: UIColor(audioPlayer.accent)
-            )
-            .frame(width: 44, height: 44)
-
-            Button {
-                isQueuePresented = true
-            } label: {
-                Image(systemName: "list.bullet")
-                    .font(.title3)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .foregroundStyle(.secondary)
-            .buttonStyle(PressableButtonStyle())
-
-            trackMenu
         }
     }
 
@@ -457,6 +438,16 @@ struct PlayerView: View {
                 .font(.title3)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
+                // Пока идёт таймер сна, на меню горит лампа: сам таймер живёт
+                // внутри, а знать, что он идёт, полезно и не открывая.
+                .overlay(alignment: .topTrailing) {
+                    if audioPlayer.hasSleepTimer {
+                        DeckLamp(isOn: true, accent: accent)
+                            .rotationEffect(.degrees(90))
+                            .padding(.top, 10)
+                            .padding(.trailing, 4)
+                    }
+                }
         }
         .foregroundStyle(.secondary)
     }
@@ -506,25 +497,8 @@ struct PlayerView: View {
         return "Sleep timer • \(minutes) min"
     }
 
-    private var waveformSamples: [UInt8]? {
-        guard let data = audioPlayer.currentTrack?.waveform, !data.isEmpty else { return nil }
-        return Array(data)
-    }
-
-    /// Доля сыгранного. Считается от ползунка, а не от плеера, чтобы волна
-    /// закрашивалась прямо под пальцем во время перемотки.
-    private var playedFraction: Double {
-        guard audioPlayer.duration > 0 else { return 0 }
-        return min(max(sliderValue / audioPlayer.duration, 0), 1)
-    }
-
     /// Фон под текстом светлый — значит, сам текст должен быть тёмным.
     /// Решает не яркость обложки и не акцент, а те самые цвета, которыми залит
     /// экран: их светлота посчитана вместе с палитрой.
     private var isLightBackground: Bool { audioPlayer.palette.isLight }
-
-    private func timeString(_ time: TimeInterval) -> String {
-        let total = Int(max(0, time.rounded()))
-        return String(format: "%d:%02d", total / 60, total % 60)
-    }
 }

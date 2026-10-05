@@ -20,6 +20,27 @@ extension Album {
 
         return DiscPosition(disc: disc, track: index)
     }
+
+    /// Номер трека, как на обороте пластинки: «A3», если у пластинки две стороны,
+    /// иначе «track 3». У пластинки из одного трека номера нет.
+    func recordNumber(of track: Track) -> String? {
+        guard let position = position(of: track) else { return nil }
+
+        let tracks = discs[position.disc]
+        guard tracks.count > 1 else { return nil }
+
+        let sides = RecordSides.split(tracks, type: type)
+        guard sides.count > 1 else { return "track \(position.track + 1)" }
+
+        var start = 0
+        for (side, tracksOnSide) in sides.enumerated() {
+            if position.track < start + tracksOnSide.count {
+                return "\(RecordSides.letter(disc: position.disc, side: side))\(position.track - start + 1)"
+            }
+            start += tracksOnSide.count
+        }
+        return nil
+    }
 }
 
 /// Стороны пластинки: у первой A и B, у второй C и D — как на двойном виниле.
