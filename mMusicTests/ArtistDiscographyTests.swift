@@ -177,4 +177,51 @@ struct ArtistDiscographyTests {
 
         #expect(names(ArtistDiscography(artist: artist).career) == ["Utopia"])
     }
+
+    /// Все его треки: свои пластинки, затем гостевые; трек, отмеченный дважды, —
+    /// один раз.
+    @Test func tracksRunOwnRecordsThenGuestSpots() {
+        let own = makeAlbum("Outrun", tracks: 2, released: 2020)
+        credit(artist, on: own)
+        credit(artist, on: sortedTracks(of: own)[0])
+
+        let host = context.findOrCreateArtist(named: "Host")
+        let guest = makeAlbum("Utopia", tracks: 3)
+        credit(host, on: guest)
+        credit(artist, on: sortedTracks(of: guest)[1])
+
+        let names = ArtistDiscography(artist: artist).tracks.map(\.name)
+
+        #expect(names == ["Outrun 1", "Outrun 2", "Utopia 2"])
+    }
+
+    @Test func summaryCountsOwnRecords() {
+        credit(artist, on: makeAlbum("Outrun", type: .LP))
+        credit(artist, on: makeAlbum("Midnight", type: .EP))
+        credit(artist, on: makeAlbum("Nightcall", type: .single, tracks: 1))
+        credit(artist, on: makeAlbum("Static", type: .single, tracks: 1))
+
+        #expect(ArtistDiscography(artist: artist).recordsSummary == "1 ALBUM  ·  1 EP  ·  2 SINGLES")
+    }
+
+    /// Своих пластинок нет — строка говорит, где он в гостях, а не молчит.
+    @Test func summaryFallsBackToGuestSpots() {
+        let host = context.findOrCreateArtist(named: "Host")
+        let album = makeAlbum("Utopia")
+        credit(host, on: album)
+        credit(artist, on: sortedTracks(of: album)[0])
+
+        #expect(ArtistDiscography(artist: artist).recordsSummary == "FEATURED ON 1")
+    }
+
+    @Test func summaryIsEmptyWithoutRecords() {
+        #expect(ArtistDiscography(artist: artist).recordsSummary == nil)
+    }
+
+    @Test func initialsTakeTwoWords() {
+        #expect(ArtistDisc.initials(of: "The Weeknd") == "TW")
+        #expect(ArtistDisc.initials(of: "Kavinsky") == "K")
+        #expect(ArtistDisc.initials(of: "A$AP Rocky") == "AR")
+        #expect(ArtistDisc.initials(of: "$uicideboy$") == "U")
+    }
 }

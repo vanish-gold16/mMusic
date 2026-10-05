@@ -59,19 +59,6 @@ struct ArtistView: View {
         ArtistDiscography(artist: artist)
     }
 
-    /// Треки его пластинок плюс те, где он отмечен лично (обычно `.featured`).
-    /// Авторство наследуется от альбома, поэтому одних прямых credits мало.
-    private func allTracks(in discography: ArtistDiscography) -> [Track] {
-        let own = (discography.albums + discography.singles)
-            .flatMap { $0.tracks.sorted { $0.position < $1.position } }
-        let guest = discography.featuredOn.flatMap(discography.guestTracks(on:))
-        // Отметка на треке без альбома — альбома у трека может и не быть.
-        let loose = artist.credits.compactMap(\.track).filter { $0.album == nil }
-
-        var seen = Set<PersistentIdentifier>()
-        return (own + guest + loose).filter { seen.insert($0.persistentModelID).inserted }
-    }
-
     /// Порядок по альбомам — исходный, его и оставляем как есть.
     private func sorted(_ tracks: [Track]) -> [Track] {
         switch sortOption {
@@ -106,7 +93,7 @@ struct ArtistView: View {
 
     var body: some View {
         let discography = discography
-        let tracks = sorted(allTracks(in: discography))
+        let tracks = sorted(discography.tracks)
 
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
@@ -164,8 +151,8 @@ struct ArtistView: View {
                 in: modelContext
             )
         }
-        .task(id: [artist.artwork?.count, newestCover(discography)?.count]) {
-            await loadPhoto(fallback: newestCover(discography))
+        .task(id: [artist.artwork?.count, discography.newestCover?.count]) {
+            await loadPhoto(fallback: discography.newestCover)
         }
         // `containerBackground`, а не `background`: у вложенного экрана своя
         // непрозрачная подложка, и закрасить её можно только фоном контейнера —
@@ -191,6 +178,7 @@ struct ArtistView: View {
                     artist: artist,
                     releases: discography.career,
                     photo: photo,
+                    labelPaper: photoPalette?.accent,
                     accent: accent,
                     onTapRelease: playRelease
                 )
@@ -270,33 +258,18 @@ struct ArtistView: View {
     /// Две строки: пластинки — «2 ALBUMS  ·  1 EP  ·  6 SINGLES», под ними
     /// треки — «48 TRACKS  ·  312 PLAYS». Только то, чего больше нуля. Строки
     /// заданы руками, а не переносом: одной строкой паспорт рвался посередине,
-    /// и точка повисала в конце. Регистр тоже руками, а не `uppercased()`:
-    /// во множественном числе пишут «EPs», а «EPS» читается как другое слово.
+    /// и точка повисала в конце.
     private func passport(discography: ArtistDiscography, tracks: [Track]) -> String {
-        let eps = discography.singles.filter { $0.type == .EP }.count
-        let singles = discography.singles.count - eps
         let plays = tracks.reduce(0) { $0 + $1.playCount }
-
-        let records = [
-            Self.count(discography.albums.count, "ALBUM", "ALBUMS"),
-            Self.count(eps, "EP", "EPs"),
-            Self.count(singles, "SINGLE", "SINGLES"),
-        ]
         let music = [
-            Self.count(tracks.count, "TRACK", "TRACKS"),
-            Self.count(plays, "PLAY", "PLAYS"),
-        ]
+            ArtistDiscography.count(tracks.count, "TRACK", "TRACKS"),
+            ArtistDiscography.count(plays, "PLAY", "PLAYS"),
+        ].compactMap { $0 }
 
-        let lines = [records, music]
-            .map { $0.compactMap { $0 }.joined(separator: "  ·  ") }
-            .filter { !$0.isEmpty }
+        let lines = [discography.recordsSummary, music.isEmpty ? nil : music.joined(separator: "  ·  ")]
+            .compactMap { $0 }
 
         return lines.isEmpty ? "NOTHING HERE YET" : lines.joined(separator: "\n")
-    }
-
-    private static func count(_ number: Int, _ one: String, _ many: String) -> String? {
-        guard number > 0 else { return nil }
-        return "\(number) \(number == 1 ? one : many)"
     }
 
     /// Запуск и перемешивание всех треков. Без ленты, как у альбома: где
@@ -372,17 +345,6 @@ struct ArtistView: View {
         album.artists
             .filter { $0.persistentModelID != artist.persistentModelID }
             .map(\.name)
-    }
-
-    /// Цвета страницы, если фотографии нет: обложка последнего альбома,
-    /// а нет альбомов — сингла или чужой пластинки.
-    private func newestCover(_ discography: ArtistDiscography) -> Data? {
-        // Полки идут от старых к новым — последняя пластинка с обложкой в конце.
-        [discography.albums, discography.singles, discography.featuredOn]
-            .lazy
-            .compactMap { shelf in shelf.last { $0.artwork != nil } }
-            .first?
-            .artwork
     }
 
     // MARK: - Треки

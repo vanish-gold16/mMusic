@@ -21,6 +21,8 @@ struct ArtistDiscography {
     private let wholeAlbumGuests: Set<PersistentIdentifier>
     /// Треки чужих пластинок, где артист отмечен лично.
     private let guestCredits: [PersistentIdentifier: [Track]]
+    /// Треки без альбома, где артист отмечен лично: альбома у трека может и не быть.
+    private let looseTracks: [Track]
 
     init(artist: Artist) {
         var own: [Album] = []
@@ -60,6 +62,7 @@ struct ArtistDiscography {
         featuredOn = Self.chronological(guests)
         self.wholeAlbumGuests = wholeAlbumGuests
         self.guestCredits = guestCredits
+        looseTracks = artist.credits.compactMap(\.track).filter { $0.album == nil }
     }
 
     /// Свои пластинки от первой к последней — в таком порядке они лежат
@@ -84,6 +87,48 @@ struct ArtistDiscography {
 
     var isEmpty: Bool {
         albums.isEmpty && singles.isEmpty && featuredOn.isEmpty
+    }
+
+    /// Все треки, где он звучит: с его пластинок в порядке полок, затем гостевые.
+    /// Авторство наследуется от альбома, поэтому одних его прямых отметок мало.
+    var tracks: [Track] {
+        let own = (albums + singles).flatMap { $0.tracks.sorted { $0.position < $1.position } }
+        let guest = featuredOn.flatMap(guestTracks(on:))
+
+        var seen = Set<PersistentIdentifier>()
+        return (own + guest + looseTracks).filter { seen.insert($0.persistentModelID).inserted }
+    }
+
+    /// Обложка его последнего альбома, а нет альбомов — сингла или чужой
+    /// пластинки. Из неё берут цвета, когда фотографии артиста нет.
+    var newestCover: Data? {
+        // Полки идут от старых к новым — последняя пластинка с обложкой в конце.
+        [albums, singles, featuredOn]
+            .lazy
+            .compactMap { shelf in shelf.last { $0.artwork != nil } }
+            .first?
+            .artwork
+    }
+
+    /// Его пластинки одной строкой: «2 ALBUMS  ·  1 EP  ·  4 SINGLES». Если
+    /// своих нет — «FEATURED ON 3». Регистр расставлен руками, а не
+    /// `uppercased()`: во множественном числе пишут «EPs», а «EPS» читается
+    /// как другое слово. nil — у артиста нет ни одной пластинки.
+    var recordsSummary: String? {
+        let eps = singles.filter { $0.type == .EP }.count
+        let parts = [
+            Self.count(albums.count, "ALBUM", "ALBUMS"),
+            Self.count(eps, "EP", "EPs"),
+            Self.count(singles.count - eps, "SINGLE", "SINGLES"),
+        ].compactMap { $0 }
+
+        if !parts.isEmpty { return parts.joined(separator: "  ·  ") }
+        return featuredOn.isEmpty ? nil : "FEATURED ON \(featuredOn.count)"
+    }
+
+    static func count(_ number: Int, _ one: String, _ many: String) -> String? {
+        guard number > 0 else { return nil }
+        return "\(number) \(number == 1 ? one : many)"
     }
 
     /// По дате выхода, от старых к новым — дискография читается как история.

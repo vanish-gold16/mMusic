@@ -27,51 +27,11 @@ struct AlbumsSection: View {
         }
     }
 
-    /// Соседние альбомы с одинаковой меткой — в один ящик. Идём по уже
-    /// отсортированному списку, поэтому порядок внутри ящиков тот же.
-    private var crates: [AlbumCrate] {
-        var crates: [AlbumCrate] = []
-
-        for album in sorted {
-            let key = crateKey(for: album)
-            if crates.last?.lastKey == key {
-                crates[crates.count - 1].albums.append(album)
-            } else {
-                crates.append(AlbumCrate(firstKey: key, lastKey: key, albums: [album]))
-            }
-        }
-
-        return sort == .name ? Self.mergingSparse(crates) : crates
-    }
-
-    /// Альбомов на букву обычно один-два, и ящик на каждую букву был бы
-    /// полупустой строкой. Соседние буквы сливаются, пока в ящике не наберётся
-    /// две полные строки, — как «B–D» на разделителе в музыкальном магазине.
-    /// «#» ни с кем не сливается: «#–A» не читается.
-    private static func mergingSparse(_ crates: [AlbumCrate]) -> [AlbumCrate] {
-        let minimum = 4
-        var merged: [AlbumCrate] = []
-
-        for crate in crates {
-            if let last = merged.last, last.albums.count < minimum,
-               last.firstKey != "#", crate.firstKey != "#" {
-                merged[merged.count - 1].albums += crate.albums
-                merged[merged.count - 1].lastKey = crate.lastKey
-            } else {
-                merged.append(crate)
-            }
-        }
-
-        // Хвост алфавита, которому не хватило соседей, — к предыдущему ящику:
-        // одинокая «Z» в конце была бы той же полупустой строкой.
-        if merged.count > 1, let tail = merged.last, tail.albums.count < minimum,
-           tail.firstKey != "#", merged[merged.count - 2].firstKey != "#" {
-            merged.removeLast()
-            merged[merged.count - 1].albums += tail.albums
-            merged[merged.count - 1].lastKey = tail.lastKey
-        }
-
-        return merged
+    /// Альбомы по ящикам. Что написано на разделителе, решает сортировка.
+    /// Буквы сливаются, пока в ящике не наберётся две полные строки сетки.
+    private var crates: [Crate<Album>] {
+        let crates = Crate.grouping(sorted, by: crateKey(for:))
+        return sort == .name ? Crate.mergingSparse(crates, minimum: 4) : crates
     }
 
     var body: some View {
@@ -81,11 +41,11 @@ struct AlbumsSection: View {
             LazyVGrid(columns: columns, spacing: 24) {
                 ForEach(crates) { crate in
                     Section {
-                        ForEach(crate.albums) { album in
+                        ForEach(crate.items) { album in
                             AlbumCell(album: album)
                         }
                     } header: {
-                        CrateDivider(title: crate.title, detail: "\(crate.albums.count)")
+                        CrateDivider(title: crate.title, detail: "\(crate.items.count)")
                     }
                 }
             }
@@ -109,29 +69,9 @@ struct AlbumsSection: View {
             return "\(year / 10 * 10)s"
 
         case .name:
-            // Цифры, знаки и эмодзи — под одним «#», как в конце алфавитного указателя.
-            guard let first = album.name.trimmingCharacters(in: .whitespaces).first, first.isLetter else {
-                return "#"
-            }
-            return String(first).uppercased()
+            return album.name.crateLetter
         }
     }
-}
-
-/// Один ящик: метка разделителя и альбомы за ним. Метка — диапазон
-/// от первого ключа до последнего, если в ящик слились соседние буквы.
-private struct AlbumCrate: Identifiable {
-    let firstKey: String
-    var lastKey: String
-    var albums: [Album]
-
-    var title: String {
-        firstKey == lastKey ? firstKey : "\(firstKey)–\(lastKey)"
-    }
-
-    /// По первому альбому: метка может повториться — «#» бывает и в начале,
-    /// и в конце алфавита, если имя начинается с эмодзи.
-    var id: PersistentIdentifier { albums[0].persistentModelID }
 }
 
 /// Пустой раздел: короткая строка вместо системной картинки с заголовком —
