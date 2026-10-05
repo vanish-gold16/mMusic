@@ -85,6 +85,9 @@ struct RootView: View {
             // молчаливый — в исправной библиотеке он ничего не меняет.
             AlbumNumbering.repair(in: modelContext)
         }
+        .task {
+            await TrackDurationLoader.remeasureOnce(in: modelContext)
+        }
         .task(id: tracksNeedingDuration.count) {
             await TrackDurationLoader.fill(tracksNeedingDuration)
         }
