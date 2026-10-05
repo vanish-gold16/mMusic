@@ -414,6 +414,9 @@ class AudioPlayer: NSObject {
             let normalized = (db - self.meterFloor) / (0 - self.meterFloor)
             self.level = min(max(normalized, 0), 1)
             self.updatePunch()
+            // Тот же такт двигает звук по кругу 8D — отдельный таймер ради
+            // этого не нужен.
+            self.engine.updateOrbit(at: ProcessInfo.processInfo.systemUptime)
         }
         RunLoop.main.add(timer, forMode: .common)
         meterTimer = timer

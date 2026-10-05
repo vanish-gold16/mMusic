@@ -1,7 +1,8 @@
 import AVFoundation
 import Foundation
 
-/// Звуковой тракт приложения: файл → скорость и тон → эхо → выход.
+/// Звуковой тракт приложения: файл → скорость и тон → эквалайзер → эхо → зал →
+/// панорама → выход.
 ///
 /// Пришёл на смену `AVAudioPlayer`. Тот умеет менять только темп, сохраняя тон,
 /// а ремикс — это как раз тон и эхо, которые крутят прямо во время игры: узлы
@@ -18,7 +19,20 @@ final class PlaybackEngine {
     /// независимы. «Как на виниле» получается связкой чисел в `RemixSettings`,
     /// а не отдельным узлом.
     private let timePitch = AVAudioUnitTimePitch()
+    /// Глухость, радио и бас — четыре полосы одного эквалайзера: два среза верхов
+    /// подряд (так глухость крутая, как за стеной, а не просто «потише верхи»),
+    /// срез низов для радио и полка на басу.
+    private let equalizer = AVAudioUnitEQ(numberOfBands: 4)
+    private let echo = AVAudioUnitDelay()
     private let reverb = AVAudioUnitReverb()
+    /// Последний узел перед выходом — ради панорамы: 8D водит звук по кругу,
+    /// а панораму умеет только вход микшера.
+    private let panner = AVAudioMixerNode()
+
+    /// Насколько далеко 8D уводит звук в сторону. 0 — круга нет.
+    private var orbitDepth: Float = 0
+    /// Один круг 8D, в секундах: медленнее — круг не слышен, быстрее — укачивает.
+    private static let orbitPeriod: TimeInterval = 8
 
     private var file: AVAudioFile?
     /// Формат, под который собран граф. Узлы соединяются форматом файла, поэтому
@@ -54,7 +68,29 @@ final class PlaybackEngine {
     init() {
         engine.attach(playerNode)
         engine.attach(timePitch)
+        engine.attach(equalizer)
+        engine.attach(echo)
         engine.attach(reverb)
+        engine.attach(panner)
+
+        let bands = equalizer.bands
+        bands[0].filterType = .lowPass
+        bands[1].filterType = .lowPass
+        bands[2].filterType = .highPass
+        bands[3].filterType = .lowShelf
+        // Полка выше самого баса: с ней на 110 Гц подъём «+12» поднимал ноту
+        // в 100 Гц едва на семь децибел против середины, на 180 — на одиннадцать.
+        bands[3].frequency = 180
+        bands.forEach { $0.bypass = true }
+        equalizer.bypass = true
+
+        // Повторы темнее оригинала и тише с каждым разом — так эхо звучит
+        // как отражение, а не как второй, наложенный сверху трек.
+        echo.delayTime = 0.33
+        echo.feedback = 35
+        echo.lowPassCutoff = 4_500
+        echo.wetDryMix = 0
+        echo.bypass = true
 
         // Пресет ставится один раз: смена пресета пересобирает отклик зала и слышна
         // щелчком, а вот `wetDryMix` можно крутить сколько угодно — он плавный.
@@ -200,6 +236,58 @@ final class PlaybackEngine {
         // ход отъедает запас у потока рендеринга, и звук начинает заикаться.
         timePitch.bypass = abs(remix.speed - 1) < 0.005 && abs(remix.effectivePitch) < 0.05
         reverb.bypass = remix.reverb < 0.5
+
+        applyEqualizer(remix)
+
+        // Не больше 40%: на сотне в выходе остались бы одни повторы без самого
+        // звука, а уже на половине они складываются с ним и громкая запись хрипит.
+        echo.wetDryMix = Float(remix.echo * 0.4)
+        echo.bypass = remix.echo < 0.5
+
+        orbitDepth = remix.isOrbiting ? 0.9 : 0
+        if !remix.isOrbiting {
+            panner.pan = 0
+            panner.volume = 1
+        }
+    }
+
+    /// Глухость, радио и бас. Полосы, которые ничего не делают, выключены, а если
+    /// не делает ничего весь эквалайзер — он в обходе целиком: по той же причине,
+    /// что и растяжение времени, холостой узел отъедает запас у потока рендеринга.
+    private func applyEqualizer(_ remix: RemixSettings) {
+        let bands = equalizer.bands
+
+        // У радио свой потолок — 3 кГц, как у маленького динамика. Глухость
+        // может опустить его ещё ниже, но не поднять.
+        let ceiling = remix.isRadio ? min(remix.muffleCutoff, 3_000) : remix.muffleCutoff
+        for band in bands[0...1] {
+            band.frequency = Float(ceiling)
+            band.bypass = ceiling > 19_000
+        }
+
+        bands[2].frequency = 420
+        bands[2].bypass = !remix.isRadio
+
+        bands[3].gain = Float(remix.bass)
+        bands[3].bypass = abs(remix.bass) < 0.25
+
+        // Подъём баса добавляет громкости, и на сведённой «в кирпич» записи бас
+        // упирается в потолок и хрипит — половину подъёма снимаем общим уровнем.
+        // Радио, наоборот, срезает много энергии, и без прибавки звучит тише.
+        equalizer.globalGain = Float(-max(remix.bass, 0) * 0.5) + (remix.isRadio ? 3 : 0)
+        equalizer.bypass = bands.allSatisfy(\.bypass)
+    }
+
+    /// Шаг 8D: где сейчас звук на круге. Зовётся тридцать раз в секунду вместе
+    /// с замером громкости — водить панораму сам по себе ни один узел не умеет.
+    func updateOrbit(at time: TimeInterval) {
+        guard orbitDepth > 0 else { return }
+
+        let phase = time.truncatingRemainder(dividingBy: Self.orbitPeriod) / Self.orbitPeriod * 2 * .pi
+        panner.pan = orbitDepth * Float(sin(phase))
+        // За головой звук чуть тише: так слышен именно круг, а не качели
+        // слева направо.
+        panner.volume = 1 - 0.2 * Float(max(-cos(phase), 0))
     }
 
     // MARK: - Граф
@@ -208,8 +296,11 @@ final class PlaybackEngine {
         guard connectedFormat != format else { return }
 
         engine.connect(playerNode, to: timePitch, format: format)
-        engine.connect(timePitch, to: reverb, format: format)
-        engine.connect(reverb, to: engine.mainMixerNode, format: format)
+        engine.connect(timePitch, to: equalizer, format: format)
+        engine.connect(equalizer, to: echo, format: format)
+        engine.connect(echo, to: reverb, format: format)
+        engine.connect(reverb, to: panner, format: format)
+        engine.connect(panner, to: engine.mainMixerNode, format: format)
         connectedFormat = format
 
         // Отвод для замера громкости живёт на выходе микшера и переживает пересборку,
