@@ -1,6 +1,13 @@
 import SwiftData
 import SwiftUI
 
+/// Страница артиста. Наверху его пластинка: фотография на яблоке, кольца — его
+/// релизы за всю карьеру (`ArtistRecord`), рядом — сколько времени вы вместе.
+/// Ниже имя крупным сжатым шрифтом, паспорт и кнопки.
+///
+/// Пластинки разложены по разделителям, как в ящике магазина: альбомы,
+/// синглы с EP и чужие пластинки, где он гость, — у тех светятся кольца
+/// его треков. В самом низу — все его треки.
 struct ArtistView: View {
 
     @Environment(AudioPlayer.self) private var audioPlayer
@@ -11,12 +18,17 @@ struct ArtistView: View {
     @Bindable var artist: Artist
 
     @State private var sortOption: SortOption = .mostPlayed
-    @State private var showImagePicker = false
     /// Время с артистом — снимок, а не живой запрос: пока трек играет, история
     /// пересчитывается пять раз в секунду, и `@Query` перерисовывал бы на каждый
     /// тик весь список треков. Снимок обновляется, когда играть начинает
     /// следующий трек, — то есть ровно тогда, когда прошлое число устарело.
     @State private var listening: ArtistListening?
+
+    /// Уменьшенная фотография и цвета страницы. Считаются в `.task`, а не
+    /// в `body`: фотография весит мегабайты, а `body` пересчитывается на каждой
+    /// смене трека.
+    @State private var photo: UIImage?
+    @State private var photoPalette: CoverPalette?
 
     private enum SortOption: String, CaseIterable, Identifiable {
         case mostPlayed = "Most played"
@@ -36,98 +48,124 @@ struct ArtistView: View {
         }
     }
 
-    private let columns = [GridItem(.flexible(), alignment: .top),
-                           GridItem(.flexible(), alignment: .top)]
+    private let albumColumns = [GridItem(.flexible(), spacing: 16, alignment: .top),
+                                GridItem(.flexible(), spacing: 16, alignment: .top)]
 
-    /// Альбомы, где артист указан в авторах.
-    private var albums: [Album] {
-        var seen = Set<PersistentIdentifier>()
-        return artist.credits
-            .compactMap(\.album)
-            .filter { seen.insert($0.persistentModelID).inserted }
-            .sorted { ($0.release ?? .distantPast) > ($1.release ?? .distantPast) }
+    /// Синглы мельче альбомов, как семидюймовки рядом с двенадцатидюймовыми,
+    /// и их обычно больше — в три колонки.
+    private let singleColumns = Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3)
+
+    private var discography: ArtistDiscography {
+        ArtistDiscography(artist: artist)
     }
 
-    /// Треки альбомов артиста плюс те, где он отмечен лично (обычно `.featured`).
+    /// Треки его пластинок плюс те, где он отмечен лично (обычно `.featured`).
     /// Авторство наследуется от альбома, поэтому одних прямых credits мало.
-    private var allTracks: [Track] {
-        let fromAlbums = albums.flatMap { $0.tracks.sorted { $0.position < $1.position } }
-        let own = artist.credits.compactMap(\.track)
+    private func allTracks(in discography: ArtistDiscography) -> [Track] {
+        let own = (discography.albums + discography.singles)
+            .flatMap { $0.tracks.sorted { $0.position < $1.position } }
+        let guest = discography.featuredOn.flatMap(discography.guestTracks(on:))
+        // Отметка на треке без альбома — альбома у трека может и не быть.
+        let loose = artist.credits.compactMap(\.track).filter { $0.album == nil }
 
         var seen = Set<PersistentIdentifier>()
-        return (fromAlbums + own).filter { seen.insert($0.persistentModelID).inserted }
+        return (own + guest + loose).filter { seen.insert($0.persistentModelID).inserted }
     }
 
     /// Порядок по альбомам — исходный, его и оставляем как есть.
-    private var tracks: [Track] {
+    private func sorted(_ tracks: [Track]) -> [Track] {
         switch sortOption {
         case .mostPlayed:
             // При равном счёте порядок альбома — иначе непрослушанные встают как попало.
-            allTracks.enumerated()
+            tracks.enumerated()
                 .sorted { ($0.element.playCount, $1.offset) > ($1.element.playCount, $0.offset) }
                 .map(\.element)
         case .albumOrder:
-            allTracks
+            tracks
         case .name:
-            allTracks.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            tracks.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         case .recent:
-            allTracks.sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
+            tracks.sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
         }
     }
 
-    private var totalPlays: Int {
-        allTracks.reduce(0) { $0 + $1.playCount }
+    /// Играет его трек — откуда бы его ни запустили.
+    private var isPlayingArtist: Bool {
+        audioPlayer.currentTrack?.artists.contains { $0.persistentModelID == artist.persistentModelID } ?? false
+    }
+
+    /// Пока играет его трек, страница в цветах этого трека и дышит под него;
+    /// в остальное время — в цветах фотографии или последней пластинки.
+    private var pagePalette: CoverPalette? {
+        isPlayingArtist ? audioPlayer.palette : photoPalette
+    }
+
+    private var accent: Color {
+        pagePalette?.accent ?? audioPlayer.accent
     }
 
     var body: some View {
+        let discography = discography
+        let tracks = sorted(allTracks(in: discography))
+
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 24) {
-                header
+            LazyVStack(alignment: .leading, spacing: 28) {
+                header(discography: discography, tracks: tracks)
 
-                if let listening, listening.plays > 0 {
-                    ArtistTimeCard(listening: listening)
-                        .padding(.horizontal)
-                }
-
-                if !tracks.isEmpty {
-                    playButtons
-                }
-
-                if !albums.isEmpty {
-                    section("Albums") {
-                        LazyVGrid(columns: columns, spacing: 16) {
-                            ForEach(albums) { album in
-                                AlbumCell(album: album)
+                if !discography.albums.isEmpty {
+                    shelf("ALBUMS", count: discography.albums.count) {
+                        LazyVGrid(columns: albumColumns, spacing: 24) {
+                            ForEach(discography.albums) { album in
+                                AlbumCell(album: album, byline: coauthors(of: album))
                             }
                         }
-                        .padding(.horizontal)
                     }
                 }
 
-                if !tracks.isEmpty {
-                    section("Tracks", trailing: sortMenu) {
-                        ForEach(tracks) { track in
-                            TrackCell(track: track, queue: tracks, leadingStyle: .artwork, showPlayCount: true)
+                if !discography.singles.isEmpty {
+                    shelf(singlesTitle(discography.singles), count: discography.singles.count) {
+                        LazyVGrid(columns: singleColumns, spacing: 20) {
+                            ForEach(discography.singles) { album in
+                                AlbumCell(album: album, byline: coauthors(of: album), isCompact: true)
+                            }
                         }
                     }
+                }
+
+                if !discography.featuredOn.isEmpty {
+                    shelf("FEATURED ON", count: discography.featuredOn.count) {
+                        LazyVGrid(columns: albumColumns, spacing: 24) {
+                            ForEach(discography.featuredOn) { album in
+                                AlbumCell(
+                                    album: album,
+                                    byline: hosts(of: album),
+                                    guestTracks: discography.guestTracks(on: album)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if tracks.isEmpty {
+                    LibraryEmptyState(text: "Nothing in the library credits this artist yet")
                 } else {
-                    ContentUnavailableView(
-                        "No tracks",
-                        systemImage: "music.note",
-                        description: Text("Nothing in the library credits this artist yet.")
-                    )
+                    trackList(tracks)
                 }
             }
-            .padding(.vertical)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
-        .navigationTitle(artist.name)
-        .navigationBarTitleDisplayMode(.inline)
+        // Кнопки, эквалайзер и подсветка — в цвет страницы.
+        .tint(accent)
         .task(id: audioPlayer.currentTrack?.id) {
             listening = ArtistListening.make(
                 for: artist.name,
-                filenames: Set(allTracks.map(\.filename)),
+                filenames: Set(tracks.map(\.filename)),
                 in: modelContext
             )
+        }
+        .task(id: [artist.artwork?.count, newestCover(discography)?.count]) {
+            await loadPhoto(fallback: newestCover(discography))
         }
         // `containerBackground`, а не `background`: у вложенного экрана своя
         // непрозрачная подложка, и закрасить её можно только фоном контейнера —
@@ -136,68 +174,232 @@ struct ArtistView: View {
             if isInsidePlayer {
                 PlayerBackground(audioPlayer: audioPlayer)
             } else {
-                Color(.systemBackground)
+                CoverAura(palette: pagePalette, breathes: isPlayingArtist)
             }
         }
     }
 
-    private var header: some View {
-        VStack(spacing: 12) {
-            photoMenu
+    // MARK: - Шапка
 
-            Text(artist.name)
-                .font(.title)
-                .bold()
-                .multilineTextAlignment(.center)
+    /// Пластинка и время вместе, под ними имя, паспорт и кнопки. Всё по левому
+    /// краю: круглое фото по центру с именем под ним — ровно та страница
+    /// артиста, на которую эта не должна быть похожа.
+    private func header(discography: ArtistDiscography, tracks: [Track]) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .center, spacing: 20) {
+                ArtistRecord(
+                    artist: artist,
+                    releases: discography.career,
+                    photo: photo,
+                    accent: accent,
+                    onTapRelease: playRelease
+                )
+                .frame(width: 196, height: 196)
 
-            Text(summary)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                timeTogether
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(artist.name)
+                    .font(.system(size: 44, weight: .heavy).width(.compressed))
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.6)
+
+                Text(passport(discography: discography, tracks: tracks))
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .tracking(1.2)
+                    .lineSpacing(3)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !tracks.isEmpty {
+                controls(tracks)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .sheet(isPresented: $showImagePicker) {
-            ImagePicker(imageData: $artist.artwork)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
     }
 
-    /// Фотографию ставят прямо на кружке: другого места у артиста нет — своего
-    /// экрана правки, в отличие от трека и альбома, у него не заведено.
-    private var photoMenu: some View {
-        Menu {
+    /// Время с артистом — одной цифрой рядом с пластинкой, как на обороте
+    /// конверта пишут хронометраж. Часы дублируют минуты намеренно:
+    /// «1 240» само по себе уже не читается как время.
+    private var timeTogether: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let listening, listening.plays > 0 {
+                Text(listening.minutes.formatted())
+                    .font(.system(size: 44, weight: .heavy).width(.compressed))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+
+                Text(listening.minutes == 1 ? "MINUTE TOGETHER" : "MINUTES TOGETHER")
+                    .foregroundStyle(.secondary)
+
+                if let details = togetherDetails(listening) {
+                    Text(details)
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 6)
+                }
+            } else {
+                Text("NOT PLAYED YET")
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .font(.caption2)
+        .fontWeight(.semibold)
+        .tracking(1.2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Часы и месяц первой встречи, по строке на каждое.
+    private func togetherDetails(_ listening: ArtistListening) -> String? {
+        var lines: [String] = []
+
+        if let long = listening.hoursAndMinutes { lines.append(long) }
+
+        if let first = listening.firstPlayedAt {
+            let month = first.formatted(.dateTime.month(.abbreviated).year().locale(.interface))
+            lines.append("since \(month)")
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n").uppercased()
+    }
+
+    /// Две строки: пластинки — «2 ALBUMS  ·  1 EP  ·  6 SINGLES», под ними
+    /// треки — «48 TRACKS  ·  312 PLAYS». Только то, чего больше нуля. Строки
+    /// заданы руками, а не переносом: одной строкой паспорт рвался посередине,
+    /// и точка повисала в конце. Регистр тоже руками, а не `uppercased()`:
+    /// во множественном числе пишут «EPs», а «EPS» читается как другое слово.
+    private func passport(discography: ArtistDiscography, tracks: [Track]) -> String {
+        let eps = discography.singles.filter { $0.type == .EP }.count
+        let singles = discography.singles.count - eps
+        let plays = tracks.reduce(0) { $0 + $1.playCount }
+
+        let records = [
+            Self.count(discography.albums.count, "ALBUM", "ALBUMS"),
+            Self.count(eps, "EP", "EPs"),
+            Self.count(singles, "SINGLE", "SINGLES"),
+        ]
+        let music = [
+            Self.count(tracks.count, "TRACK", "TRACKS"),
+            Self.count(plays, "PLAY", "PLAYS"),
+        ]
+
+        let lines = [records, music]
+            .map { $0.compactMap { $0 }.joined(separator: "  ·  ") }
+            .filter { !$0.isEmpty }
+
+        return lines.isEmpty ? "NOTHING HERE YET" : lines.joined(separator: "\n")
+    }
+
+    private static func count(_ number: Int, _ one: String, _ many: String) -> String? {
+        guard number > 0 else { return nil }
+        return "\(number) \(number == 1 ? one : many)"
+    }
+
+    /// Запуск и перемешивание всех треков. Без ленты, как у альбома: где
+    /// играющая пластинка, и так видно по кольцам.
+    private func controls(_ tracks: [Track]) -> some View {
+        let isPlayingHere = contains(audioPlayer.currentTrack, in: tracks) && audioPlayer.isPlaying
+
+        return HStack(spacing: 12) {
             Button {
-                showImagePicker = true
+                playOrPause(tracks)
             } label: {
-                Label(artist.artwork == nil ? "Add photo" : "Change photo", systemImage: "photo")
+                Label(isPlayingHere ? "Pause" : "Play", systemImage: isPlayingHere ? "pause.fill" : "play.fill")
+                    .font(.headline)
+                    .contentTransition(.symbolEffect(.replace))
+                    .padding(.horizontal, 12)
+                    .frame(height: 36)
             }
+            .buttonStyle(.glassProminent)
 
-            if artist.artwork != nil {
-                Button(role: .destructive) {
-                    artist.artwork = nil
-                } label: {
-                    Label("Remove photo", systemImage: "trash")
-                }
+            Button {
+                audioPlayer.playShuffled(tracks)
+            } label: {
+                Image(systemName: "shuffle")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 28, height: 28)
             }
-        } label: {
-            ArtistAvatar(artist: artist, size: 120)
-                .overlay(alignment: .bottomTrailing) {
-                    Image(systemName: "camera.fill")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(9)
-                        .background(.thinMaterial, in: Circle())
-                }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .accessibilityLabel("Shuffle")
         }
-        .buttonStyle(.plain)
-        // Иначе VoiceOver читает кнопку как «Artist, Camera» — по названиям
-        // символов внутри неё.
-        .accessibilityLabel("Artist photo")
     }
 
-    private var summary: String {
-        var parts = ["\(albums.count) albums", "\(allTracks.count) tracks"]
-        if totalPlays > 0 { parts.append("\(totalPlays) plays") }
+    // MARK: - Пластинки
 
-        return parts.joined(separator: " • ")
+    /// Раздел за разделителем ящика: крупная метка, черта и число.
+    private func shelf<Content: View>(
+        _ title: String,
+        count: Int,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            CrateDivider(title: title, detail: "\(count)")
+            content()
+        }
+        .padding(.horizontal)
+    }
+
+    /// «SINGLES & EPs», а если EP нет или нет синглов — только то, что есть.
+    private func singlesTitle(_ releases: [Album]) -> String {
+        let hasEPs = releases.contains { $0.type == .EP }
+        let hasSingles = releases.contains { $0.type == .single }
+
+        switch (hasSingles, hasEPs) {
+        case (true, true): return "SINGLES & EPs"
+        case (false, true): return "EPs"
+        default: return "SINGLES"
+        }
+    }
+
+    /// Под своей пластинкой — только те, с кем он её делил: его имя здесь
+    /// и так на каждой.
+    private func coauthors(of album: Album) -> String {
+        let others = otherArtists(on: album)
+        return others.isEmpty ? "" : "with \(others.joined(separator: ", "))"
+    }
+
+    /// Под чужой — чья она.
+    private func hosts(of album: Album) -> String {
+        otherArtists(on: album).joined(separator: ", ")
+    }
+
+    private func otherArtists(on album: Album) -> [String] {
+        album.artists
+            .filter { $0.persistentModelID != artist.persistentModelID }
+            .map(\.name)
+    }
+
+    /// Цвета страницы, если фотографии нет: обложка последнего альбома,
+    /// а нет альбомов — сингла или чужой пластинки.
+    private func newestCover(_ discography: ArtistDiscography) -> Data? {
+        // Полки идут от старых к новым — последняя пластинка с обложкой в конце.
+        [discography.albums, discography.singles, discography.featuredOn]
+            .lazy
+            .compactMap { shelf in shelf.last { $0.artwork != nil } }
+            .first?
+            .artwork
+    }
+
+    // MARK: - Треки
+
+    private func trackList(_ tracks: [Track]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                CrateDivider(title: "TRACKS", detail: "\(tracks.count)")
+                sortMenu
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 6)
+
+            ForEach(tracks) { track in
+                TrackCell(track: track, queue: tracks, leadingStyle: .artwork, showPlayCount: true)
+            }
+        }
     }
 
     private var sortMenu: some View {
@@ -210,48 +412,55 @@ struct ArtistView: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .padding(.top, 8)
+        .accessibilityLabel("Sort tracks")
+    }
+
+    // MARK: - Воспроизведение
+
+    private func contains(_ track: Track?, in tracks: [Track]) -> Bool {
+        guard let track else { return false }
+        return tracks.contains { $0.id == track.id }
+    }
+
+    /// Играет что-то из этого — ставит паузу и снимает её. Играет что-то
+    /// другое — запускает это с начала.
+    private func playOrPause(_ tracks: [Track]) {
+        if contains(audioPlayer.currentTrack, in: tracks) {
+            audioPlayer.togglePlayPause()
+        } else {
+            audioPlayer.play(tracks)
         }
     }
 
-    private var playButtons: some View {
-        HStack {
-            Button {
-                audioPlayer.play(tracks)
-            } label: {
-                Label("Play", systemImage: "play.fill")
-                    .bold()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-            }
-            .buttonStyle(.glassProminent)
-
-            Button {
-                audioPlayer.playShuffled(tracks)
-            } label: {
-                Label("Shuffle", systemImage: "shuffle")
-                    .bold()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-            }
-            .buttonStyle(.glassProminent)
-        }
-        .padding(.horizontal)
+    /// Кольцо на пластинке артиста: играет эта пластинка — пауза,
+    /// иначе она ставится с начала.
+    private func playRelease(_ album: Album) {
+        playOrPause(album.tracks.sorted { $0.position < $1.position })
     }
 
-    private func section<Content: View, Trailing: View>(
-        _ title: String,
-        trailing: Trailing = EmptyView(),
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                SectionLabel(title)
-                Spacer()
-                trailing
-                    .padding(.horizontal)
-            }
+    // MARK: - Фотография
 
-            content()
-        }
+    /// Яблоко на пластинке — около 100 pt, это ~300 px на экране @3x; с запасом
+    /// под цвета. Без фотографии цвета берутся с последней пластинки, а яблоко
+    /// остаётся пустым: чужая обложка на месте лица сбивала бы с толку.
+    private func loadPhoto(fallback: Data?) async {
+        let data = artist.artwork
+
+        let (image, palette) = await Task.detached(priority: .utility) {
+            let image = data.flatMap { UIImage.thumbnail(from: $0, side: 400) }
+            let source = image ?? fallback.flatMap { UIImage.thumbnail(from: $0, side: 200) }
+            return (image, source?.coverPalette)
+        }.value
+
+        guard !Task.isCancelled else { return }
+
+        photo = image
+        photoPalette = palette
     }
 }

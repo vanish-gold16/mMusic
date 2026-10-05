@@ -47,6 +47,9 @@ struct AlbumSleeve: View {
     /// `fraction` (0...1) его длины. Без него диски только показывают:
     /// в сетке нажатие открывает альбом.
     var onTapTrack: ((_ disc: Int, _ index: Int, _ fraction: Double) -> Void)? = nil
+    /// Кольца, подсвеченные серебром, по пластинкам: `marked[k]` — номера треков
+    /// пластинки `k`. На странице артиста так видно, где на чужом альбоме он в гостях.
+    var marked: [Set<Int>] = []
 
     /// Ширина к высоте. Место под выехавший диск держится всегда: иначе
     /// играющий вылезал бы на соседнюю ячейку.
@@ -115,7 +118,8 @@ struct AlbumSleeve: View {
             rpm: type.rpm,
             labelFraction: type.labelFraction,
             accent: accent,
-            onTapTrack: isOut ? onTapTrack.map { onTap in { onTap(disc, $0, $1) } } : nil
+            onTapTrack: isOut ? onTapTrack.map { onTap in { onTap(disc, $0, $1) } } : nil,
+            marked: marked.indices.contains(disc) ? marked[disc] : []
         )
         .frame(width: radius * 2, height: radius * 2)
         // Правый край диска — на `peek` за краем конверта. Задние чуть выше
@@ -206,6 +210,12 @@ struct VinylRecord: View {
     let labelFraction: CGFloat
     let accent: Color
     let onTapTrack: ((_ index: Int, _ fraction: Double) -> Void)?
+    /// Треки, чьи кольца светлее остальных, — не играющие, а отмеченные.
+    var marked: Set<Int> = []
+    /// Яблоко всегда стоит ровно. Остановленный диск замирает под любым углом,
+    /// как настоящий, — но на пластинке артиста на яблоке лицо, и наклонять его
+    /// незачем. Такой диск и не крутится.
+    var isUpright = false
 
     /// Размер диска — нужен, чтобы по точке нажатия найти кольцо.
     @State private var diameter: CGFloat = 0
@@ -219,7 +229,7 @@ struct VinylRecord: View {
         // Крутится только диск: блик неподвижен, как отражение лампы на настоящем.
         TimelineView(.animation(paused: !isSpinning || reduceMotion)) { context in
             disc
-                .rotationEffect(.degrees(angle(at: context.date)))
+                .rotationEffect(.degrees(isUpright ? 0 : angle(at: context.date)))
         }
         .overlay {
             sheen
@@ -346,7 +356,14 @@ struct VinylRecord: View {
                     fillRing(from: edge, to: needle, with: accent)
                     fillRing(from: needle, to: bottom, with: accent.opacity(0.35))
                 } else {
-                    let color = index == currentIndex ? accent.opacity(0.9) : Color(white: 0.16)
+                    let color = if index == currentIndex {
+                        accent.opacity(0.9)
+                    } else if marked.contains(index) {
+                        // Серебро, а не акцент: акцент значит «играет сейчас».
+                        Color(white: 0.58)
+                    } else {
+                        Color(white: 0.16)
+                    }
                     fillRing(from: edge, to: bottom, with: color)
                 }
 

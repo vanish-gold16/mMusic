@@ -18,6 +18,15 @@ struct AlbumCell: View {
     @State private var cover: UIImage?
 
     let album: Album
+    /// Строка авторов под именем. nil — все авторы альбома; пустая — строки нет.
+    /// На странице артиста его самого под каждым конвертом не пишут.
+    var byline: String? = nil
+    /// Треки, где звучит гость, — на странице артиста в разделе Featured on.
+    /// Их кольца на диске светятся, а если гость не на всём альбоме,
+    /// под конвертом написано, на каких.
+    var guestTracks: [Track] = []
+    /// Мелкая ячейка для сетки в три колонки — синглы на странице артиста.
+    var isCompact = false
 
     private var sortedTracks: [Track] {
         album.tracks.sorted { $0.position < $1.position }
@@ -31,6 +40,27 @@ struct AlbumCell: View {
             parts.append(String(Calendar.current.component(.year, from: release)))
         }
         return parts.joined(separator: "  ·  ").uppercased()
+    }
+
+    private var artistsLine: String {
+        byline ?? album.artistNames.joined(separator: ", ")
+    }
+
+    /// Кольца гостевых треков по пластинкам — в том виде, в каком их ждёт конверт.
+    private var markedRings: [Set<Int>] {
+        guard !guestTracks.isEmpty else { return [] }
+        let ids = Set(guestTracks.map(\.persistentModelID))
+
+        return album.discs.map { disc in
+            Set(disc.indices.filter { ids.contains(disc[$0].persistentModelID) })
+        }
+    }
+
+    /// На каких треках гость. Только если не на всех: у сингла имя трека —
+    /// это и есть имя альбома, а «все треки» видно по кольцам.
+    private var guestNote: String? {
+        guard !guestTracks.isEmpty, guestTracks.count < album.tracks.count else { return nil }
+        return guestTracks.map(\.name).joined(separator: ", ")
     }
     
     var body: some View {
@@ -118,7 +148,7 @@ struct AlbumCell: View {
         let playing = album.position(of: audioPlayer.currentTrack)
         let isCurrent = playing != nil
 
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: isCompact ? 8 : 10) {
             // `isPlaying` и акцент читаются только у играющего альбома: иначе
             // каждая ячейка сетки перерисовывалась бы на каждой паузе.
             AlbumSleeve(
@@ -128,18 +158,34 @@ struct AlbumCell: View {
                 outDisc: playing?.disc,
                 playing: playing,
                 isPlaying: isCurrent && audioPlayer.isPlaying,
-                accent: isCurrent ? audioPlayer.accent : .clear
+                accent: isCurrent ? audioPlayer.accent : .clear,
+                marked: markedRings
             )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(album.name)
-                    .font(.system(size: 21, weight: .heavy).width(.compressed))
+                    .font(.system(size: isCompact ? 17 : 21, weight: .heavy).width(.compressed))
                     .lineLimit(2)
 
-                Text(album.artistNames.joined(separator: ", "))
+                if !artistsLine.isEmpty {
+                    Text(artistsLine)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if let guestNote {
+                    // Контурная звезда — та же, что у гостя в редакторе авторов.
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Image(systemName: "star")
+                            .font(.caption2)
+                            .accessibilityLabel("Guest on")
+                        Text(guestNote)
+                            .lineLimit(1)
+                    }
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                }
 
                 HStack(spacing: 6) {
                     Text(passport)
