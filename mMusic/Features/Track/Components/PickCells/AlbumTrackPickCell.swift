@@ -5,6 +5,8 @@ import SwiftUI
 /// плюс справа при сборке альбома из полусотни треков — занятие на любителя.
 struct AlbumTrackPickCell: View {
 
+    @Environment(AudioPlayer.self) private var audioPlayer
+
     var track: Track
     @Binding var addedTracks: [TrackDraft]
     /// Альбом, который собираем. Нужен, чтобы отличить «трек уже здесь»
@@ -40,17 +42,20 @@ struct AlbumTrackPickCell: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            artwork
+            PickCover(track: track)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.name)
                     .bold()
                     .lineLimit(1)
 
-                Text(track.artistNames.joined(separator: ", "))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                // У трека без авторов строки нет: пустая оставляла бы под именем дыру.
+                if !track.artistNames.isEmpty {
+                    Text(track.artistNames.joined(separator: ", "))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
                 if isAlreadyHere {
                     Label("Already in this album", systemImage: "checkmark")
@@ -78,7 +83,7 @@ struct AlbumTrackPickCell: View {
         .contentShape(Rectangle())
         // Выбранная строка красится тем же стеклом, что и играющая в списках, —
         // приложение уже говорит этим цветом «вот это».
-        .glassEffect(isPicked ? .regular.tint(Color.accentColor.opacity(0.28)) : .regular)
+        .glassEffect(isPicked ? .regular.tint(audioPlayer.accent.opacity(0.28)) : .regular)
         .padding(.horizontal)
         // Уже добавленные приглушены и не нажимаются: строка сообщает о состоянии,
         // а не предлагает действие.
@@ -87,23 +92,6 @@ struct AlbumTrackPickCell: View {
             guard !isAlreadyHere else { return }
             withAnimation(.snappy) { swapIsPicked() }
         }
-    }
-
-    private var artwork: some View {
-        RoundedRectangle(cornerRadius: 2)
-            .fill(Color.gray.opacity(0.2))
-            .frame(width: 40, height: 40)
-            .overlay {
-                if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Image(systemName: "music.note")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 2))
     }
 
     /// У выбранного трека вместо галочки — его номер в альбоме: порядком выбора
@@ -121,7 +109,7 @@ struct AlbumTrackPickCell: View {
                     .monospacedDigit()
                     .foregroundStyle(.white)
                     .frame(width: 26, height: 26)
-                    .background(Color.accentColor, in: Circle())
+                    .background(.tint, in: Circle())
             } else {
                 Image(systemName: "plus.circle")
                     .font(.title3)

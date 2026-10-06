@@ -1,10 +1,15 @@
 import SwiftData
 import SwiftUI
 
+/// Строка выбора трека в плейлист. Нажимается вся целиком, как строка выбора
+/// в альбом: попадать в маленький плюс справа, листая сотню треков, неудобно.
+/// Выбранная подкрашена тем же стеклом, что играющая строка трека, —
+/// приложение уже говорит этим цветом «вот это».
 struct PlaylistTrackPickCell: View {
-    
-    @Environment(\.modelContext) var modelContext
-    
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AudioPlayer.self) private var audioPlayer
+
     var track: Track
     var playlist: Playlist
 
@@ -13,39 +18,46 @@ struct PlaylistTrackPickCell: View {
     }
 
     var body: some View {
-        HStack {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 50, height: 50)
-                .overlay {
-                    if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFit()
-                    } else {
-                        Image(systemName: "music.note")
-                    }
-                }
-            VStack(alignment: .leading) {
+        let isPicked = isPicked
+
+        HStack(spacing: 12) {
+            PickCover(track: track)
+
+            VStack(alignment: .leading, spacing: 2) {
                 Text(track.name)
                     .bold()
-                Text(track.artistNames.joined(separator: ", "))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button {
-                swapIsPicked()
-            } label: {
-                if isPicked {
-                    Image(systemName: "checkmark.circle.dotted")
-                } else {
-                    Image(systemName: "plus")
+                    .lineLimit(1)
+
+                // У трека без авторов строки нет: пустая оставляла бы под именем дыру.
+                if !track.artistNames.isEmpty {
+                    Text(track.artistNames.joined(separator: ", "))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: isPicked ? "checkmark.circle.fill" : "plus.circle")
+                .font(.title3)
+                .foregroundStyle(isPicked ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 32)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .glassEffect(isPicked ? .regular.tint(audioPlayer.accent.opacity(0.28)) : .regular)
         .padding(.horizontal)
+        .onTapGesture {
+            withAnimation(.snappy) { swapIsPicked() }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(isPicked ? "In the playlist" : "")
     }
-    
+
     func swapIsPicked() {
         if isPicked {
             if let item = playlist.items.first(where: { $0.track == track }) {
