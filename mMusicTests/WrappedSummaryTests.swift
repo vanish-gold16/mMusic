@@ -195,4 +195,24 @@ struct WrappedSummaryTests {
 
         #expect(summary(of: events, year: 2026).topTracks.first?.minutes == 1)
     }
+
+    /// Дни считаются от 1 января, и в високосном году их на один больше:
+    /// иначе 31 декабря падало бы за край дорожки.
+    @Test func spreadsSecondsOverTheDaysOfTheYear() {
+        let track = makeTrack("Nightcall")
+        let events = [
+            play(track, seconds: 60, on: date(2024, 1, 1)),
+            play(track, seconds: 30, on: date(2024, 1, 1)),
+            play(track, seconds: 120, on: date(2024, 2, 1)),
+            play(track, seconds: 240, on: date(2024, 12, 31))
+        ]
+
+        let leap = summary(of: events, year: 2024)
+
+        #expect(leap.dailySeconds.count == 366)
+        #expect(leap.dailySeconds[0] == 90)
+        #expect(leap.dailySeconds[31] == 120)
+        #expect(leap.dailySeconds[365] == 240)
+        #expect(summary(of: [], year: 2025).dailySeconds.count == 365)
+    }
 }

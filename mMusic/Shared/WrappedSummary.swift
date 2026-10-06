@@ -35,9 +35,11 @@ struct WrappedSummary {
     /// Сколько разного встретилось за год — «широта» вкуса рядом с его глубиной.
     let distinctTracks: Int
     let distinctArtists: Int
-    /// Секунды по месяцам, двенадцать чисел начиная с января: из них рисуется
-    /// столбчатый год.
+    /// Секунды по месяцам, двенадцать чисел начиная с января.
     let monthlySeconds: [TimeInterval]
+    /// Секунды по дням года, с 1 января: 365 чисел, в високосный — 366.
+    /// Из них рисуется год одной звуковой дорожкой.
+    let dailySeconds: [TimeInterval]
 
     var totalMinutes: Int { Int(totalSeconds / 60) }
     var totalHours: Int { Int(totalSeconds / 3600) }
@@ -51,6 +53,7 @@ struct WrappedSummary {
         var artists: [String: Bucket] = [:]
         var genres: [String: Bucket] = [:]
         var monthly = [TimeInterval](repeating: 0, count: 12)
+        var daily = [TimeInterval](repeating: 0, count: daysIn(year, calendar: calendar))
         var days: Set<Date> = []
         var totalSeconds: TimeInterval = 0
 
@@ -71,6 +74,9 @@ struct WrappedSummary {
             }
 
             monthly[calendar.component(.month, from: event.playedAt) - 1] += event.seconds
+            if let day = calendar.ordinality(of: .day, in: .year, for: event.playedAt), daily.indices.contains(day - 1) {
+                daily[day - 1] += event.seconds
+            }
             days.insert(calendar.startOfDay(for: event.playedAt))
         }
 
@@ -86,8 +92,17 @@ struct WrappedSummary {
             longestStreak: longestStreak(in: days, calendar: calendar),
             distinctTracks: tracks.count,
             distinctArtists: artists.count,
-            monthlySeconds: monthly
+            monthlySeconds: monthly,
+            dailySeconds: daily
         )
+    }
+
+    /// Сколько дней в году: 365 или 366.
+    static func daysIn(_ year: Int, calendar: Calendar = .current) -> Int {
+        guard let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1)),
+              let range = calendar.range(of: .day, in: .year, for: start)
+        else { return 365 }
+        return range.count
     }
 
     /// Годы, за которые вообще есть что показать.

@@ -1,8 +1,13 @@
 import SwiftData
 import SwiftUI
 
-/// Итоги года. Крупные цифры моноширинно и почти без украшений —
-/// сама статистика здесь и есть содержание.
+/// Итоги года — как годовой чарт на последних страницах музыкального журнала.
+///
+/// Наверху год крупными сжатыми словами (если лет несколько — все, открытый
+/// напечатан в полную силу, как разделы библиотеки). Под ним часы с музыкой —
+/// самой крупной цифрой в приложении, — потом весь год одной звуковой дорожкой
+/// по дням, как неделя на главной, и чарты треков, артистов и жанров
+/// с большими номерами. Страница светится цветом обложки трека номер один.
 struct WrappedView: View {
 
     @Environment(AudioPlayer.self) private var audioPlayer
@@ -11,14 +16,12 @@ struct WrappedView: View {
     /// Библиотека нужна топу треков: история помнит имя файла, но обложку и
     /// возможность включить песню даёт только сам трек.
     @Query private var libraryTracks: [Track]
-    /// А артисты — ради фотографий в топе.
+    /// А артисты — чтобы строка артиста вела на его страницу.
     @Query private var libraryArtists: [Artist]
 
     @State private var year = Calendar.current.component(.year, from: .now)
-
-    /// Высота столбика месяца. Задана числом, а не местом на экране: полоса года
-    /// должна выглядеть одинаково и в январе, и в декабре.
-    private let monthBarHeight: CGFloat = 88
+    /// Цвета обложки трека номер один — ими светится страница.
+    @State private var palette: CoverPalette?
 
     private var availableYears: [Int] {
         let years = WrappedSummary.years(in: events)
@@ -35,170 +38,193 @@ struct WrappedView: View {
     }
 
     var body: some View {
+        // Свод — это проход по всей истории, поэтому считается один раз за
+        // перерисовку и дальше передаётся уже готовым.
+        let summary = WrappedSummary.make(from: events, year: year)
+        let topTrack = summary.topTracks.first.flatMap { tracksByFilename[$0.key] }
+
         ScrollView {
-            // Свод — это проход по всей истории, поэтому считается один раз за
-            // перерисовку и дальше передаётся уже готовым.
-            report(WrappedSummary.make(from: events, year: year))
-                .padding(.vertical)
+            LazyVStack(alignment: .leading, spacing: 36) {
+                masthead(summary)
+                    .padding(.top, 4)
+
+                if summary.plays == 0 {
+                    LibraryEmptyState(text: "Nothing played in \(String(year)) yet")
+                } else {
+                    // Над цифрами такого кегля и так много воздуха — шрифт
+                    // оставляет его под заглавные, которых в числе нет.
+                    headline(summary)
+                        .padding(.top, -20)
+                    yearTape(summary)
+                    topTracks(summary.topTracks)
+                    chart("TOP ARTISTS", entries: summary.topArtists, linksToArtists: true)
+                    chart("TOP GENRES", entries: summary.topGenres)
+                }
+            }
+            .padding(.bottom, 32)
         }
-        .navigationTitle("\(String(year)) in music")
+        // `containerBackground`, а не `background`: у экрана в навигации своя
+        // непрозрачная подложка.
+        .containerBackground(for: .navigation) {
+            CoverAura(palette: palette, breathes: false)
+        }
+        .tint(palette?.accent ?? audioPlayer.accent)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             // Открываем на последнем годе, где что-то слушали, а не на календарном.
             if !availableYears.contains(year), let latest = availableYears.first { year = latest }
         }
-    }
-
-    @ViewBuilder
-    private func report(_ summary: WrappedSummary) -> some View {
-        LazyVStack(alignment: .leading, spacing: 28) {
-            if availableYears.count > 1 {
-                Picker("Year", selection: $year) {
-                    ForEach(availableYears, id: \.self) { year in
-                        Text(String(year)).tag(year)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-            }
-
-            if summary.plays == 0 {
-                LibraryEmptyState(text: "Nothing played in \(String(year)) yet")
-            } else {
-                headline(summary)
-                stats(summary)
-                months(summary)
-                topTracks(summary.topTracks)
-                list("Top artists", entries: summary.topArtists, artists: artistsByName)
-                list("Top genres", entries: summary.topGenres)
-            }
+        .task(id: topTrack?.displayArtwork?.count) {
+            await loadPalette(topTrack?.displayArtwork)
         }
     }
 
+    // MARK: - Шапка
+
+    private func masthead(_ summary: WrappedSummary) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if availableYears.count > 1 {
+                // Самый крупный кегль, при котором все годы встают в строку.
+                ViewThatFits(in: .horizontal) {
+                    yearIndex(size: 44)
+                    yearIndex(size: 34)
+                    yearIndex(size: 26)
+                }
+            } else {
+                Text(String(year))
+                    .font(.system(size: 44, weight: .heavy).width(.compressed))
+            }
+
+            Text(passport(summary))
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .tracking(1.2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+    }
+
+    private func yearIndex(size: CGFloat) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: size * 0.4) {
+            ForEach(availableYears, id: \.self) { option in
+                let isOpen = option == year
+
+                Button {
+                    withAnimation(.snappy(duration: 0.25)) { year = option }
+                } label: {
+                    Text(String(option))
+                        .font(.system(size: size, weight: .heavy).width(.compressed))
+                        .foregroundStyle(isOpen ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isOpen ? .isSelected : [])
+            }
+        }
+        // Идеальная ширина, а не сжатая: по ней `ViewThatFits` и выбирает кегль.
+        .fixedSize()
+    }
+
+    /// «IN MUSIC  ·  312 PLAYS  ·  87 DAYS  ·  12 IN A ROW».
+    private func passport(_ summary: WrappedSummary) -> String {
+        guard summary.plays > 0 else { return "IN MUSIC" }
+
+        return [
+            "IN MUSIC",
+            ArtistDiscography.count(summary.plays, "PLAY", "PLAYS"),
+            ArtistDiscography.count(summary.activeDays, "DAY", "DAYS"),
+            summary.longestStreak > 1 ? "\(summary.longestStreak) IN A ROW" : nil,
+        ]
+        .compactMap { $0 }
+        .joined(separator: "  ·  ")
+    }
+
+    // MARK: - Часы
+
     /// Час — естественная единица года, но в январе или у новичка часов ещё нет,
     /// и «0 hours» было бы обидной неправдой: тогда крупно идут минуты.
+    /// Рядом — широта вкуса: одни часы не говорят, крутили вы весь год один
+    /// альбом или полторы сотни разных песен.
     private func headline(_ summary: WrappedSummary) -> some View {
         let hours = summary.totalHours
         let value = hours >= 1 ? hours : summary.totalMinutes
         let unit = hours >= 1
-            ? (hours == 1 ? "hour" : "hours")
-            : (value == 1 ? "minute" : "minutes")
+            ? (hours == 1 ? "HOUR OF MUSIC" : "HOURS OF MUSIC")
+            : (value == 1 ? "MINUTE OF MUSIC" : "MINUTES OF MUSIC")
 
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(value.formatted())
-                    .font(.system(size: 72, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .foregroundStyle(.tint)
+        let details = [
+            unit,
+            ArtistDiscography.count(summary.distinctTracks, "TRACK", "TRACKS"),
+            ArtistDiscography.count(summary.distinctArtists, "ARTIST", "ARTISTS"),
+        ]
+        .compactMap { $0 }
+        .joined(separator: "  ·  ")
 
-                Text(unit)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
+        return VStack(alignment: .leading, spacing: 0) {
+            Text(value.formatted())
+                .font(.system(size: 132, weight: .heavy).width(.compressed))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
+                .foregroundStyle(.tint)
 
-            Text(breadth(summary))
-                .font(.subheadline)
+            Text(details)
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .tracking(1.2)
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
+        .accessibilityElement(children: .combine)
     }
 
-    /// Широта вкуса рядом с его глубиной: одни часы не говорят, крутили вы весь
-    /// год один альбом или полторы сотни разных песен.
-    private func breadth(_ summary: WrappedSummary) -> String {
-        let tracks = summary.distinctTracks == 1 ? "1 track" : "\(summary.distinctTracks) tracks"
-        let artists = summary.distinctArtists == 1 ? "1 artist" : "\(summary.distinctArtists) artists"
+    // MARK: - Год
 
-        return "\(tracks) • \(artists)"
-    }
+    /// Подпись самого громкого месяца — под дорожкой, а не у разделителя:
+    /// там на неё не хватало места, и она рвалась на две строки. Его буква
+    /// на дорожке горит тем же цветом.
+    private func yearTape(_ summary: WrappedSummary) -> some View {
+        let busiest = summary.monthlySeconds.indices.max { summary.monthlySeconds[$0] < summary.monthlySeconds[$1] }
 
-    private func stats(_ summary: WrappedSummary) -> some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 76), alignment: .leading)],
-            alignment: .leading,
-            spacing: 16
-        ) {
-            stat("\(summary.plays)", label: summary.plays == 1 ? "play" : "plays")
-            stat("\(summary.activeDays)", label: summary.activeDays == 1 ? "day" : "days")
-            stat("\(summary.longestStreak)", label: "in a row")
+        return VStack(alignment: .leading, spacing: 14) {
+            CrateDivider(title: "THE YEAR")
+
+            YearTape(
+                daily: summary.dailySeconds,
+                year: year,
+                busiestMonth: summary.busiestMonth == nil ? nil : busiest,
+                accent: palette?.accent ?? audioPlayer.accent
+            )
 
             if let month = summary.busiestMonth {
-                stat(String(month.name.prefix(3)), label: "busiest")
+                HStack(spacing: 0) {
+                    Text("BUSIEST  ·  ")
+                        .foregroundStyle(.secondary)
+                    Text(month.name.uppercased())
+                        .foregroundStyle(.tint)
+                    Text("  ·  \(Self.listening(month.seconds))")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .tracking(1.2)
+                .accessibilityElement(children: .combine)
             }
         }
         .padding(.horizontal)
     }
 
-    private func stat(_ value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.title2)
-                .bold()
-                .monospacedDigit()
-
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+    /// «41 H» или «35 MIN» — как время в паспортах по всему приложению.
+    private static func listening(_ seconds: TimeInterval) -> String {
+        let minutes = Int((seconds / 60).rounded())
+        return minutes >= 60 ? "\(minutes / 60) H" : "\(minutes) MIN"
     }
 
-    /// Год столбиками. Все двенадцать одного цвета: длина уже и есть значение,
-    /// красить её ещё и оттенком — сказать одно и то же дважды. Число подписано
-    /// только у пика: двенадцать чисел в ряд всё равно никто не прочитает.
-    private func months(_ summary: WrappedSummary) -> some View {
-        let peak = summary.monthlySeconds.max() ?? 0
-        let symbols = Calendar.current.veryShortMonthSymbols
+    // MARK: - Чарты
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                SectionLabel("Months")
-
-                Spacer()
-
-                if let month = summary.busiestMonth {
-                    Text("\(month.name) • \(Int((month.seconds / 60).rounded())) min")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
-                }
-            }
-
-            HStack(alignment: .bottom, spacing: 4) {
-                ForEach(Array(symbols.enumerated()), id: \.offset) { index, symbol in
-                    VStack(spacing: 6) {
-                        monthBar(seconds: summary.monthlySeconds[index], peak: peak)
-
-                        Text(symbol)
-                            .font(.caption2)
-                            .foregroundStyle(summary.monthlySeconds[index] > 0 ? .secondary : .tertiary)
-                    }
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-
-    private func monthBar(seconds: TimeInterval, peak: TimeInterval) -> some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: 4, topTrailingRadius: 4)
-        let filled = peak > 0 ? monthBarHeight * (seconds / peak) : 0
-
-        return ZStack(alignment: .bottom) {
-            // Дорожка пустого месяца еле видна: это мера, а не значение.
-            shape.fill(.quaternary.opacity(0.5))
-
-            // Месяц с крохотным временем всё равно получает несколько точек
-            // высоты: иначе он неотличим от месяца, когда не слушали вовсе.
-            shape
-                .fill(.tint)
-                .frame(height: seconds > 0 ? max(3, filled) : 0)
-        }
-        .frame(height: monthBarHeight)
-    }
-
-    /// Единственный список, который умеет играть: за строкой артиста или жанра
+    /// Единственный чарт, который умеет играть: за строкой артиста или жанра
     /// нет одного трека, который она означает.
     private func topTracks(_ entries: [WrappedSummary.Entry]) -> some View {
         let peak = entries.first?.seconds ?? 0
@@ -206,19 +232,22 @@ struct WrappedView: View {
         // нечего. Очередь собирается из того, что осталось.
         let available = entries.compactMap { tracksByFilename[$0.key] }
 
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                SectionLabel("Top tracks")
-
-                Spacer()
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                CrateDivider(title: "TOP TRACKS", detail: "\(entries.count)")
 
                 if !available.isEmpty {
                     Button {
                         audioPlayer.play(available)
                     } label: {
                         Image(systemName: "play.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(width: 22, height: 22)
                     }
-                    .padding(.horizontal)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .padding(.top, 8)
+                    .accessibilityLabel("Play top tracks")
                 }
             }
 
@@ -232,98 +261,153 @@ struct WrappedView: View {
 
                     audioPlayer.play(available, startingAt: start)
                 } label: {
-                    row(rank: index + 1, entry: entry, peak: peak, track: track)
+                    ChartRow(rank: index + 1, entry: entry, peak: peak, track: track)
                 }
                 .buttonStyle(.plain)
                 .disabled(track == nil)
             }
         }
+        .padding(.horizontal)
     }
 
-    /// Артисты передаются словарём: фотография есть только у тех, кто ещё в
-    /// библиотеке и кому её поставили, — у жанров же лица нет вовсе.
+    /// Чарт артистов или жанров. В чарте артистов строка того, кто ещё
+    /// в библиотеке, ведёт на его страницу.
     @ViewBuilder
-    private func list(
-        _ title: String,
-        entries: [WrappedSummary.Entry],
-        artists: [String: Artist] = [:]
-    ) -> some View {
+    private func chart(_ title: String, entries: [WrappedSummary.Entry], linksToArtists: Bool = false) -> some View {
         if !entries.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionLabel(title)
+            VStack(alignment: .leading, spacing: 14) {
+                CrateDivider(title: title, detail: "\(entries.count)")
 
                 ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                    row(rank: index + 1, entry: entry, peak: entries[0].seconds, artist: artists[entry.key])
+                    let row = ChartRow(rank: index + 1, entry: entry, peak: entries[0].seconds)
+
+                    if linksToArtists, let artist = artistsByName[entry.key] {
+                        NavigationLink {
+                            ArtistView(artist: artist)
+                        } label: {
+                            row
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        row
+                    }
                 }
             }
+            .padding(.horizontal)
         }
     }
 
-    private func row(
-        rank: Int,
-        entry: WrappedSummary.Entry,
-        peak: TimeInterval,
-        track: Track? = nil,
-        artist: Artist? = nil
-    ) -> some View {
+    // MARK: - Цвета
+
+    /// Цвета обложки трека номер один. Миниатюры хватает: нужен только цвет.
+    private func loadPalette(_ data: Data?) async {
+        guard let data else {
+            palette = nil
+            return
+        }
+
+        let palette = await Task.detached(priority: .utility) {
+            UIImage.thumbnail(from: data, side: 200)?.coverPalette
+        }.value
+
+        guard !Task.isCancelled else { return }
+        self.palette = palette
+    }
+}
+
+/// Строка чарта: большой номер, как в годовом чарте журнала, обложка, если это
+/// трек, имя с полоской доли и время. Номер один напечатан цветом страницы.
+private struct ChartRow: View {
+
+    let rank: Int
+    let entry: WrappedSummary.Entry
+    /// Время первой строки: от него меряется полоска доли.
+    let peak: TimeInterval
+    var track: Track? = nil
+
+    @State private var cover: UIImage?
+
+    var body: some View {
         HStack(spacing: 12) {
             Text("\(rank)")
-                .font(.subheadline)
+                .font(.system(size: 34, weight: .heavy).width(.compressed))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: 18, alignment: .trailing)
+                .foregroundStyle(rank == 1 ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+                .frame(width: 24, alignment: .leading)
 
-            if let track {
-                artwork(track)
-            } else if let artist, artist.artwork != nil {
-                ArtistAvatar(artist: artist, size: 40)
+            if track != nil {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(.quaternary)
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        if let cover {
+                            Image(uiImage: cover)
+                                .resizable()
+                                .scaledToFill()
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(entry.name)
+                    .font(.system(size: 20, weight: .heavy).width(.compressed))
                     .lineLimit(1)
 
-                shareBar(entry.seconds, of: peak)
+                if let track, !track.artistNames.isEmpty {
+                    Text(track.artistNames.joined(separator: ", "))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                ShareBar(seconds: entry.seconds, peak: peak)
             }
 
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(entry.minutes) min")
-                    .font(.subheadline)
-                    .monospacedDigit()
+                Text("\(entry.minutes) MIN")
+                    .foregroundStyle(.primary)
 
-                Text(entry.count == 1 ? "1 play" : "\(entry.count) plays")
-                    .font(.caption2)
-                    .monospacedDigit()
+                Text(entry.count == 1 ? "1 PLAY" : "\(entry.count) PLAYS")
                     .foregroundStyle(.secondary)
             }
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .tracking(1.2)
+            .monospacedDigit()
         }
-        .padding(.horizontal)
         .contentShape(.rect)
+        .task(id: track?.displayArtwork?.count) {
+            await loadCover()
+        }
     }
 
-    private func artwork(_ track: Track) -> some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(.quaternary)
-            .frame(width: 40, height: 40)
-            .overlay {
-                if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Image(systemName: "music.note")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
+    /// Обложка здесь 44 pt — около 130 px на экране @3x.
+    private func loadCover() async {
+        guard let data = track?.displayArtwork else {
+            cover = nil
+            return
+        }
 
-    /// Полоска доли: длина — время строки относительно первой в списке. По ней
-    /// сразу видно, отрыв это или почти ничья.
-    private func shareBar(_ seconds: TimeInterval, of peak: TimeInterval) -> some View {
+        let image = await Task.detached(priority: .utility) {
+            UIImage.thumbnail(from: data, side: 140)
+        }.value
+
+        guard !Task.isCancelled else { return }
+        cover = image
+    }
+}
+
+/// Полоска доли: длина — время строки относительно первой в чарте. По ней
+/// сразу видно, отрыв это или почти ничья.
+private struct ShareBar: View {
+
+    let seconds: TimeInterval
+    let peak: TimeInterval
+
+    var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Capsule()
@@ -334,6 +418,104 @@ struct WrappedView: View {
                     .frame(width: max(4, proxy.size.width * (peak > 0 ? seconds / peak : 0)))
             }
         }
-        .frame(height: 4)
+        .frame(height: 3)
+    }
+}
+
+/// Год одной звуковой дорожкой: столбик — несколько дней подряд, высота —
+/// сколько в эти дни звучала музыка. Тот же рисунок, что у недели на главной
+/// (`WeekTape`), только в масштабе года. Под дорожкой — буквы месяцев, самый
+/// громкий месяц — цветом страницы. В текущем году ещё не наступившие дни
+/// едва видны: год не кончился.
+private struct YearTape: View {
+
+    let daily: [TimeInterval]
+    let year: Int
+    /// Месяц с самым большим временем, с нуля. nil — год пустой.
+    let busiestMonth: Int?
+    let accent: Color
+
+    private let step: CGFloat = 3
+    private let barWidth: CGFloat = 2
+    private let tapeHeight: CGFloat = 64
+    private let labelHeight: CGFloat = 14
+
+    /// Сегодняшний день года, с нуля, — если открыт текущий год.
+    private var today: Int? {
+        let calendar = Calendar.current
+        guard calendar.component(.year, from: .now) == year,
+              let day = calendar.ordinality(of: .day, in: .year, for: .now)
+        else { return nil }
+        return day - 1
+    }
+
+    /// С какого дня года начинается каждый месяц, с нуля.
+    private var monthStarts: [Int] {
+        let calendar = Calendar.current
+        return (1...12).map { month in
+            guard let date = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+                  let day = calendar.ordinality(of: .day, in: .year, for: date)
+            else { return 0 }
+            return day - 1
+        }
+    }
+
+    var body: some View {
+        let today = today
+        let monthStarts = monthStarts
+        let letters = Calendar.current.veryShortMonthSymbols
+
+        Canvas { context, size in
+            let days = max(daily.count, 1)
+            let count = max(Int(size.width / step), 1)
+
+            // Дни раскладываются по столбикам; столбик — сумма своих дней.
+            var bars = [TimeInterval](repeating: 0, count: count)
+            for (day, seconds) in daily.enumerated() {
+                bars[min(day * count / days, count - 1)] += seconds
+            }
+            let peak = bars.max() ?? 0
+
+            for bar in 0..<count {
+                let firstDay = bar * days / count
+                let isFuture = today.map { firstDay > $0 } ?? false
+
+                // Корень, а не прямая доля: иначе тихие недели рядом с самой
+                // громкой пропали бы совсем.
+                let level = peak > 0 ? sqrt(bars[bar] / peak) : 0
+                let height = bars[bar] > 0 ? max(3, level * tapeHeight) : 2
+                let rect = CGRect(
+                    x: CGFloat(bar) * step,
+                    y: (tapeHeight - height) / 2,
+                    width: barWidth,
+                    height: height
+                )
+
+                let color: Color = if isFuture {
+                    .primary.opacity(0.06)
+                } else if bars[bar] > 0 {
+                    accent
+                } else {
+                    .primary.opacity(0.15)
+                }
+                context.fill(Path(roundedRect: rect, cornerRadius: 1), with: .color(color))
+            }
+
+            // Буквы месяцев — под первым столбиком каждого месяца.
+            for (month, start) in monthStarts.enumerated() where letters.indices.contains(month) {
+                let x = CGFloat(start * count / days) * step
+                let style: Color = month == busiestMonth ? accent : .secondary
+                context.draw(
+                    Text(letters[month])
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(style),
+                    at: CGPoint(x: x, y: tapeHeight + 4),
+                    anchor: .topLeading
+                )
+            }
+        }
+        .frame(height: tapeHeight + labelHeight + 4)
+        .accessibilityElement()
+        .accessibilityLabel("Listening through the year")
     }
 }
