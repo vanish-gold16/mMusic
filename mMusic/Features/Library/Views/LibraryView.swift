@@ -3,10 +3,17 @@ import SwiftUI
 
 /// Вся библиотека на одном экране. Раньше это были четыре отдельных экрана,
 /// в которые вели два одинаковых бургер-меню — из Home и отсюда же.
+///
+/// Наверху — указатель разделов крупными словами (`LibraryMasthead`), как
+/// шапка главной; под ним открытый раздел. Сверху светится цвет того, что
+/// играет, — та же комната, что на главной, только спокойнее: здесь ищут,
+/// а не слушают.
 struct LibraryView: View {
 
-    @State private var section: LibrarySection = .albums
-    @State private var albumSort: AlbumSort = .dateAdded
+    @Environment(AudioPlayer.self) private var audioPlayer
+
+    @AppStorage(AppSettings.librarySection) private var section: LibrarySection = .albums
+    @AppStorage(AppSettings.albumSort) private var albumSort: AlbumSort = .dateAdded
 
     @State private var showCreateAlbum = false
     @State private var showCreatePlaylist = false
@@ -14,15 +21,9 @@ struct LibraryView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 20) {
-                Picker("Section", selection: $section) {
-                    ForEach(LibrarySection.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .padding(.horizontal)
+            LazyVStack(spacing: 24) {
+                LibraryMasthead(section: $section, albumSort: $albumSort)
+                    .padding(.top, 4)
 
                 switch section {
                 case .albums:
@@ -35,15 +36,15 @@ struct LibraryView: View {
                     SmartPlaylistsSection()
                 }
             }
-            .padding(.vertical)
+            .padding(.bottom, 24)
         }
-        .navigationTitle("Library")
+        // `containerBackground`, а не `background`: у экрана в навигации своя
+        // непрозрачная подложка.
+        .containerBackground(for: .navigation) {
+            CoverAura(palette: audioPlayer.currentTrack == nil ? nil : audioPlayer.palette, breathes: false)
+        }
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if section == .albums {
-                ToolbarItem(placement: .topBarLeading) {
-                    sortMenu
-                }
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 addMenu
             }
@@ -83,19 +84,6 @@ struct LibraryView: View {
             }
         } label: {
             Image(systemName: "plus")
-        }
-    }
-
-    private var sortMenu: some View {
-        Menu {
-            Picker("Sort By", selection: $albumSort) {
-                ForEach(AlbumSort.allCases) { option in
-                    Label(option.rawValue, systemImage: option.systemImage)
-                        .tag(option)
-                }
-            }
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
         }
     }
 }

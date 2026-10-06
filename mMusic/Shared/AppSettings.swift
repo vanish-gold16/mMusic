@@ -8,6 +8,11 @@ enum AppSettings {
     static let deleteOriginalAfterImport = "deleteOriginalAfterImport"
     static let appearance = "appearance"
     static let birthdayNotifications = "birthdayNotifications"
+    /// Открытый раздел библиотеки и порядок альбомов — чтобы библиотека
+    /// открывалась там же, где её оставили. Регистрировать не нужно: значение
+    /// по умолчанию задаёт сам `@AppStorage`.
+    static let librarySection = "librarySection"
+    static let albumSort = "albumSort"
 
     /// Без регистрации `bool(forKey:)` вернул бы false для ещё не записанного ключа,
     /// и обе настройки стартовали бы выключенными, хотя в интерфейсе выглядят включёнными.
