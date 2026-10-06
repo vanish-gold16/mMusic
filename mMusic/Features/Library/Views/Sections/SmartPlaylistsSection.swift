@@ -4,58 +4,76 @@ import SwiftUI
 /// Список автоподборок. Пустые не показываются — карточка «0 треков» только мешает.
 struct SmartPlaylistsSection: View {
 
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AudioPlayer.self) private var audioPlayer
+    @Environment(ToastCenter.self) private var toasts
+
     @Query private var tracks: [Track]
 
-    private var available: [(playlist: SmartPlaylist, count: Int)] {
+    /// Подборки вместе с их треками: считаются один раз на весь список,
+    /// а не заново в каждой строке и в каждом пункте меню.
+    private var available: [(playlist: SmartPlaylist, tracks: [Track])] {
         SmartPlaylist.allCases
-            .map { ($0, $0.tracks(from: tracks).count) }
-            .filter { $0.1 > 0 }
+            .map { ($0, $0.tracks(from: tracks)) }
+            .filter { !$0.1.isEmpty }
     }
 
     var body: some View {
+        let available = available
+
         if available.isEmpty {
             LibraryEmptyState(text: "Nothing to collect yet")
         } else {
-            LazyVStack(spacing: 8) {
+            LazyVStack(spacing: 10) {
                 ForEach(available, id: \.playlist.id) { entry in
                     NavigationLink {
                         SmartPlaylistView(playlist: entry.playlist)
                     } label: {
-                        row(entry.playlist, count: entry.count)
+                        SmartPlaylistCell(playlist: entry.playlist, tracks: entry.tracks)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu { menu(entry.playlist, tracks: entry.tracks) }
                 }
             }
             .padding(.horizontal)
         }
     }
 
-    private func row(_ playlist: SmartPlaylist, count: Int) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: playlist.systemImage)
-                .font(.title3)
-                .foregroundStyle(.tint)
-                .frame(width: 44, height: 44)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(playlist.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                Text(playlist.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            Text("\(count)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+    @ViewBuilder
+    private func menu(_ playlist: SmartPlaylist, tracks: [Track]) -> some View {
+        Button {
+            audioPlayer.play(tracks)
+        } label: {
+            Label("Play", systemImage: "play")
         }
-        .padding(12)
-        .contentShape(Rectangle())
-        .glassEffect()
+        Button {
+            audioPlayer.playShuffled(tracks)
+        } label: {
+            Label("Shuffle", systemImage: "shuffle")
+        }
+
+        Divider()
+
+        Button {
+            audioPlayer.enqueueNext(tracks)
+            toasts.enqueuedNext(tracks.count)
+        } label: {
+            Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+        }
+        Button {
+            audioPlayer.enqueueLast(tracks)
+            toasts.enqueuedLast(tracks.count)
+        } label: {
+            Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
+        }
+
+        Divider()
+
+        Button {
+            let kept = playlist.keep(tracks, in: modelContext)
+            toasts.show("Kept as \(kept.name)", systemImage: "text.badge.plus")
+        } label: {
+            Label("Keep as playlist", systemImage: "text.badge.plus")
+        }
     }
 }

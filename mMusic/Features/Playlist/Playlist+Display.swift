@@ -5,14 +5,29 @@ import SwiftUI
 /// у экрана плейлиста и строки в библиотеке — иначе они разошлись бы на первой же правке.
 extension Playlist {
 
-    /// Из чего собирать веер: своя обложка плейлиста, затем обложки треков —
-    /// по одной на альбом, иначе три карты подряд оказались бы одной картинкой.
+    /// Из чего собирать веер: своя обложка плейлиста, затем обложки треков.
     var fanCovers: [Data] {
+        orderedTracks.fanCovers(after: artwork)
+    }
+
+    /// Паспорт одной строкой: «11 TRACKS · 45 MIN · 5 ARTISTS». Артисты — только
+    /// на экране плейлиста: в строке библиотеки места на них нет.
+    func summary(includingArtists: Bool) -> String {
+        orderedTracks.summary(includingArtists: includingArtists)
+    }
+}
+
+/// То же для любого списка треков: так выглядят и плейлисты, и автоподборки.
+extension Array where Element == Track {
+
+    /// Обложки для веера: сначала `own`, если она есть, затем обложки треков —
+    /// по одной на альбом, иначе три карты подряд оказались бы одной картинкой.
+    func fanCovers(after own: Data? = nil) -> [Data] {
         var sources: [Data] = []
-        if let artwork { sources.append(artwork) }
+        if let own { sources.append(own) }
 
         var seenAlbums = Set<PersistentIdentifier>()
-        for track in orderedTracks where sources.count < 3 {
+        for track in self where sources.count < 3 {
             guard let data = track.displayArtwork else { continue }
 
             if let album = track.album, album.artwork != nil,
@@ -25,22 +40,20 @@ extension Playlist {
         return sources
     }
 
-    /// Паспорт одной строкой: «11 TRACKS · 45 MIN · 5 ARTISTS». Артисты — только
-    /// на экране плейлиста: в строке библиотеки места на них нет.
+    /// «11 TRACKS · 45 MIN · 5 ARTISTS».
     func summary(includingArtists: Bool) -> String {
-        let tracks = orderedTracks
-        guard !tracks.isEmpty else { return "NO TRACKS YET" }
+        guard !isEmpty else { return "NO TRACKS YET" }
 
-        var parts = [tracks.count == 1 ? "1 track" : "\(tracks.count) tracks"]
+        var parts = [count == 1 ? "1 track" : "\(count) tracks"]
 
         // Складывается из уже прочитанных длительностей — файлы для этого не открываются.
-        let minutes = Int((tracks.reduce(0) { $0 + $1.duration } / 60).rounded())
+        let minutes = Int((reduce(0) { $0 + $1.duration } / 60).rounded())
         if minutes > 0 {
             parts.append(minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min")
         }
 
         if includingArtists {
-            let artists = Set(tracks.flatMap(\.artistNames)).count
+            let artists = Set(flatMap(\.artistNames)).count
             if artists > 0 {
                 parts.append(artists == 1 ? "1 artist" : "\(artists) artists")
             }

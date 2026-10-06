@@ -32,13 +32,26 @@ enum SmartPlaylist: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Надпись на наклейке поверх обложки — как наклейки на пластинках
+    /// в магазине: «тяжёлая ротация», «только привезли». Перенос строки —
+    /// где ему место на круглой наклейке.
+    var sticker: String {
+        switch self {
+        case .favourites: "STARRED"
+        case .mostPlayed: "HEAVY\nROTATION"
+        case .recentlyAdded: "JUST\nIN"
+        case .forgotten: "DUSTY"
+        case .neverPlayed: "STILL\nSEALED"
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .favourites: "star"
         case .mostPlayed: "flame"
         case .recentlyAdded: "sparkles"
         case .forgotten: "hourglass"
-        case .neverPlayed: "questionmark.circle"
+        case .neverPlayed: "seal"
         }
     }
 
