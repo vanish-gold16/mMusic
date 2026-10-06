@@ -2,20 +2,16 @@ import SwiftUI
 
 /// Что играет сейчас и что дальше. Список — это ровно `audioPlayer.queue`,
 /// поэтому перестановка и удаление здесь сразу меняют воспроизведение.
+///
+/// Шапка — как у страниц приложения: «Queue» сжатым шрифтом, паспорт «сколько
+/// впереди и сколько осталось», под ними выключатели с лампами — те же подписи,
+/// что на панели плеера под клавишами.
 struct QueueView: View {
 
     let audioPlayer: AudioPlayer
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ToastCenter.self) private var toasts
-
-    /// Сколько ещё играть с текущего трека до конца очереди.
-    private var timeLeft: TimeInterval {
-        guard audioPlayer.queue.indices.contains(audioPlayer.currentIndex) else { return 0 }
-
-        let upcoming = audioPlayer.queue[audioPlayer.currentIndex...].reduce(0) { $0 + $1.duration }
-        return max(upcoming - audioPlayer.currentTime, 0)
-    }
 
     private var upcomingCount: Int {
         max(audioPlayer.queue.count - audioPlayer.currentIndex - 1, 0)
@@ -26,12 +22,10 @@ struct QueueView: View {
             header
 
             if audioPlayer.queue.isEmpty {
-                ContentUnavailableView(
-                    "Queue is empty",
-                    systemImage: "music.note.list",
-                    description: Text("Play an album or a playlist to fill it.")
-                )
-                .frame(maxHeight: .infinity)
+                Text("Play an album or a playlist to fill it")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 list
             }
@@ -47,17 +41,12 @@ struct QueueView: View {
     /// Свой заголовок вместо навигационной панели: строка состояния очереди
     /// («сколько ещё играть») здесь полезнее, чем слово «Queue» по центру.
     private var header: some View {
-        VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Queue")
-                        .font(.title3.bold())
+        let accent = audioPlayer.accent
 
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Queue")
+                    .font(.system(size: 34, weight: .heavy).width(.compressed))
 
                 Spacer()
 
@@ -65,71 +54,44 @@ struct QueueView: View {
                     .font(.subheadline.weight(.semibold))
             }
 
-            HStack(spacing: 10) {
-                toggle("shuffle", title: "Shuffle", isOn: audioPlayer.isShuffled) {
+            QueuePassport(audioPlayer: audioPlayer, upcomingCount: upcomingCount)
+
+            // Режимы — выключатели с лампами, как «TEXT» и «REMIX» под клавишами
+            // плеера: горит — включено. «Clear» лампы не имеет: он ничего
+            // не включает, а только делает.
+            HStack(spacing: 18) {
+                PanelSwitch(title: "Shuffle", isOn: audioPlayer.isShuffled, accent: accent) {
                     audioPlayer.toggleShuffle()
                 }
 
-                toggle(
-                    audioPlayer.repeatMode.systemImage,
-                    title: audioPlayer.repeatMode.title,
-                    isOn: audioPlayer.repeatMode.isActive
-                ) {
+                PanelSwitch(title: repeatTitle, isOn: audioPlayer.repeatMode.isActive, accent: accent) {
                     audioPlayer.cycleRepeatMode()
                 }
 
-                Spacer()
+                Spacer(minLength: 0)
 
-                Button {
+                PanelSwitch(title: "Clear", accent: accent) {
                     let removed = upcomingCount
                     audioPlayer.clearUpcoming()
                     toasts.removed(removed == 1 ? "1 track removed" : "\(removed) tracks removed")
-                } label: {
-                    Label("Clear", systemImage: "trash")
-                        .font(.subheadline)
-                        .padding(.horizontal, 14)
-                        .frame(height: 36)
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .capsule)
                 .disabled(upcomingCount == 0)
                 .opacity(upcomingCount == 0 ? 0.4 : 1)
+                .accessibilityLabel("Clear what plays next")
             }
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
-        .padding(.bottom, 12)
+        .padding(.bottom, 8)
     }
 
-    private var subtitle: String {
-        guard !audioPlayer.queue.isEmpty else { return "nothing lined up" }
-
-        let tracks = upcomingCount == 1 ? "1 track next" : "\(upcomingCount) tracks next"
-        return timeLeft > 0 ? "\(tracks) • \(minutesString(timeLeft)) left" : tracks
-    }
-
-    /// Круглые тумблеры режимов: включённый заливается цветом обложки —
-    /// то же правило, что у кнопок в плеере.
-    private func toggle(
-        _ systemImage: String,
-        title: String,
-        isOn: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.subheadline)
-                .labelStyle(.iconOnly)
-                .frame(width: 36, height: 36)
-                .foregroundStyle(isOn ? audioPlayer.accent : Color.secondary)
+    /// Подпись повтора говорит, что именно повторяется, — лампа говорит только «вкл».
+    private var repeatTitle: String {
+        switch audioPlayer.repeatMode {
+        case .off: "Repeat"
+        case .all: "Repeat all"
+        case .one: "Repeat one"
         }
-        .buttonStyle(.plain)
-        .glassEffect(
-            isOn ? .regular.tint(audioPlayer.accent.opacity(0.25)).interactive() : .regular.interactive(),
-            in: .circle
-        )
-        .accessibilityLabel(title)
-        .accessibilityValue(isOn ? "on" : "off")
     }
 
     /// Индексы, а не сами треки: один и тот же трек может стоять в очереди дважды,
@@ -169,27 +131,15 @@ struct QueueView: View {
         let isPlayed = index < audioPlayer.currentIndex
 
         return HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(.quaternary)
-                .frame(width: 46, height: 46)
-                .overlay {
-                    if let data = track.displayArtwork, let uiImage = UIImage(data: data) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Image(systemName: "music.note")
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            PickCover(track: track, side: 46)
                 .overlay {
                     if isCurrent {
                         Color.black.opacity(0.45)
-                        EqualizerView(level: audioPlayer.level)
+                        QueueBars(audioPlayer: audioPlayer)
                             .foregroundStyle(.white)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.name)
@@ -197,10 +147,12 @@ struct QueueView: View {
                     .lineLimit(1)
                     .foregroundStyle(isCurrent ? audioPlayer.accent : Color.primary)
 
-                Text(track.artistNames.joined(separator: ", "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if !track.artistNames.isEmpty {
+                    Text(track.artistNames.joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer()
@@ -225,10 +177,60 @@ struct QueueView: View {
         return String(format: "%d:%02d", total / 60, total % 60)
     }
 
-    private func minutesString(_ time: TimeInterval) -> String {
-        let minutes = Int((time / 60).rounded())
-        guard minutes >= 60 else { return "\(max(minutes, 1)) min" }
+}
 
-        return "\(minutes / 60) h \(minutes % 60) min"
+/// «12 TRACKS NEXT  ·  47 MIN LEFT». Время читается здесь, а не в самой
+/// очереди: оно меняется пять раз в секунду, и перерисовываться на каждый тик
+/// должна одна строка, а не весь список.
+private struct QueuePassport: View {
+
+    let audioPlayer: AudioPlayer
+    let upcomingCount: Int
+
+    /// Сколько ещё играть с текущего трека до конца очереди.
+    private var timeLeft: TimeInterval {
+        guard audioPlayer.queue.indices.contains(audioPlayer.currentIndex) else { return 0 }
+
+        let upcoming = audioPlayer.queue[audioPlayer.currentIndex...].reduce(0) { $0 + $1.duration }
+        return max(upcoming - audioPlayer.currentTime, 0)
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .tracking(1.2)
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+    }
+
+    private var text: String {
+        guard !audioPlayer.queue.isEmpty else { return "NOTHING LINED UP" }
+
+        let tracks = upcomingCount == 0
+            ? "LAST TRACK"
+            : (upcomingCount == 1 ? "1 TRACK NEXT" : "\(upcomingCount) TRACKS NEXT")
+        let left = timeLeft
+
+        guard left > 0 else { return tracks }
+        return "\(tracks)  ·  \(Self.minutes(left)) LEFT"
+    }
+
+    private static func minutes(_ time: TimeInterval) -> String {
+        let minutes = Int((time / 60).rounded())
+        guard minutes >= 60 else { return "\(max(minutes, 1)) MIN" }
+
+        return "\(minutes / 60) H \(minutes % 60) MIN"
+    }
+}
+
+/// Полоски на обложке играющего трека. Громкость читается здесь: она меняется
+/// 30 раз в секунду, и перерисовываться должны полоски, а не вся очередь.
+private struct QueueBars: View {
+
+    let audioPlayer: AudioPlayer
+
+    var body: some View {
+        EqualizerView(level: audioPlayer.level)
     }
 }

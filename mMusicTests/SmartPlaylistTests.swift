@@ -44,4 +44,21 @@ struct SmartPlaylistTests {
         #expect(tracks.summary(includingArtists: false) == "2 TRACKS  ·  1 H 10 MIN")
         #expect([Track]().summary(includingArtists: false) == "NO TRACKS YET")
     }
+
+    /// Трек хоть в одном плейлисте — разложен; в подборке остаются только
+    /// те, что ещё нигде не лежат, свежие сверху.
+    @Test func notInPlaylistsKeepsOnlyUnfiledTracks() {
+        let filed = makeTrack("Filed")
+        let older = makeTrack("Older")
+        older.addedAt = .now.addingTimeInterval(-3600)
+        let newer = makeTrack("Newer")
+
+        let playlist = Playlist(name: "Night drives", items: [])
+        container.mainContext.insert(playlist)
+        container.mainContext.insert(TrackPlaylistItem(track: filed, playlist: playlist, position: 0))
+
+        let unfiled = SmartPlaylist.notInPlaylists.tracks(from: [filed, older, newer])
+
+        #expect(unfiled.map(\.name) == ["Newer", "Older"])
+    }
 }

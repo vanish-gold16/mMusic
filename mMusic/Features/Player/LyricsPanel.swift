@@ -38,6 +38,8 @@ struct LyricsPanel: View {
             }
             .font(.title3.weight(.semibold))
             .textSelection(.enabled)
+            // Выделение текста — цветом обложки, как всё остальное в плеере.
+            .tint(accent)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 16)
         }
@@ -58,25 +60,23 @@ struct LyricsPanel: View {
         }
     }
 
+    /// Пустая панель не просто сообщает о пустоте, а предлагает её заполнить —
+    /// пунктирным слотом, как везде в приложении, где «сюда можно что-то положить».
     private var empty: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "text.quote")
-                .font(.largeTitle)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("NO TEXT YET")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .tracking(1.2)
                 .foregroundStyle(.secondary)
-
-            Text("No text yet")
-                .font(.headline)
 
             Text("Lyrics, a translation or a note — whatever you want to read while this track plays.")
-                .font(.footnote)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
 
-            Button("Add text", action: onEdit)
-                .buttonStyle(.glassProminent)
-                .tint(accent)
-                .padding(.top, 4)
+            DashedSlot(title: "Add text", systemImage: "text.quote", action: onEdit)
+                .padding(.top, 6)
         }
-        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

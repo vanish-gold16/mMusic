@@ -1,14 +1,17 @@
 import Foundation
 
 /// Подборка, которая собирается сама из того, что уже знает модель:
-/// счётчик прослушиваний, дата добавления, дата последнего запуска, звезда.
-/// Никаких новых полей — только правила поверх существующих.
+/// счётчик прослушиваний, дата добавления, дата последнего запуска, звезда,
+/// плейлисты трека. Никаких новых полей — только правила поверх существующих.
 enum SmartPlaylist: String, CaseIterable, Identifiable {
     case favourites
     case mostPlayed
     case recentlyAdded
     case forgotten
     case neverPlayed
+    /// Треки, которых нет ни в одном плейлисте: чтобы импортированное
+    /// и ни разу не разложенное по плейлистам не терялось в библиотеке.
+    case notInPlaylists
 
     var id: String { rawValue }
 
@@ -19,6 +22,7 @@ enum SmartPlaylist: String, CaseIterable, Identifiable {
         case .recentlyAdded: "Recently added"
         case .forgotten: "Forgotten"
         case .neverPlayed: "Never played"
+        case .notInPlaylists: "Not in playlists"
         }
     }
 
@@ -29,6 +33,7 @@ enum SmartPlaylist: String, CaseIterable, Identifiable {
         case .recentlyAdded: "Newest in the library"
         case .forgotten: "Loved once, untouched for a month"
         case .neverPlayed: "Imported but never started"
+        case .notInPlaylists: "Waiting to be filed somewhere"
         }
     }
 
@@ -42,6 +47,7 @@ enum SmartPlaylist: String, CaseIterable, Identifiable {
         case .recentlyAdded: "JUST\nIN"
         case .forgotten: "DUSTY"
         case .neverPlayed: "STILL\nSEALED"
+        case .notInPlaylists: "UNFILED"
         }
     }
 
@@ -52,6 +58,7 @@ enum SmartPlaylist: String, CaseIterable, Identifiable {
         case .recentlyAdded: "sparkles"
         case .forgotten: "hourglass"
         case .neverPlayed: "seal"
+        case .notInPlaylists: "tray"
         }
     }
 
@@ -89,6 +96,12 @@ enum SmartPlaylist: String, CaseIterable, Identifiable {
 
         case .neverPlayed:
             all.filter { $0.lastPlayedAt == nil }
+                .sorted { $0.addedAt > $1.addedAt }
+
+        case .notInPlaylists:
+            // Без обрезки, как и неслушанное: смысл подборки — увидеть всё,
+            // что ещё не разложено. Свежие сверху — их раскладывают первыми.
+            all.filter(\.items.isEmpty)
                 .sorted { $0.addedAt > $1.addedAt }
         }
     }
