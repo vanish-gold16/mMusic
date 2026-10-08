@@ -30,6 +30,7 @@ struct TrackArtistCell: View {
             Text(name)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(editable ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .lineLimit(1)
 
             if showDelete {
                 // Без `role: .destructive`: с ней система красит крестик в красный
@@ -49,7 +50,9 @@ struct TrackArtistCell: View {
         .padding(.vertical, 9)
         // Автор альбома — прозрачное стекло: его видно, но правят его не здесь.
         .glassEffect(editable ? .regular : .clear, in: Capsule())
-        .fixedSize()
+        // По высоте — своя, по ширине — сколько дадут: слишком длинное имя
+        // обрезается многоточием, а не распирает строку шире экрана.
+        .fixedSize(horizontal: false, vertical: true)
         .contentShape(Capsule())
         .onTapGesture(perform: onTap)
     }

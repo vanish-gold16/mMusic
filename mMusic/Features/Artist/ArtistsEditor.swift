@@ -206,7 +206,15 @@ struct FlowLayout: Layout {
         var totalWidth: CGFloat = 0
 
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            var size = subview.sizeThatFits(.unspecified)
+            // Капсула шире всей строки — например, артист, в имя которого при
+            // импорте попало название файла, — ставится во всю строку и сама
+            // обрезает подпись. Иначе поток становился шире экрана и растягивал
+            // за собой всю форму вбок.
+            if size.width > maxWidth {
+                size = subview.sizeThatFits(ProposedViewSize(width: maxWidth, height: nil))
+                size.width = min(size.width, maxWidth)
+            }
             if currentX + size.width > maxWidth, currentX > 0 {
                 currentX = 0
                 currentY += rowHeight + spacing

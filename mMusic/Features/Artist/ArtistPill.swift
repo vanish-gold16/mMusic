@@ -21,13 +21,15 @@ struct ArtistPill: View {
                 }
 
                 Text(artist.name)
+                    .lineLimit(1)
             }
             // Фон от .primary, а не белый: у плеера схема переворачивается под
             // обложку, и фиксированный цвет на светлой обложке пропал бы.
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(Color.primary.opacity(0.15), in: Capsule())
-            .fixedSize()
+            // Слишком длинное имя обрезается, а не распирает экран вбок.
+            .fixedSize(horizontal: false, vertical: true)
         }
         .buttonStyle(.plain)
     }
