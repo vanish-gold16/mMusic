@@ -35,6 +35,7 @@ enum Genre: String, CaseIterable, Codable {
     case rap = "Rap"
     case archievecore = "Arhievecore"
     case trap = "Trap"
+    case rage = "Rage"
     case drill = "Drill"
     case phonk = "Phonk"
     case grime = "Grime"
