@@ -574,6 +574,15 @@ struct CreateAlbumView: View {
                 track.album = album
                 track.position = index
                 track.disc = disc
+
+                // Имя и жанр выбранного в библиотеке трека правят прямо в форме
+                // альбома — раньше правка тихо терялась. У узнанного сингла поля
+                // закрыты: в черновике там имя из файла, а не его.
+                if draft.sourceTrack != nil {
+                    let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !name.isEmpty, name != track.name { track.name = name }
+                    if draft.genre != track.genre { track.genre = draft.genre }
+                }
             } else if draft.sourceTrack == nil {
                 let filename: String
                 do {
@@ -587,7 +596,13 @@ struct CreateAlbumView: View {
                     AudioFileStore.removeOriginalIfNeeded(original)
                 }
 
-                let track = Track(name: draft.name, album: album, credits: [], genre: draft.genre, filename: filename)
+                let track = Track(
+                    name: draft.name.trimmingCharacters(in: .whitespacesAndNewlines),
+                    album: album,
+                    credits: [],
+                    genre: draft.genre,
+                    filename: filename
+                )
                 track.position = index
                 track.disc = disc
 
