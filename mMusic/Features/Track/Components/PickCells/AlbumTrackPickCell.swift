@@ -13,8 +13,10 @@ struct AlbumTrackPickCell: View {
     /// от «трек лежит в чужом альбоме и уедет оттуда».
     var currentAlbum: Album?
 
+    /// Узнанный в файле сингл тоже считается выбранным: он уже едет в альбом,
+    /// и второй черновик того же трека сломал бы нумерацию.
     private func matches(_ draft: TrackDraft) -> Bool {
-        draft.sourceTrack == track.persistentModelID
+        (draft.sourceTrack ?? draft.existingTrack) == track.persistentModelID
     }
 
     private var pickedIndex: Int? {

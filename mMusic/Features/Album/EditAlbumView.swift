@@ -466,6 +466,6 @@ struct EditAlbumView: View {
             return modelContext.model(for: id) as? Track
         }
 
-        album.append(picked)
+        album.append(picked, albumArtists: albumArtistNames)
     }
 }

@@ -134,13 +134,18 @@ struct CreateAlbumView: View {
             .tint(accent)
             .navigationDestination(item: $editingDraft) { id in
                 if let index = trackDrafts.firstIndex(where: { $0.id == id }) {
-                    TrackDraftEditView(draft: $trackDrafts[index], albumArtists: artists.map(\.name))
+                    TrackDraftEditView(
+                        draft: $trackDrafts[index],
+                        albumArtists: artists.map(\.name),
+                        existing: trackDrafts[index].existingTrack.flatMap { modelContext.model(for: $0) as? Track }
+                    )
                 }
             }
             // Новые черновики (из файлов, SoundCloud, библиотеки) приходят без
             // пластинки — кладём их на последнюю, как `Album.append`.
             .onChange(of: trackDrafts.map(\.id)) {
                 placeNewDrafts()
+                adoptSingleCover()
             }
             .task(id: artworkData?.count) {
                 let (image, colors) = await UIImage.coverAndPalette(from: artworkData)
@@ -261,6 +266,26 @@ struct CreateAlbumView: View {
         return draft.duration
     }
 
+    /// Трек из библиотеки, который переедет в альбом вместо импорта:
+    /// выбранный в ней или узнанный в файле сингл.
+    private func libraryTrack(of draft: TrackDraft) -> Track? {
+        guard let id = draft.sourceTrack ?? draft.existingTrack else { return nil }
+        return modelContext.model(for: id) as? Track
+    }
+
+    /// Подпись под строкой, когда трек не новый, а переезжает. Молча забирать
+    /// песню у сингла нельзя — как и в пикере, это говорится прямо в строке.
+    private func origin(of draft: TrackDraft) -> String? {
+        guard let track = libraryTrack(of: draft) else { return nil }
+
+        if draft.existingTrack != nil {
+            return track.album == nil
+                ? "Already in your library — moves in"
+                : "Your single moves in, plays and all"
+        }
+        return track.album.map { "Moves out of \($0.name)" }
+    }
+
     // MARK: - Сохранение
 
     private var createButton: some View {
@@ -302,7 +327,12 @@ struct CreateAlbumView: View {
                     Button {
                         editingDraft = id
                     } label: {
-                        AlbumTrackDraftCell(draft: draft, position: numbers[id] ?? 0, duration: duration(of: draft))
+                        AlbumTrackDraftCell(
+                            draft: draft,
+                            position: numbers[id] ?? 0,
+                            duration: duration(of: draft),
+                            origin: origin(of: draft)
+                        )
                     }
                     .buttonStyle(.plain)
                     .bareRow()
@@ -348,6 +378,18 @@ struct CreateAlbumView: View {
     private func placeNewDrafts() {
         guard trackDrafts.contains(where: { $0.disc == nil }) else { return }
         apply(split)
+    }
+
+    /// Своей обложки у альбома может ещё не быть — тогда, как и с файлами,
+    /// берём первую пришедшую. У сингла из библиотеки это обложка сингла.
+    private func adoptSingleCover() {
+        guard artworkData == nil else { return }
+
+        artworkData = trackDrafts.lazy
+            .compactMap(libraryTrack(of:))
+            .filter { $0.album == nil || $0.album?.type == .single }
+            .compactMap(\.displayArtwork)
+            .first
     }
 
     /// Номер трека на своей пластинке, с 1.
@@ -410,13 +452,15 @@ struct CreateAlbumView: View {
 
             let parsedNames = metadata.artistNames.isEmpty ? url.parsedArtistNames() : metadata.artistNames
             let names = parsedNames.filter { !isAlbumArtist($0) }
+            let title = metadata.title ?? url.parseMusic().name
 
             trackDrafts.append(
                 TrackDraft(
-                    name: metadata.title ?? url.parseMusic().name,
+                    name: title,
                     artists: names.map { ArtistDraft(name: $0, role: .featured) },
                     stagedURL: stagedURL,
                     originalURL: url,
+                    existingTrack: existingSingle(titled: title, by: parsedNames),
                     duration: await TrackDurationLoader.duration(of: stagedURL) ?? 0
                 )
             )
@@ -430,11 +474,13 @@ struct CreateAlbumView: View {
     /// а `originalURL` пуст: в «Файлах» его никогда и не было.
     private func addDraft(from file: PickedFile, metadata: AudioMetadata) {
         let names = metadata.artistNames.filter { !isAlbumArtist($0) }
+        let title = metadata.title ?? file.url.parseMusic().name
 
         let draft = TrackDraft(
-            name: metadata.title ?? file.url.parseMusic().name,
+            name: title,
             artists: names.map { ArtistDraft(name: $0, role: .featured) },
-            stagedURL: file.url
+            stagedURL: file.url,
+            existingTrack: existingSingle(titled: title, by: metadata.artistNames)
         )
         trackDrafts.append(draft)
 
@@ -484,6 +530,20 @@ struct CreateAlbumView: View {
         artists.contains { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 
+    /// Сингл из библиотеки с той же песней, что и в файле. Авторы — из файла
+    /// и из шапки альбома: в тегах альбомного файла автора альбома часто нет.
+    /// Трек, который уже едет в этот альбом, второй раз не предлагаем.
+    private func existingSingle(titled title: String, by names: [String]) -> PersistentIdentifier? {
+        let claimed = Set(trackDrafts.compactMap { $0.sourceTrack ?? $0.existingTrack })
+        let library = (try? modelContext.fetch(FetchDescriptor<Track>())) ?? []
+
+        return SingleMatch.track(
+            titled: title,
+            by: names + artists.map(\.name),
+            among: library.filter { !claimed.contains($0.persistentModelID) }
+        )?.persistentModelID
+    }
+
     private func save() {
         let album = Album(name: name, type: type, release: release, artwork: artworkData)
         album.discTitles = discCount > 1 ? discTitles : []
@@ -493,22 +553,28 @@ struct CreateAlbumView: View {
         // Черновики уже лежат пластинка за пластинкой (см. `apply`), поэтому
         // номер по порядку и пластинка черновика сходятся сами.
         let lastDisc = discCount - 1
+        let albumArtists = artists.map(\.name)
 
         var previousAlbums = Set<Album>()
 
         for (index, draft) in trackDrafts.enumerated() {
-            if let id = draft.sourceTrack {
-                guard let track = modelContext.model(for: id) as? Track else { continue }
+            let disc = min(draft.disc ?? lastDisc, lastDisc)
 
+            // Трек, который уже есть в библиотеке, переезжает сам — с прослушиваниями,
+            // звёздочкой, плейлистами и всем остальным. Файл узнанного сингла при
+            // этом не импортируется, а его оригинал в «Файлах» остаётся на месте:
+            // если совпадение ошибочное, песня не пропадёт.
+            if let track = libraryTrack(of: draft) {
                 if let previous = track.album {
+                    album.inheritSingle(of: track, albumArtists: albumArtists)
                     previousAlbums.insert(previous)
-                    previous.tracks.removeAll { $0.persistentModelID == id }
+                    previous.tracks.removeAll { $0.persistentModelID == track.persistentModelID }
                 }
 
                 track.album = album
                 track.position = index
-                track.disc = min(draft.disc ?? lastDisc, lastDisc)
-            } else {
+                track.disc = disc
+            } else if draft.sourceTrack == nil {
                 let filename: String
                 do {
                     filename = try AudioFileStore.moveIntoLibrary(from: draft.stagedURL)
@@ -523,7 +589,7 @@ struct CreateAlbumView: View {
 
                 let track = Track(name: draft.name, album: album, credits: [], genre: draft.genre, filename: filename)
                 track.position = index
-                track.disc = min(draft.disc ?? lastDisc, lastDisc)
+                track.disc = disc
 
                 modelContext.insert(track)
 
@@ -543,8 +609,14 @@ struct CreateAlbumView: View {
             modelContext.insert(credit)
         }
 
-        for previous in previousAlbums where previous.type == .single && previous.tracks.isEmpty {
-            modelContext.delete(previous)
+        // Опустевший сингл — пустой конверт: всё ценное трек увёз с собой.
+        // Альбом побольше остаётся, только без дыры в нумерации.
+        for previous in previousAlbums {
+            if previous.type == .single && previous.tracks.isEmpty {
+                modelContext.delete(previous)
+            } else {
+                previous.renumberTracks()
+            }
         }
 
         trackDrafts.forEach(discardStagedFile)

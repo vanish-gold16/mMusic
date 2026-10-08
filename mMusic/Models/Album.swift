@@ -77,7 +77,11 @@ class Album {
     /// Только добавляет: то, что уже лежит в альбоме, остаётся на своих местах —
     /// убирают трек из альбома отдельно. Приехавший из другого альбома оттуда
     /// уезжает, и в том альбоме закрывается дыра в нумерации: альбом у трека один.
-    func append(_ tracks: [Track]) {
+    /// Сингл, у которого так забрали его песню, уходит из библиотеки целиком —
+    /// см. `inheritSingle(of:albumArtists:)`.
+    ///
+    /// `albumArtists` — авторы альбома, если на экране они новее, чем в базе.
+    func append(_ tracks: [Track], albumArtists: [String]? = nil) {
         var position = self.tracks.count
         var touched: [Album] = []
 
@@ -85,6 +89,7 @@ class Album {
             guard track.album?.persistentModelID != persistentModelID else { continue }
 
             if let previous = track.album {
+                inheritSingle(of: track, albumArtists: albumArtists ?? artistNames)
                 previous.tracks.removeAll { $0.persistentModelID == track.persistentModelID }
                 touched.append(previous)
             }
@@ -98,6 +103,50 @@ class Album {
         }
 
         touched.forEach { $0.renumberTracks() }
+
+        for previous in Set(touched) where previous.type == .single && previous.tracks.isEmpty {
+            modelContext?.delete(previous)
+        }
+    }
+
+    /// Песня переезжает сюда со своего сингла и забирает с собой то, что сингл
+    /// хранил за неё: обложку и авторов. Сингл после переезда — пустой конверт,
+    /// его убирают из библиотеки, и всё это ушло бы вместе с ним.
+    ///
+    /// Остальное трек и так везёт сам: прослушивания (они записаны на его файл),
+    /// звёздочку, плейлисты, текст, ремикс, дату добавления.
+    ///
+    /// Вызывать до переезда, пока `track.album` ещё сингл. `albumArtists` —
+    /// авторы этого альбома: их трек унаследует и без того.
+    func inheritSingle(of track: Track, albumArtists: [String]) {
+        guard let single = track.album,
+              single.persistentModelID != persistentModelID,
+              single.type == .single
+        else { return }
+
+        // В альбоме видна обложка альбома, но своя у трека остаётся и вернётся,
+        // если он из альбома выйдет. У сингла обложка лежала на конверте.
+        if track.artwork == nil, let cover = single.artwork {
+            track.artwork = cover
+        }
+
+        // Авторов трек брал у сингла. Тех, кого среди авторов альбома нет, он
+        // оставляет за собой — иначе «Song feat. B» в альбоме A потерял бы B.
+        let known = albumArtists + track.credits.map(\.artist.name)
+        let carried = single.credits
+            .sorted { $0.position < $1.position }
+            .filter { credit in
+                !known.contains { $0.caseInsensitiveCompare(credit.artist.name) == .orderedSame }
+            }
+        guard !carried.isEmpty else { return }
+
+        // Авторы сингла шли впереди гостей трека — так и остаются.
+        for credit in track.credits {
+            credit.position += carried.count
+        }
+        for (position, credit) in carried.enumerated() {
+            modelContext?.insert(Credit(artist: credit.artist, role: credit.role, position: position, track: track))
+        }
     }
 
     /// Номера идут подряд с нуля, и треки каждой пластинки в них — подряд,

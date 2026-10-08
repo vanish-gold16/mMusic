@@ -124,7 +124,7 @@ struct AlbumTrackPickerView: View {
             result = result.filter { track in
                 track.album == nil
                     || track.album?.persistentModelID == currentAlbum?.persistentModelID
-                    || addedTracks.contains { $0.sourceTrack == track.persistentModelID }
+                    || addedTracks.contains { ($0.sourceTrack ?? $0.existingTrack) == track.persistentModelID }
             }
         }
 
