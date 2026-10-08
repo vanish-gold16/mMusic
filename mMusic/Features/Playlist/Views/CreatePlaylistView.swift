@@ -71,7 +71,7 @@ struct CreatePlaylistView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("cancel") {
+                    SheetActionButton(.scrap) {
                         dismiss()
                     }
                 }

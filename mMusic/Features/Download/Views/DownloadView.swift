@@ -71,7 +71,7 @@ struct DownloadView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("done") { dismiss() }
+                SheetActionButton(.done) { dismiss() }
                     .disabled(isDownloading)
             }
         }

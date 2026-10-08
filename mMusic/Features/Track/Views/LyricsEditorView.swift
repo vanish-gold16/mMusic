@@ -12,7 +12,7 @@ struct LyricsEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     /// Черновик: SwiftData пишет изменение модели в базу сразу, и правь мы
-    /// `track.lyrics` напрямую, кнопке «Cancel» нечего было бы отменять.
+    /// `track.lyrics` напрямую, кнопке «SCRAP» нечего было бы выбрасывать.
     @State private var draft = ""
     /// Клавиатура поднимается сама, когда текста ещё нет: пустой экран открывают,
     /// чтобы писать, а не чтобы смотреть.
@@ -58,10 +58,10 @@ struct LyricsEditorView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
+                        SheetActionButton(.scrap) { dismiss() }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
+                        SheetActionButton(.save) {
                             track.lyrics = Lyrics.normalized(draft)
                             dismiss()
                         }

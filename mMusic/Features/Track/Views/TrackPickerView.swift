@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// Музыка в плейлист из библиотеки. Выбор сразу кладёт трек в плейлист,
-/// повторное нажатие убирает, — поэтому кнопка у листа одна: «done».
+/// повторное нажатие убирает, — поэтому кнопка у листа одна: «DONE».
 ///
 /// Наверху «Add music», куда добавляем и вкладки словами; в жанрах треки
 /// разложены за разделителями, как пластинки в ящике.
@@ -83,7 +83,7 @@ struct TrackPickerView: View {
             .searchable(text: $searchText, prompt: "Track or artist")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("done") {
+                    SheetActionButton(.done) {
                         dismiss()
                     }
                 }

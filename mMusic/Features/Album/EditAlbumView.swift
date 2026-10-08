@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 /// Правка альбома — та же страница будущей пластинки, что и сборка нового
 /// (`CreateAlbumView`), только пластинка уже настоящая: в конверте её обложка,
 /// на диске её треки кольцами, и всё, что меняешь, сразу пишется в альбом.
-/// Поэтому внизу нет кнопки «сохранить» — «done» просто закрывает лист.
+/// Поэтому внизу нет кнопки «сохранить» — «DONE» просто закрывает лист.
 struct EditAlbumView: View {
 
     @Environment(\.modelContext) private var modelContext
@@ -128,12 +128,12 @@ struct EditAlbumView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .onAppear(perform: loadArtists)
-            // Не по кнопке «done»: лист закрывают и свайпом вниз, а остальные поля
+            // Не по кнопке «DONE»: лист закрывают и свайпом вниз, а остальные поля
             // альбома пишутся в базу сразу — артисты не должны быть исключением.
             .onDisappear(perform: syncArtists)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("done") {
+                    SheetActionButton(.done) {
                         dismiss()
                     }
                 }

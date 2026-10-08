@@ -30,7 +30,7 @@ struct SoundCloudImportView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("cancel") { dismiss() }
+                    SheetActionButton(.close) { dismiss() }
                         .disabled(isWorking)
                 }
             }

@@ -62,8 +62,7 @@ struct RemixView: View {
 
             Spacer()
 
-            Button("Done") { dismiss() }
-                .font(.subheadline.weight(.semibold))
+            SheetActionButton(.close) { dismiss() }
         }
     }
 

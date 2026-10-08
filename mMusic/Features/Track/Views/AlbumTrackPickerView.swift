@@ -62,8 +62,7 @@ struct AlbumTrackPickerView: View {
             .searchable(text: $searchText, prompt: "Track or artist")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .font(.subheadline.weight(.semibold))
+                    SheetActionButton(.done) { dismiss() }
                 }
             }
         }

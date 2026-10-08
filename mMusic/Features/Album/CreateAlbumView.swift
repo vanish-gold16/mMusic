@@ -154,7 +154,7 @@ struct CreateAlbumView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("cancel") {
+                    SheetActionButton(.scrap) {
                         trackDrafts.forEach(discardStagedFile)
                         dismiss()
                     }

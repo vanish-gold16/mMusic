@@ -6,7 +6,7 @@ import SwiftUI
 /// Дальше — как в форме нового трека: имя крупно в шапке, авторы, жанр, текст.
 ///
 /// Поля пишутся в трек сразу, кроме авторов: те собираются в черновике
-/// и переезжают в базу по «done».
+/// и переезжают в базу по «DONE».
 struct EditTrackView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -98,7 +98,7 @@ struct EditTrackView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("done") {
+                    SheetActionButton(.done) {
                         syncArtists()
                         dismiss()
                     }

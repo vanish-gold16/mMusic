@@ -66,7 +66,7 @@ struct AddToPlaylistView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("cancel") { dismiss() }
+                    SheetActionButton(.close) { dismiss() }
                 }
             }
             .task(id: tracks.first?.displayArtwork?.count) {
@@ -74,7 +74,7 @@ struct AddToPlaylistView: View {
             }
         }
         // Лист открывается наполовину: список плейлистов короткий, а закрывать
-        // его протяжкой удобнее, чем целиться в «cancel».
+        // его протяжкой удобнее, чем целиться в «CLOSE».
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }

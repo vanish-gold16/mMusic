@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Правка плейлиста — его же страница, только всё в ней меняется: веер
 /// с главной обложкой, имя, описание и список треков, из которого их смахивают.
-/// Изменения пишутся сразу, «done» просто закрывает лист.
+/// Изменения пишутся сразу, «DONE» просто закрывает лист.
 struct EditPlaylistView: View {
     
     @Environment(\.dismiss) private var dismiss
@@ -76,7 +76,7 @@ struct EditPlaylistView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("done") {
+                    SheetActionButton(.done) {
                         dismiss()
                     }
                 }

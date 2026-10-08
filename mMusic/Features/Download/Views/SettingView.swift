@@ -124,7 +124,7 @@ struct SettingView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("cancel") {
+                    SheetActionButton(.skip) {
                         dismiss()
                     }
                 }
