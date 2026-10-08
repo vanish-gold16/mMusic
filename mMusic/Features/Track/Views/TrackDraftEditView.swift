@@ -4,15 +4,17 @@ import SwiftUI
 /// разделами, как в форме нового трека. Авторы альбома стоят приглушёнными
 /// впереди: они у трека и так есть, здесь добавляют только гостей.
 ///
-/// Если в файле узнан сингл из библиотеки, в альбом переедет сам сингл, а не
+/// Если в файле узнан сингл из библиотеки, в альбом придёт его трек, а не
 /// этот файл, — поля тогда приглушены: править нечего, трек уже есть.
 struct TrackDraftEditView: View {
 
     @Binding var draft: TrackDraft
 
     var albumArtists: [String] = []
-    /// Трек библиотеки, который переедет вместо файла. nil — файл станет новым треком.
+    /// Трек библиотеки, который придёт вместо файла. nil — файл станет новым треком.
     var existing: Track?
+    /// Трек не уйдёт со своего сингла, а разделит песню с альбомом.
+    var sharesSingle = false
 
     private var isMovingIn: Bool { draft.existingTrack != nil && existing != nil }
 
@@ -74,6 +76,9 @@ struct TrackDraftEditView: View {
         case track.name: "a single"
         case let name?: "the single \(name)"
         }
-        return "\(track.name) is already here as \(place). It moves into this album with its plays, star, playlists and cover. This file won't be imported."
+        let outcome = sharesSingle
+            ? "The album gets that same track: plays, star and playlists stay shared, and the single stays in your library."
+            : "It moves into this album with its plays, star and playlists."
+        return "\(track.name) is already here as \(place). \(outcome) This file won't be imported."
     }
 }

@@ -12,6 +12,9 @@ struct AlbumTrackPickCell: View {
     /// Альбом, который собираем. Нужен, чтобы отличить «трек уже здесь»
     /// от «трек лежит в чужом альбоме и уедет оттуда».
     var currentAlbum: Album?
+    /// Формат альбома, который собираем: от него зависит, уйдёт ли трек
+    /// со своего сингла или разделит песню с ним.
+    var type: Album.AlbumType
 
     /// Узнанный в файле сингл тоже считается выбранным: он уже едет в альбом,
     /// и второй черновик того же трека сломал бы нумерацию.
@@ -33,13 +36,9 @@ struct AlbumTrackPickCell: View {
         return track.album?.persistentModelID == currentAlbum.persistentModelID
     }
 
-    /// Альбом, из которого трек уедет, если его выбрать. nil — забирать не у кого.
-    private var albumToLeave: Album? {
-        guard let album = track.album,
-              album.persistentModelID != currentAlbum?.persistentModelID
-        else { return nil }
-
-        return album
+    /// Что станет с прежним альбомом трека, если его выбрать. nil — трек ниоткуда не уходит.
+    private var joinNote: TrackJoinNote? {
+        TrackJoinNote(track: track, joining: currentAlbum, type: type)
     }
 
     var body: some View {
@@ -68,8 +67,9 @@ struct AlbumTrackPickCell: View {
 
                 // Предупреждение, а не запрет: перенести трек из альбома в альбом
                 // можно, но делать это молча нельзя — в том альбоме он пропадёт.
-                if let albumToLeave {
-                    Label("Moves out of \(albumToLeave.name)", systemImage: "arrow.turn.up.right")
+                // С сингла песня не пропадает, и подпись говорит и это.
+                if let joinNote {
+                    Label(joinNote.text, systemImage: joinNote.systemImage)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -131,7 +131,8 @@ struct AlbumTrackPickCell: View {
         let draft = TrackDraft(
             name: track.name,
             genre: track.genre,
-            artists: track.artistNames.map { ArtistDraft(name: $0) },
+            // С ролями: гость остаётся гостем и в строке черновика, и в редакторе.
+            artists: track.artistDrafts,
             stagedURL: AudioFileStore.url(for: track.filename),
             sourceTrack: track.persistentModelID
         )

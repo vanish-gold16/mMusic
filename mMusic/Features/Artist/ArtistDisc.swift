@@ -39,7 +39,7 @@ struct ArtistDisc: View {
 
         VinylRecord(
             cover: photo,
-            durations: releases.map { $0.tracks.reduce(0) { $0 + $1.duration } },
+            durations: releases.map { $0.tracklist.reduce(0) { $0 + $1.duration } },
             currentIndex: currentIndex,
             progress: nil,
             isSpinning: false,

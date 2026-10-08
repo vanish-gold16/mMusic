@@ -177,6 +177,14 @@ struct TrackCell: View {
                         Label("Go to Album", systemImage: "music.note.square.stack")
                     }
                 }
+                // Песня вышла ещё и синглом — до него тоже один шаг.
+                if let single = track.single {
+                    Button {
+                        albumToShow = single
+                    } label: {
+                        Label("Go to Single", systemImage: "record.circle")
+                    }
+                }
                 
                 Divider()
 

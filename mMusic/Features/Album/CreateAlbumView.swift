@@ -137,7 +137,8 @@ struct CreateAlbumView: View {
                     TrackDraftEditView(
                         draft: $trackDrafts[index],
                         albumArtists: artists.map(\.name),
-                        existing: trackDrafts[index].existingTrack.flatMap { modelContext.model(for: $0) as? Track }
+                        existing: trackDrafts[index].existingTrack.flatMap { modelContext.model(for: $0) as? Track },
+                        sharesSingle: origin(of: trackDrafts[index])?.sharesSingle == true
                     )
                 }
             }
@@ -177,7 +178,7 @@ struct CreateAlbumView: View {
                 }
             }
             .sheet(isPresented: $showTrackPicker) {
-                AlbumTrackPickerView(album: [], addedTracks: $trackDrafts)
+                AlbumTrackPickerView(album: [], type: type, addedTracks: $trackDrafts)
             }
             .alert(
                 "Some files were not imported",
@@ -273,17 +274,23 @@ struct CreateAlbumView: View {
         return modelContext.model(for: id) as? Track
     }
 
-    /// Подпись под строкой, когда трек не новый, а переезжает. Молча забирать
-    /// песню у сингла нельзя — как и в пикере, это говорится прямо в строке.
-    private func origin(of draft: TrackDraft) -> String? {
+    /// Подпись под строкой, когда трек не новый, а приходит из библиотеки:
+    /// откуда он уйдёт или с каким синглом его разделит — как и в пикере.
+    private func origin(of draft: TrackDraft) -> TrackJoinNote? {
         guard let track = libraryTrack(of: draft) else { return nil }
+        let note = TrackJoinNote(track: track, joining: nil, type: type)
 
-        if draft.existingTrack != nil {
-            return track.album == nil
-                ? "Already in your library — moves in"
-                : "Your single moves in, plays and all"
+        // Узнанный в файле сингл — отдельные слова: человек его не выбирал,
+        // и надо сказать, что это та же песня, а не новая.
+        guard draft.existingTrack != nil else { return note }
+
+        if track.album == nil {
+            return TrackJoinNote(text: "Already in your library — moves in", systemImage: "arrow.turn.up.right")
         }
-        return track.album.map { "Moves out of \($0.name)" }
+        if note?.sharesSingle == true {
+            return TrackJoinNote(text: "Same song as your single — both show it", systemImage: "link", sharesSingle: true)
+        }
+        return note
     }
 
     // MARK: - Сохранение
@@ -560,28 +567,33 @@ struct CreateAlbumView: View {
         for (index, draft) in trackDrafts.enumerated() {
             let disc = min(draft.disc ?? lastDisc, lastDisc)
 
-            // Трек, который уже есть в библиотеке, переезжает сам — с прослушиваниями,
-            // звёздочкой, плейлистами и всем остальным. Файл узнанного сингла при
-            // этом не импортируется, а его оригинал в «Файлах» остаётся на месте:
-            // если совпадение ошибочное, песня не пропадёт.
+            // Трек, который уже есть в библиотеке, приходит сам — с прослушиваниями,
+            // звёздочкой, плейлистами и всем остальным, а сингл, с которого он
+            // пришёл, остаётся и показывает его у себя (см. `Album.takeIn`).
+            // Файл узнанного сингла не импортируется, а его оригинал в «Файлах»
+            // остаётся на месте: если совпадение ошибочное, песня не пропадёт.
             if let track = libraryTrack(of: draft) {
-                if let previous = track.album {
-                    album.inheritSingle(of: track, albumArtists: albumArtists)
+                if let previous = album.takeIn(track, albumArtists: albumArtists) {
                     previousAlbums.insert(previous)
-                    previous.tracks.removeAll { $0.persistentModelID == track.persistentModelID }
                 }
 
                 track.album = album
                 track.position = index
                 track.disc = disc
 
-                // Имя и жанр выбранного в библиотеке трека правят прямо в форме
-                // альбома — раньше правка тихо терялась. У узнанного сингла поля
-                // закрыты: в черновике там имя из файла, а не его.
+                // Имя, жанр и авторов выбранного в библиотеке трека правят прямо
+                // в форме альбома — раньше правка тихо терялась. У узнанного сингла
+                // поля закрыты: в черновике там всё из файла, а не его.
                 if draft.sourceTrack != nil {
                     let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
                     if !name.isEmpty, name != track.name { track.name = name }
                     if draft.genre != track.genre { track.genre = draft.genre }
+
+                    // Авторы — как в редакторе черновика: что там видно, то и будет.
+                    // Начинался он с авторов трека (`Track.artistDrafts`), поэтому
+                    // нетронутый список ничего не теряет: прежние авторы остаются
+                    // за треком, а авторов нового альбома он унаследует.
+                    track.setOwnArtists(draft.artists, albumArtists: albumArtists, in: modelContext)
                 }
             } else if draft.sourceTrack == nil {
                 let filename: String
@@ -624,15 +636,7 @@ struct CreateAlbumView: View {
             modelContext.insert(credit)
         }
 
-        // Опустевший сингл — пустой конверт: всё ценное трек увёз с собой.
-        // Альбом побольше остаётся, только без дыры в нумерации.
-        for previous in previousAlbums {
-            if previous.type == .single && previous.tracks.isEmpty {
-                modelContext.delete(previous)
-            } else {
-                previous.renumberTracks()
-            }
-        }
+        previousAlbums.forEach { $0.tidyUpAfterLeaving() }
 
         trackDrafts.forEach(discardStagedFile)
 

@@ -21,6 +21,8 @@ struct AlbumTrackPickerView: View {
 
     /// Альбом, который собираем. Пустой массив — альбома ещё нет, идёт создание.
     var album: [Album]
+    /// Его формат — у создаваемого он есть раньше самого альбома.
+    var type: Album.AlbumType
     @Binding var addedTracks: [TrackDraft]
 
     private var currentAlbum: Album? { album.first }
@@ -92,7 +94,8 @@ struct AlbumTrackPickerView: View {
         AlbumTrackPickCell(
             track: track,
             addedTracks: $addedTracks,
-            currentAlbum: currentAlbum
+            currentAlbum: currentAlbum,
+            type: type
         )
     }
 

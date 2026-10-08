@@ -7,6 +7,11 @@ class Album {
     @Relationship(deleteRule: .cascade, inverse: \Track.album)
     var tracks: [Track]
     var type: AlbumType
+    /// Песни, которые живут в другом альбоме, а этот сингл их только показывает:
+    /// сингл вышел раньше, потом песня вошла в альбом. Удаление сингла их
+    /// не трогает — они остаются дома.
+    @Relationship(deleteRule: .nullify, inverse: \Track.single)
+    var linkedTracks: [Track] = []
     @Relationship(deleteRule: .cascade, inverse: \Credit.album)
     var credits: [Credit]
     var artists: [Artist] {
@@ -17,7 +22,7 @@ class Album {
         artists.map(\.name)
     }
     var genres: [Genre] {
-        let counts = tracks.reduce(into: [Genre: Int]()) { counts, track in
+        let counts = tracklist.reduce(into: [Genre: Int]()) { counts, track in
             counts[track.genre, default: 0] += 1
         }
         return counts.keys.sorted {
@@ -52,6 +57,27 @@ class Album {
         return discs
     }
 
+    /// Пластинки, как их показывают и играют: `discs`, и у сингла впереди ещё
+    /// его песня, живущая в альбоме. Номера и раскладку правят только по
+    /// `discs` — чужой трек подмешан сюда посмотреть, его номер принадлежит
+    /// его альбому.
+    var tracklistDiscs: [[Track]] {
+        var discs = discs
+        discs[0].insert(contentsOf: linkedTracks.sorted { $0.addedAt < $1.addedAt }, at: 0)
+        return discs
+    }
+
+    /// Все треки пластинки подряд, в порядке показа. См. `tracklistDiscs`.
+    var tracklist: [Track] {
+        tracklistDiscs.flatMap { $0 }
+    }
+
+    /// Есть ли трек на этой пластинке — своим или песней с альбома.
+    func contains(_ track: Track) -> Bool {
+        track.album?.persistentModelID == persistentModelID
+            || track.single?.persistentModelID == persistentModelID
+    }
+
     /// Пластинка трека в пределах альбома. Номер за пределами — у трека,
     /// пришедшего из альбома, где пластинок было больше: такой ложится на последнюю.
     func clampedDisc(of track: Track) -> Int {
@@ -76,22 +102,19 @@ class Album {
     ///
     /// Только добавляет: то, что уже лежит в альбоме, остаётся на своих местах —
     /// убирают трек из альбома отдельно. Приехавший из другого альбома оттуда
-    /// уезжает, и в том альбоме закрывается дыра в нумерации: альбом у трека один.
-    /// Сингл, у которого так забрали его песню, уходит из библиотеки целиком —
-    /// см. `inheritSingle(of:albumArtists:)`.
+    /// уезжает — альбом-дом у трека один, — но сингл свою песню не теряет:
+    /// см. `takeIn(_:albumArtists:)`.
     ///
     /// `albumArtists` — авторы альбома, если на экране они новее, чем в базе.
     func append(_ tracks: [Track], albumArtists: [String]? = nil) {
         var position = self.tracks.count
-        var touched: [Album] = []
+        var left: [Album] = []
 
         for track in tracks {
             guard track.album?.persistentModelID != persistentModelID else { continue }
 
-            if let previous = track.album {
-                inheritSingle(of: track, albumArtists: albumArtists ?? artistNames)
-                previous.tracks.removeAll { $0.persistentModelID == track.persistentModelID }
-                touched.append(previous)
+            if let previous = takeIn(track, albumArtists: albumArtists ?? artistNames) {
+                left.append(previous)
             }
 
             track.album = self
@@ -102,36 +125,63 @@ class Album {
             position += 1
         }
 
-        touched.forEach { $0.renumberTracks() }
+        Set(left).forEach { $0.tidyUpAfterLeaving() }
+    }
 
-        for previous in Set(touched) where previous.type == .single && previous.tracks.isEmpty {
-            modelContext?.delete(previous)
+    /// Трек переходит в этот альбом из другого. Вызывать до того, как сменится
+    /// `track.album`: здесь решается, что станет с прежним альбомом. Номер и
+    /// пластинку трека ставит вызывающий.
+    ///
+    /// Песня с сингла приходит в альбом побольше, не уходя с сингла: сингл
+    /// остаётся в библиотеке со своей обложкой, датой и авторами и показывает
+    /// её у себя (`Track.single`). Трек при этом один — прослушивания, звёздочка,
+    /// плейлисты у сингла и альбома общие. Из любого другого альбома трек
+    /// просто уходит. А на свой сингл — возвращается домой.
+    ///
+    /// Возвращает альбом, из которого трек ушёл, — после переезда его приводят
+    /// в порядок: `tidyUpAfterLeaving()`. nil — уходить было неоткуда.
+    func takeIn(_ track: Track, albumArtists: [String]) -> Album? {
+        if track.single?.persistentModelID == persistentModelID {
+            track.single = nil
+        }
+
+        guard let previous = track.album, previous.persistentModelID != persistentModelID else { return nil }
+
+        if previous.type == .single, type != .single, track.single == nil {
+            keepGuests(of: track, from: previous, albumArtists: albumArtists)
+            track.single = previous
+        }
+
+        previous.tracks.removeAll { $0.persistentModelID == track.persistentModelID }
+        return previous
+    }
+
+    /// Альбом, из которого ушли треки: закрыть дыру в нумерации, а опустевший
+    /// сингл — убрать. Пустой конверт в сетке ничего не значит, а всё ценное
+    /// трек увёз с собой. Сингл, который показывает песню с альбома, не пустой —
+    /// он остаётся.
+    func tidyUpAfterLeaving() {
+        if type == .single && tracks.isEmpty && linkedTracks.isEmpty {
+            modelContext?.delete(self)
+        } else {
+            renumberTracks()
         }
     }
 
-    /// Песня переезжает сюда со своего сингла и забирает с собой то, что сингл
-    /// хранил за неё: обложку и авторов. Сингл после переезда — пустой конверт,
-    /// его убирают из библиотеки, и всё это ушло бы вместе с ним.
-    ///
-    /// Остальное трек и так везёт сам: прослушивания (они записаны на его файл),
-    /// звёздочку, плейлисты, текст, ремикс, дату добавления.
-    ///
-    /// Вызывать до переезда, пока `track.album` ещё сингл. `albumArtists` —
-    /// авторы этого альбома: их трек унаследует и без того.
-    func inheritSingle(of track: Track, albumArtists: [String]) {
-        guard let single = track.album,
-              single.persistentModelID != persistentModelID,
-              single.type == .single
-        else { return }
-
-        // В альбоме видна обложка альбома, но своя у трека остаётся и вернётся,
-        // если он из альбома выйдет. У сингла обложка лежала на конверте.
-        if track.artwork == nil, let cover = single.artwork {
-            track.artwork = cover
+    /// Перед удалением альбома: песни, вышедшие ещё и синглом, возвращаются на
+    /// свои синглы, а не уходят каскадом вместе с файлами — иначе синглы
+    /// остались бы пустыми. Возвращает треки, которые уйдут вместе с альбомом.
+    func sendSinglesHome() -> [Track] {
+        for track in Array(tracks) where track.single != nil {
+            track.returnToSingle()
         }
+        return tracks
+    }
 
-        // Авторов трек брал у сингла. Тех, кого среди авторов альбома нет, он
-        // оставляет за собой — иначе «Song feat. B» в альбоме A потерял бы B.
+    /// Авторов песня брала у сингла, а в альбоме наследует авторов альбома.
+    /// Тех, кого среди них нет, она оставляет за собой — иначе «Song feat. B»
+    /// в альбоме A потеряла бы B. У сингла авторы остаются как были.
+    private func keepGuests(of track: Track, from single: Album, albumArtists: [String]) {
         let known = albumArtists + track.credits.map(\.artist.name)
         let carried = single.credits
             .sorted { $0.position < $1.position }
@@ -221,4 +271,17 @@ class Album {
         case LP = "LP"
     }
     
+}
+
+extension Track {
+
+    /// Песня возвращается жить на свой сингл: её альбом удаляют или её оттуда
+    /// убирают. Без этого она осталась бы без альбома, а при удалении альбома
+    /// ушла бы каскадом вместе с файлом. false — сингла у песни нет.
+    @discardableResult
+    func returnToSingle() -> Bool {
+        guard let single else { return false }
+        single.append([self])
+        return true
+    }
 }

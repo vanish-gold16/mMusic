@@ -77,7 +77,7 @@ struct ArtistDiscography {
     /// альбома звучит на всех треках.
     func guestTracks(on album: Album) -> [Track] {
         let id = album.persistentModelID
-        let tracks = wholeAlbumGuests.contains(id) ? album.tracks : guestCredits[id] ?? []
+        let tracks = wholeAlbumGuests.contains(id) ? album.tracklist : guestCredits[id] ?? []
 
         var seen = Set<PersistentIdentifier>()
         return tracks
@@ -92,7 +92,9 @@ struct ArtistDiscography {
     /// Все треки, где он звучит: с его пластинок в порядке полок, затем гостевые.
     /// Авторство наследуется от альбома, поэтому одних его прямых отметок мало.
     var tracks: [Track] {
-        let own = (albums + singles).flatMap { $0.tracks.sorted { $0.position < $1.position } }
+        // Песня, вышедшая синглом и вошедшая в альбом, — один трек: `seen` ниже
+        // оставит её один раз, там, где она встретилась первой.
+        let own = (albums + singles).flatMap(\.tracklist)
         let guest = featuredOn.flatMap(guestTracks(on:))
 
         var seen = Set<PersistentIdentifier>()

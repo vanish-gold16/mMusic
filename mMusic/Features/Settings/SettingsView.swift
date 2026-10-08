@@ -35,8 +35,10 @@ struct SettingsView: View {
         artists.filter { $0.credits.isEmpty }
     }
 
+    /// Сингл, который показывает свою песню из альбома, не пустой, хоть своих
+    /// треков у него и нет.
     private var emptyAlbums: [Album] {
-        albums.filter { $0.tracks.isEmpty }
+        albums.filter { $0.tracks.isEmpty && $0.linkedTracks.isEmpty }
     }
 
     private var junkCount: Int {

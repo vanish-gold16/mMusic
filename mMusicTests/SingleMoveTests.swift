@@ -107,17 +107,35 @@ struct SingleMoveTests {
         #expect(found?.persistentModelID == played.persistentModelID)
     }
 
-    // MARK: - Переезд
+    // MARK: - Сингл и альбом делят песню
 
-    @Test func theTrackKeepsTheSinglesCoverAndGuests() {
-        let cover = Data([1, 2, 3])
-        let track = makeSingle("Nightcall", by: [("Kavinsky", .main), ("Lovefoxxx", .featured)], cover: cover)
+    @Test func theSingleStaysAndShowsTheSameTrack() throws {
+        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)], cover: Data([1]))
+        let single = try #require(track.album)
+        let album = makeAlbum("Outrun", by: "Kavinsky")
+
+        album.append([track])
+        try context.save()
+
+        #expect(Set(albums.map(\.name)) == ["Nightcall", "Outrun"])
+        #expect(track.album?.persistentModelID == album.persistentModelID)
+        #expect(track.single?.persistentModelID == single.persistentModelID)
+        // Трек один на двоих: его видно и в альбоме, и на сингле.
+        #expect(album.tracklist.map(\.persistentModelID) == [track.persistentModelID])
+        #expect(single.tracklist.map(\.persistentModelID) == [track.persistentModelID])
+        #expect(single.tracks.isEmpty)
+        #expect(single.contains(track) && album.contains(track))
+        #expect(((try? context.fetch(FetchDescriptor<Track>())) ?? []).count == 1)
+    }
+
+    @Test func theSingleKeepsItsArtistsAndTheTrackKeepsTheGuests() throws {
+        let track = makeSingle("Nightcall", by: [("Kavinsky", .main), ("Lovefoxxx", .featured)])
+        let single = try #require(track.album)
         let album = makeAlbum("Outrun", by: "Kavinsky")
 
         album.append([track])
 
-        #expect(track.album?.persistentModelID == album.persistentModelID)
-        #expect(track.artwork == cover)
+        #expect(single.artistNames == ["Kavinsky", "Lovefoxxx"])
         // Автор альбома не продублирован, гость сингла остался гостем трека.
         #expect(track.artistNames == ["Kavinsky", "Lovefoxxx"])
         #expect(track.credits.map(\.artist.name) == ["Lovefoxxx"])
@@ -134,30 +152,7 @@ struct SingleMoveTests {
         #expect(track.artistNames == ["Kavinsky", "Lovefoxxx", "Guest"])
     }
 
-    @Test func anOwnCoverIsNotOverwritten() {
-        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)], cover: Data([1]))
-        track.artwork = Data([9])
-        let album = makeAlbum("Outrun", by: "Kavinsky")
-
-        album.append([track])
-
-        #expect(track.artwork == Data([9]))
-    }
-
-    @Test func theEmptiedSingleLeavesTheLibrary() throws {
-        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)])
-        let album = makeAlbum("Outrun", by: "Kavinsky")
-
-        album.append([track])
-        try context.save()
-
-        // Сам трек каскад сингла не задел: он уже числится за альбомом.
-        #expect(albums.map(\.name) == ["Outrun"])
-        #expect(((try? context.fetch(FetchDescriptor<Track>())) ?? []).count == 1)
-        #expect(track.album?.persistentModelID == album.persistentModelID)
-    }
-
-    @Test func aRecordThatStillHasSongsStays() throws {
+    @Test func aSongFromAnEPJustMoves() throws {
         let moving = makeSingle("Nightcall", by: [("Kavinsky", .main)], type: .EP)
         let ep = try #require(moving.album)
         let staying = Track(name: "Testarossa", album: ep, credits: [], genre: .pop, filename: "testarossa.mp3")
@@ -168,9 +163,93 @@ struct SingleMoveTests {
         album.append([moving])
         try context.save()
 
-        #expect(Set(albums.map(\.name)) == ["Nightcall", "Outrun"])
+        #expect(moving.single == nil)
+        #expect(ep.tracklist.map(\.name) == ["Testarossa"])
         #expect(staying.position == 0)
-        // Обложку и авторов отдаёт только сингл: у EP они общие для оставшихся песен.
         #expect(moving.credits.isEmpty)
+    }
+
+    @Test func aSingleIntoASingleIsAPlainMove() throws {
+        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)])
+        let other = Album(name: "Nightcall (Remixes)", type: .single)
+        context.insert(other)
+
+        other.append([track])
+        try context.save()
+
+        #expect(track.single == nil)
+        #expect(albums.map(\.name) == ["Nightcall (Remixes)"])
+    }
+
+    // MARK: - Обратно на сингл
+
+    @Test func deletingTheAlbumSendsTheSongHome() throws {
+        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)])
+        let single = try #require(track.album)
+        let album = makeAlbum("Outrun", by: "Kavinsky")
+        let albumOnly = Track(name: "Roadgame", credits: [], genre: .pop, filename: "roadgame.mp3")
+        context.insert(albumOnly)
+        album.append([track, albumOnly])
+
+        // Имена — до удаления: трек, ушедший каскадом, читать уже нельзя.
+        let leaving = album.sendSinglesHome().map(\.name)
+        context.delete(album)
+        try context.save()
+
+        #expect(leaving == ["Roadgame"])
+        #expect(track.album?.persistentModelID == single.persistentModelID)
+        #expect(track.single == nil)
+        #expect(single.linkedTracks.isEmpty)
+        #expect(((try? context.fetch(FetchDescriptor<Track>())) ?? []).map(\.name) == ["Nightcall"])
+    }
+
+    @Test func deletingTheSingleLeavesTheSongInTheAlbum() throws {
+        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)])
+        let single = try #require(track.album)
+        let album = makeAlbum("Outrun", by: "Kavinsky")
+        album.append([track])
+
+        context.delete(single)
+        try context.save()
+
+        #expect(track.album?.persistentModelID == album.persistentModelID)
+        #expect(track.single == nil)
+    }
+
+    @Test func returningToTheSingleClosesTheGapInTheAlbum() throws {
+        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)])
+        let single = try #require(track.album)
+        let album = makeAlbum("Outrun", by: "Kavinsky")
+        let after = Track(name: "Roadgame", credits: [], genre: .pop, filename: "roadgame.mp3")
+        context.insert(after)
+        album.append([track, after])
+
+        #expect(track.returnToSingle())
+
+        #expect(track.album?.persistentModelID == single.persistentModelID)
+        #expect(album.tracklist.map(\.name) == ["Roadgame"])
+        #expect(after.position == 0)
+    }
+
+    // MARK: - Обложка
+
+    @Test func theCoverIsTheAlbumsUnlessTheSinglesIsChosen() {
+        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)], cover: Data([1]))
+        let album = makeAlbum("Outrun", by: "Kavinsky")
+        album.artwork = Data([2])
+        album.append([track])
+
+        #expect(track.displayArtwork == Data([2]))
+
+        track.prefersSingleArtwork = true
+        #expect(track.displayArtwork == Data([1]))
+    }
+
+    @Test func anAlbumWithoutACoverFallsBackToTheSingles() {
+        let track = makeSingle("Nightcall", by: [("Kavinsky", .main)], cover: Data([1]))
+        let album = makeAlbum("Outrun", by: "Kavinsky")
+        album.append([track])
+
+        #expect(track.displayArtwork == Data([1]))
     }
 }

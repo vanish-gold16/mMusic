@@ -65,7 +65,14 @@ struct EditAlbumView: View {
                             .buttonStyle(.borderless)
                     }
                 } content: {
-                    if album.tracks.isEmpty {
+                    // Песни сингла, живущие в альбоме, здесь только названы: их номер
+                    // и место — в их альбоме, и правят их там.
+                    ForEach(album.linkedTracks) { track in
+                        RecordHint("\(track.name) lives on \"\(track.album?.name ?? "")\" — edit it there")
+                            .padding(.horizontal)
+                    }
+
+                    if album.tracklist.isEmpty {
                         RecordHint("The record is empty — add tracks below")
                             .padding(.horizontal)
                     }
@@ -150,7 +157,7 @@ struct EditAlbumView: View {
                 }
             }
             .sheet(isPresented: $showTrackPicker, onDismiss: addPickedTracks) {
-                AlbumTrackPickerView(album: [album], addedTracks: $addedTracks)
+                AlbumTrackPickerView(album: [album], type: album.type, addedTracks: $addedTracks)
             }
             .alert(
                 "Some files were not imported",
@@ -175,7 +182,7 @@ struct EditAlbumView: View {
                 AlbumSleeve(
                     cover: cover,
                     type: album.type,
-                    discs: album.discs.map { $0.map(\.duration) },
+                    discs: album.tracklistDiscs.map { $0.map(\.duration) },
                     outDisc: album.discCount - 1,
                     playing: nil,
                     isPlaying: false,
@@ -198,7 +205,7 @@ struct EditAlbumView: View {
 
     /// «2×LP  ·  12 TRACKS  ·  43 MIN  ·  2024».
     private var passport: [String] {
-        let tracks = album.tracks
+        let tracks = album.tracklist
         var parts = [album.formatLabel]
 
         switch tracks.count {
@@ -322,9 +329,11 @@ struct EditAlbumView: View {
         split.removeBoundaries(atOffsets: offsets)
         split.removeTracks(removed)
 
+        // Песня, вышедшая ещё и синглом, возвращается на сингл, а не остаётся без альбома.
         for id in removed {
-            tracks[id]?.album = nil
-            tracks[id]?.disc = 0
+            guard let track = tracks[id], !track.returnToSingle() else { continue }
+            track.album = nil
+            track.disc = 0
         }
 
         apply(split)

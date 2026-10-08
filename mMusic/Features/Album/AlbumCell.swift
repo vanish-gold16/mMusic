@@ -28,8 +28,9 @@ struct AlbumCell: View {
     /// Мелкая ячейка для сетки в три колонки — синглы на странице артиста.
     var isCompact = false
 
+    /// У сингла сюда входит и его песня, живущая в альбоме: см. `Album.tracklist`.
     private var sortedTracks: [Track] {
-        album.tracks.sorted { $0.position < $1.position }
+        album.tracklist
     }
 
     /// Паспорт одной строкой: «LP  ·  2024», у двойного — «2×LP  ·  2024».
@@ -51,7 +52,7 @@ struct AlbumCell: View {
         guard !guestTracks.isEmpty else { return [] }
         let ids = Set(guestTracks.map(\.persistentModelID))
 
-        return album.discs.map { disc in
+        return album.tracklistDiscs.map { disc in
             Set(disc.indices.filter { ids.contains(disc[$0].persistentModelID) })
         }
     }
@@ -59,7 +60,7 @@ struct AlbumCell: View {
     /// На каких треках гость. Только если не на всех: у сингла имя трека —
     /// это и есть имя альбома, а «все треки» видно по кольцам.
     private var guestNote: String? {
-        guard !guestTracks.isEmpty, guestTracks.count < album.tracks.count else { return nil }
+        guard !guestTracks.isEmpty, guestTracks.count < album.tracklist.count else { return nil }
         return guestTracks.map(\.name).joined(separator: ", ")
     }
     
@@ -154,7 +155,7 @@ struct AlbumCell: View {
             AlbumSleeve(
                 cover: cover,
                 type: album.type,
-                discs: album.discs.map { $0.map(\.duration) },
+                discs: album.tracklistDiscs.map { $0.map(\.duration) },
                 outDisc: playing?.disc,
                 playing: playing,
                 isPlaying: isCurrent && audioPlayer.isPlaying,
@@ -221,7 +222,9 @@ struct AlbumCell: View {
 
     private func deleteAlbum() {
         // Каскад в SwiftData уберёт строки треков, но не mp3 — их мы копировали руками.
-        for track in album.tracks {
+        // Песни, вышедшие ещё и синглом, не уходят: они возвращаются на свои синглы.
+        // А песни с альбома, которые показывал этот сингл, остаются в альбоме.
+        for track in album.sendSinglesHome() {
             audioPlayer.forget(track)
             AudioFileStore.remove(filename: track.filename)
         }

@@ -12,13 +12,16 @@ extension Album {
     }
 
     /// Где в альбоме трек: пластинка и номер на ней. nil — трек не отсюда.
+    /// Песня, которую сингл показывает у себя, тоже отсюда — см. `tracklistDiscs`.
     func position(of track: Track?) -> DiscPosition? {
-        guard let track, track.album?.persistentModelID == persistentModelID else { return nil }
+        guard let track, contains(track) else { return nil }
 
-        let disc = clampedDisc(of: track)
-        guard let index = discs[disc].firstIndex(where: { $0.id == track.id }) else { return nil }
-
-        return DiscPosition(disc: disc, track: index)
+        for (disc, tracks) in tracklistDiscs.enumerated() {
+            if let index = tracks.firstIndex(where: { $0.id == track.id }) {
+                return DiscPosition(disc: disc, track: index)
+            }
+        }
+        return nil
     }
 
     /// Номер трека, как на обороте пластинки: «A3», если у пластинки две стороны,
@@ -26,7 +29,7 @@ extension Album {
     func recordNumber(of track: Track) -> String? {
         guard let position = position(of: track) else { return nil }
 
-        let tracks = discs[position.disc]
+        let tracks = tracklistDiscs[position.disc]
         guard tracks.count > 1 else { return nil }
 
         let sides = RecordSides.split(tracks, type: type)
@@ -40,6 +43,39 @@ extension Album {
             start += tracksOnSide.count
         }
         return nil
+    }
+}
+
+/// Что станет с прежним альбомом трека, когда его положат в другой, — подпись
+/// под строкой, где трек выбирают. Молча забирать песню из чужого альбома нельзя,
+/// а сингл её и вовсе не отдаёт, только делит с альбомом: см. `Album.takeIn`.
+struct TrackJoinNote {
+    let text: String
+    let systemImage: String
+    /// Трек не уходит, а делит песню со своим синглом.
+    var sharesSingle = false
+
+    /// `destination` — альбом, куда кладут (nil — его ещё создают), `type` — его
+    /// формат. nil — трек ниоткуда не уходит.
+    init?(track: Track, joining destination: Album?, type: Album.AlbumType) {
+        guard let previous = track.album,
+              previous.persistentModelID != destination?.persistentModelID
+        else { return nil }
+
+        if previous.type == .single, type != .single, track.single == nil {
+            text = "Also stays on \(previous.name)"
+            systemImage = "link"
+            sharesSingle = true
+        } else {
+            text = "Moves out of \(previous.name)"
+            systemImage = "arrow.turn.up.right"
+        }
+    }
+
+    init(text: String, systemImage: String, sharesSingle: Bool = false) {
+        self.text = text
+        self.systemImage = systemImage
+        self.sharesSingle = sharesSingle
     }
 }
 

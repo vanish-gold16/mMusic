@@ -34,6 +34,13 @@ struct EditTrackView: View {
         track.album?.artwork != nil
     }
 
+    /// Песня вышла ещё и синглом, и обложки у сингла и альбома разные —
+    /// есть из чего выбрать, какую видеть у трека.
+    private var canChooseCover: Bool {
+        guard let singleCover = track.single?.artwork, let albumCover = track.album?.artwork else { return false }
+        return singleCover != albumCover
+    }
+
     /// Дата живёт на альбоме: у сингла это дата самого трека, у альбома — общая.
     private var release: Binding<Date?> {
         Binding(
@@ -86,7 +93,9 @@ struct EditTrackView: View {
             // Всё в цвет обложки. Строго до `.toolbar` и листов: редактор текста
             // остаётся в цвете приложения.
             .tint(accent)
-            .task(id: track.displayArtwork?.count) {
+            // Переключатель тоже меняет обложку, а размер у двух картинок может
+            // совпасть — одного числа байт для «обложка сменилась» мало.
+            .task(id: "\(track.displayArtwork?.count ?? 0)·\(track.prefersSingleArtwork)") {
                 let (image, colors) = await UIImage.coverAndPalette(from: track.displayArtwork)
                 guard !Task.isCancelled else { return }
 
@@ -129,7 +138,9 @@ struct EditTrackView: View {
                 RecordTitleField(placeholder: "Track name", text: $track.name)
                 RecordPassport(parts: passport)
 
-                if coverBelongsToAlbum, let album = track.album {
+                if canChooseCover {
+                    coverSwitch
+                } else if coverBelongsToAlbum, let album = track.album {
                     RecordHint("Cover comes from \"\(album.name)\"")
                         .padding(.top, 2)
                 }
@@ -137,6 +148,22 @@ struct EditTrackView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
+    }
+
+    /// Обложка альбома или сингла — выключатель с лампой, как в панели плеера:
+    /// горит — трек везде с обложкой сингла. Подсказка рядом говорит, чья видна.
+    private var coverSwitch: some View {
+        HStack(spacing: 14) {
+            PanelSwitch(title: "Single cover", isOn: track.prefersSingleArtwork, accent: accent) {
+                withAnimation(.snappy) { track.prefersSingleArtwork.toggle() }
+            }
+
+            let source = track.prefersSingleArtwork ? track.single : track.album
+            if let source {
+                RecordHint("Now from \"\(source.name)\"")
+                    .lineLimit(1)
+            }
+        }
     }
 
     /// Пластинка альбома с горящим кольцом этого трека. Трек без альбома —

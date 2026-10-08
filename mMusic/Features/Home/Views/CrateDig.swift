@@ -16,7 +16,7 @@ struct CrateDig: View {
     @State private var cover: UIImage?
 
     private var sortedTracks: [Track] {
-        album.tracks.sorted { $0.position < $1.position }
+        album.tracklist
     }
 
     /// «UNTOUCHED SINCE MAY», «UNTOUCHED SINCE NOV 2025» или «NEVER SPUN».
@@ -39,7 +39,7 @@ struct CrateDig: View {
                 AlbumSleeve(
                     cover: cover,
                     type: album.type,
-                    discs: album.discs.map { $0.map(\.duration) },
+                    discs: album.tracklistDiscs.map { $0.map(\.duration) },
                     outDisc: nil,
                     playing: nil,
                     isPlaying: false,

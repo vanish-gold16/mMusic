@@ -39,8 +39,9 @@ struct AlbumView: View {
     /// Иначе закрытый альбом открывался бы снова при каждом возврате на экран.
     @State private var didOpenPlayingDisc = false
 
+    /// У сингла сюда входит и его песня, живущая в альбоме: см. `Album.tracklist`.
     private var sortedTracks: [Track] {
-        album.tracks.sorted { $0.position < $1.position }
+        album.tracklist
     }
 
     private var isMultiDisc: Bool {
@@ -48,7 +49,8 @@ struct AlbumView: View {
     }
 
     /// Где играющий трек, если он из этого альбома. Очередь, как у плейлиста,
-    /// проверять незачем: альбом у трека один.
+    /// проверять незачем: у трека один альбом и разве что сингл с той же
+    /// песней — играет она и там и там.
     private var playing: DiscPosition? {
         album.position(of: audioPlayer.currentTrack)
     }
@@ -73,7 +75,7 @@ struct AlbumView: View {
     }
 
     var body: some View {
-        let discs = album.discs
+        let discs = album.tracklistDiscs
         let scope = scope(in: discs)
         let isClosed = isMultiDisc && openDisc == nil
 
@@ -354,7 +356,9 @@ struct AlbumView: View {
                         track: track,
                         queue: tracks,
                         showDuration: true,
-                        number: lettered ? "\(letter)\(position + 1)" : nil,
+                        // Номер — место на этой пластинке, а не `track.position`:
+                        // у песни, которую сингл показывает у себя, тот номер из её альбома.
+                        number: lettered ? "\(letter)\(position + 1)" : "\(position + 1)",
                         showsOnlyGuests: true
                     )
                 }

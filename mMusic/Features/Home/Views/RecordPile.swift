@@ -40,7 +40,7 @@ private struct RecordSpine: View {
     @State private var palette: CoverPalette?
 
     private var sortedTracks: [Track] {
-        album.tracks.sorted { $0.position < $1.position }
+        album.tracklist
     }
 
     /// Небольшой разброс, свой у каждого альбома и одинаковый от запуска
@@ -156,7 +156,7 @@ private struct RecordSpine: View {
 
     /// Торец — 42 pt, около 130 px на @3x; цвета берутся с той же миниатюры.
     private func loadCover() async {
-        guard let data = album.artwork ?? album.tracks.first?.displayArtwork else {
+        guard let data = album.artwork ?? album.tracklist.first?.displayArtwork else {
             cover = nil
             palette = nil
             return

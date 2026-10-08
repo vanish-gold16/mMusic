@@ -213,7 +213,7 @@ struct HomeView: View {
     }
 
     private func lastPlayed(_ album: Album) -> Date? {
-        album.tracks.compactMap(\.lastPlayedAt).max()
+        album.tracklist.compactMap(\.lastPlayedAt).max()
     }
 
     /// Достаёт из ящика альбом, который не ставили месяц или не ставили никогда.
@@ -226,7 +226,7 @@ struct HomeView: View {
         if let album = audioPlayer.currentTrack?.album { excluded.insert(album.persistentModelID) }
         if let dig { excluded.insert(dig.persistentModelID) }
 
-        let candidates = albums.filter { !$0.tracks.isEmpty && !excluded.contains($0.persistentModelID) }
+        let candidates = albums.filter { !$0.tracklist.isEmpty && !excluded.contains($0.persistentModelID) }
         let dusty = candidates.filter { (lastPlayed($0) ?? .distantPast) < monthAgo }
 
         dig = dusty.randomElement() ?? candidates.randomElement() ?? dig

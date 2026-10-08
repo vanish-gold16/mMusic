@@ -9,8 +9,8 @@ struct AlbumTrackDraftCell: View {
     /// Длительность — у трека из библиотеки она берётся из самого трека,
     /// поэтому приходит снаружи, а не из черновика.
     var duration: TimeInterval = 0
-    /// Откуда трек переедет, если он уже есть в библиотеке. nil — трек новый.
-    var origin: String?
+    /// Откуда трек придёт, если он уже есть в библиотеке. nil — трек новый.
+    var origin: TrackJoinNote?
 
     private var featuredNames: [String] {
         var names: [String] = []
@@ -38,9 +38,9 @@ struct AlbumTrackDraftCell: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                // Тот же значок, что в пикере у трека, который уедет из чужого альбома.
+                // Та же подпись, что в пикере у трека из чужого альбома.
                 if let origin {
-                    Label(origin, systemImage: "arrow.turn.up.right")
+                    Label(origin.text, systemImage: origin.systemImage)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

@@ -403,7 +403,7 @@ struct ArtistView: View {
     /// Кольцо на пластинке артиста: играет эта пластинка — пауза,
     /// иначе она ставится с начала.
     private func playRelease(_ album: Album) {
-        playOrPause(album.tracks.sorted { $0.position < $1.position })
+        playOrPause(album.tracklist)
     }
 
     // MARK: - Фотография
