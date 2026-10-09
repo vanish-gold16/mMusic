@@ -16,12 +16,11 @@ struct RadarArtistView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Release alerts", isOn: Binding(
-                    get: { !(entry?.isMuted ?? false) },
-                    set: { radar.setMuted(!$0, artist: name) }
-                ))
+                Toggle("Mute releases", isOn: mutedBinding(radar, name))
             } footer: {
-                Text("New albums, EPs, singles and features by \(name) land on Home and in Drops.")
+                Text(entry?.isMuted == true
+                     ? "Nothing by \(name) reaches you: no notifications, nothing on Home or in Drops."
+                     : "New albums, EPs, singles and features by \(name) land on Home and in Drops, and a notification comes with them.")
             }
 
             matchSection(.deezer, match: entry?.deezer, footer: "Albums, EPs and singles where \(name) is the main artist.")
@@ -194,9 +193,9 @@ struct RadarCandidatesView: View {
     }
 }
 
-/// Колокольчик на странице артиста: по значку видно, следит ли за ним радар,
-/// а нажатие открывает настройки радара для него.
-struct RadarArtistButton: View {
+/// «…» на странице артиста: заглушить его одним касанием — или открыть
+/// радар целиком и посмотреть, кем он считается в каталогах.
+struct RadarArtistMenu: View {
 
     @Environment(ReleaseRadar.self) private var radar
 
@@ -205,16 +204,22 @@ struct RadarArtistButton: View {
     @State private var isPresented = false
 
     var body: some View {
-        Button {
-            isPresented = true
+        Menu {
+            Toggle(isOn: mutedBinding(radar, name)) {
+                Label("Mute releases", systemImage: "bell.slash")
+            }
+
+            Button {
+                isPresented = true
+            } label: {
+                // Второй текст в пункте меню — его подпись мелким шрифтом.
+                Label("Release radar", systemImage: "dot.radiowaves.left.and.right")
+                Text(status)
+            }
         } label: {
-            Image(systemName: symbol)
-                .font(.body.weight(.semibold))
-                .frame(width: 28, height: 28)
+            Image(systemName: "ellipsis")
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .accessibilityLabel("Release radar")
+        .accessibilityLabel("More")
         .sheet(isPresented: $isPresented) {
             NavigationStack {
                 RadarArtistView(name: name)
@@ -227,11 +232,20 @@ struct RadarArtistButton: View {
         }
     }
 
-    /// Следит — колокольчик; молчит — перечёркнутый; не уверен, тот ли это
-    /// человек, — с точкой: стоит заглянуть.
-    private var symbol: String {
-        guard let entry = radar.artist(named: name) else { return "bell" }
-        if entry.isMuted { return "bell.slash" }
-        return entry.needsReview ? "bell.badge" : "bell.fill"
+    /// Подпись под пунктом: следит ли радар и уверен ли, что это он.
+    private var status: String {
+        guard let entry = radar.artist(named: name) else { return "Not checked yet" }
+        if entry.isMuted { return "Muted" }
+        if entry.deezer?.isWatched == true || entry.apple?.isWatched == true { return "Watching" }
+        return entry.needsReview ? "Needs a look" : "Not found"
     }
+}
+
+/// «Заглушить» в меню и в листе радара — один и тот же переключатель.
+@MainActor
+private func mutedBinding(_ radar: ReleaseRadar, _ name: String) -> Binding<Bool> {
+    Binding(
+        get: { radar.artist(named: name)?.isMuted ?? false },
+        set: { radar.setMuted($0, artist: name) }
+    )
 }

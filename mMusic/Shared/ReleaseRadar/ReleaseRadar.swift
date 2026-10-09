@@ -66,18 +66,32 @@ final class ReleaseRadar {
     /// Уже пришедшее во входящие, свежее сверху.
     var inbox: [RadarRelease] {
         let now = Date.now
-        return releases.filter { $0.arrivesAt <= now }.sorted { $0.arrivesAt > $1.arrivesAt }
+        return audible.filter { $0.arrivesAt <= now }.sorted { $0.arrivesAt > $1.arrivesAt }
     }
 
     /// Анонсы: выйдут позже, ближайший сверху.
     var upcoming: [RadarRelease] {
         let now = Date.now
-        return releases.filter { $0.arrivesAt > now && !$0.isDismissed }.sorted { $0.arrivesAt < $1.arrivesAt }
+        return audible.filter { $0.arrivesAt > now && !$0.isDismissed }.sorted { $0.arrivesAt < $1.arrivesAt }
     }
 
     var unreadCount: Int {
         let now = Date.now
-        return releases.filter { !$0.isQuiet && $0.arrivesAt > inboxSeenAt && $0.arrivesAt <= now }.count
+        return audible.filter { !$0.isQuiet && $0.arrivesAt > inboxSeenAt && $0.arrivesAt <= now }.count
+    }
+
+    /// Всё, кроме релизов заглушённых артистов. Заглушить — значит не слышать
+    /// о нём вовсе: ни уведомлений, ни полки, ни входящих. Найденное раньше
+    /// не стирается и вернётся, если звук включить обратно.
+    private var audible: [RadarRelease] {
+        releases.filter { !isMuted($0) }
+    }
+
+    /// Релиз заглушён, когда заглушены все артисты библиотеки на нём:
+    /// совместный сингл с тем, кого слушают, всё равно новость.
+    func isMuted(_ release: RadarRelease) -> Bool {
+        !release.libraryArtists.isEmpty
+            && release.libraryArtists.allSatisfy { artist(named: $0)?.isMuted == true }
     }
 
     /// Полка новинок на главной: вышедшее за две недели, свежее первым, потом анонсы.
@@ -86,7 +100,7 @@ final class ReleaseRadar {
         let today = calendar.startOfDay(for: .now)
         let from = calendar.date(byAdding: .day, value: -RadarLogic.freshDays, to: today) ?? today
 
-        let out = releases
+        let out = audible
             .filter { !$0.isDismissed && $0.arrivesAt <= .now }
             .filter { (RadarLogic.date(of: $0.releaseDay) ?? .distantPast) >= from }
             .sorted { ($0.releaseDay, $0.foundAt) > ($1.releaseDay, $1.foundAt) }
@@ -124,8 +138,12 @@ final class ReleaseRadar {
         Task { await rescheduleUpcoming() }
     }
 
+    /// Заглушённого радар не проверяет, а его анонсы снимаются с расписания.
     func setMuted(_ muted: Bool, artist name: String) {
         update(name) { $0.isMuted = muted }
+        Task { await rescheduleUpcoming() }
+        // Включили обратно — посмотреть, что вышло, пока он молчал.
+        if !muted { check(force: false) }
     }
 
     /// Выбран руками: с этого каталога радар знакомится заново, молча.
@@ -467,7 +485,7 @@ final class ReleaseRadar {
 
         // К этому моменту релиз могли убрать или он слился с другим — берём
         // его нынешнюю запись, с полным списком артистов.
-        let fresh = releases.filter { ids.contains($0.id) && !$0.isDismissed }
+        let fresh = audible.filter { ids.contains($0.id) && !$0.isDismissed }
         guard !fresh.isEmpty, notificationsEnabled else { return }
 
         Task { await ReleaseNotifications.post(fresh) }

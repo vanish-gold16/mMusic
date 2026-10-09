@@ -339,6 +339,42 @@ struct ReleaseRadarTests {
         #expect(RadarText.variants(of: "Krewella - Alive (Remix)") == ["Krewella - Alive", "Krewella", "Alive"])
     }
 
+    // MARK: - Заглушённые
+
+    @MainActor
+    @Test func mutedArtistGoesQuiet() {
+        let url = URL.temporaryDirectory.appending(path: "radar-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let now = Date.now
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: now)
+        let today = String(format: "%04d-%02d-%02d", parts.year!, parts.month!, parts.day!)
+
+        var solo = release(1, "Solo", day: today)
+        solo.libraryArtists = ["madk1d"]
+        solo.arrivesAt = now.addingTimeInterval(-60)
+        var collab = release(2, "Collab", day: today)
+        collab.libraryArtists = ["madk1d", "VILLIAN"]
+        collab.arrivesAt = now.addingTimeInterval(-60)
+
+        var muted = RadarArtist(name: "madk1d")
+        muted.isMuted = true
+
+        var state = RadarState()
+        state.releases = [solo, collab]
+        state.artists = [RadarText.key("madk1d"): muted]
+        RadarStore.save(state, to: url)
+
+        let radar = ReleaseRadar(fileURL: url)
+
+        #expect(radar.isMuted(solo))
+        // Совместный с тем, кого слушают, — всё ещё новость.
+        #expect(!radar.isMuted(collab))
+        #expect(radar.shelf.map(\.id) == ["deezer:2"])
+        #expect(radar.inbox.map(\.id) == ["deezer:2"])
+        #expect(radar.unreadCount == 1)
+    }
+
     // MARK: - Сводка и расписание
 
     @Test func digestOfOneAndOfMany() {

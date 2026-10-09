@@ -154,6 +154,11 @@ struct ArtistView: View {
         .task(id: [artist.artwork?.count, discography.newestCover?.count]) {
             await loadPhoto(fallback: discography.newestCover)
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                RadarArtistMenu(name: artist.name)
+            }
+        }
         // `containerBackground`, а не `background`: у вложенного экрана своя
         // непрозрачная подложка, и закрасить её можно только фоном контейнера —
         // зато он ложится и под панель навигации.
@@ -299,8 +304,6 @@ struct ArtistView: View {
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
             .accessibilityLabel("Shuffle")
-
-            RadarArtistButton(name: artist.name)
         }
     }
 
