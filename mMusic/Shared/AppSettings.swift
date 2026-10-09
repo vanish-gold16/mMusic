@@ -8,6 +8,7 @@ enum AppSettings {
     static let deleteOriginalAfterImport = "deleteOriginalAfterImport"
     static let appearance = "appearance"
     static let birthdayNotifications = "birthdayNotifications"
+    static let releaseNotifications = "releaseNotifications"
     /// Открытый раздел библиотеки и порядок альбомов — чтобы библиотека
     /// открывалась там же, где её оставили. Регистрировать не нужно: значение
     /// по умолчанию задаёт сам `@AppStorage`.
@@ -23,7 +24,8 @@ enum AppSettings {
             playbackRate: 1.0,
             deleteOriginalAfterImport: true,
             appearance: Appearance.system.rawValue,
-            birthdayNotifications: true
+            birthdayNotifications: true,
+            releaseNotifications: true
         ])
     }
 }

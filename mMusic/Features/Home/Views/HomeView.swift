@@ -14,6 +14,7 @@ struct HomeView: View {
     @Environment(AudioPlayer.self) private var audioPlayer
     @Environment(\.modelContext) private var modelContext
     @Environment(ToastCenter.self) private var toasts
+    @Environment(ReleaseRadar.self) private var radar
     /// Приложение могли не закрывать сутками — тогда о новом дне узнаём только
     /// по возвращению из фона.
     @Environment(\.scenePhase) private var scenePhase
@@ -71,12 +72,30 @@ struct HomeView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Входящие радара: что вышло у артистов из библиотеки. Число на
+            // колокольчике — сколько пришло с прошлого раза.
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(value: RadarRoute.inbox) {
+                    Image(systemName: "bell")
+                }
+                .badge(radar.unreadCount)
+                .accessibilityLabel("Drops")
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showSettings = true
                 } label: {
                     Image(systemName: "gear")
                 }
+            }
+        }
+        .navigationDestination(for: RadarRoute.self) { route in
+            switch route {
+            case .inbox:
+                ReleaseInboxView()
+            case .release(let id):
+                ReleaseView(id: id)
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -125,6 +144,13 @@ struct HomeView: View {
 
         if let track = audioPlayer.currentTrack {
             NowSpinning(track: track)
+        }
+
+        // Новинки — сразу за проигрывателем: они живут две недели,
+        // и место у кассы им как раз.
+        let shelf = radar.shelf
+        if !shelf.isEmpty {
+            NewReleasesShelf(releases: shelf)
         }
 
         if !mix.isEmpty {

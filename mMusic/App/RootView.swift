@@ -10,6 +10,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Треки, у которых длительность ещё не прочитана. Запрос сам сужается по мере
     /// заполнения, поэтому `task(id:)` ниже перезапускается ровно тогда, когда работа появилась —
@@ -26,12 +27,17 @@ struct RootView: View {
     
     @AppStorage(AppSettings.appearance) private var appearance = Appearance.system.rawValue
     @AppStorage(AppSettings.birthdayNotifications) private var birthdayNotifications = true
+    @AppStorage(AppSettings.releaseNotifications) private var releaseNotifications = true
 
     @State private var audioPlayer = AudioPlayer()
     @State private var isPlayerPresented = false
 
     /// Общая на всё приложение «плашка о сделанном» — см. `ToastCenter`.
     @State private var toasts = ToastCenter()
+
+    /// Радар один на всё приложение: его же будит фоновое обновление,
+    /// где никакого интерфейса нет.
+    @State private var radar = ReleaseRadar.shared
 
     @Namespace private var playerNamespace
     
@@ -54,6 +60,7 @@ struct RootView: View {
         .toastOverlay(toasts)
         .environment(audioPlayer)
         .environment(toasts)
+        .environment(radar)
         .task {
             // Плеер живёт в @State и своего контекста не имеет — отдаём ему рабочий.
             audioPlayer.modelContext = modelContext
@@ -76,8 +83,32 @@ struct RootView: View {
         }
         // Перезапускается и при смене настройки: выключили — уведомления снимаются.
         .task(id: birthdayNotifications) {
-            BirthdayNotifications.startPresentingInForeground()
             await scheduleBirthdays()
+        }
+        .task(id: releaseNotifications) {
+            await radar.notificationsSettingChanged()
+        }
+        // Нажатие на уведомление о релизах: на главную и сразу к нему.
+        // `task(id:)`, а не `onChange`: уведомление могло само запустить
+        // приложение, и маршрут тогда уже лежит к первому кадру.
+        .task(id: radar.route) {
+            guard let route = radar.route else { return }
+            radar.route = nil
+            selected = .home
+            homePath = NavigationPath()
+            homePath.append(route)
+        }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            switch phase {
+            case .active:
+                // Библиотека менялась только здесь, в приложении, — снимок
+                // для фоновой проверки обновляется при каждом возвращении.
+                radar.refresh(from: modelContext)
+            case .background:
+                radar.flush()
+            default:
+                break
+            }
         }
         .task {
             // Разовая починка номеров: у собранной раньше библиотеки нумерация

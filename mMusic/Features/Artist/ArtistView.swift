@@ -299,6 +299,8 @@ struct ArtistView: View {
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
             .accessibilityLabel("Shuffle")
+
+            RadarArtistButton(name: artist.name)
         }
     }
 

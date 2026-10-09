@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.deleteOriginalAfterImport) private var deleteOriginalAfterImport = true
     @AppStorage(AppSettings.appearance) private var appearance = Appearance.system.rawValue
     @AppStorage(AppSettings.birthdayNotifications) private var birthdayNotifications = true
+    @AppStorage(AppSettings.releaseNotifications) private var releaseNotifications = true
 
     @Query private var tracks: [Track]
     @Query private var albums: [Album]
@@ -86,10 +87,17 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Track birthdays", isOn: $birthdayNotifications)
+                    Toggle("New releases", isOn: $releaseNotifications)
+
+                    NavigationLink {
+                        ReleaseRadarSettingsView()
+                    } label: {
+                        Label("Release radar", systemImage: "dot.radiowaves.left.and.right")
+                    }
                 } header: {
                     Text("notifications")
                 } footer: {
-                    Text("On the day a track turns a year older, the app sends a note with how much you have played it. iOS asks for permission the first time there is something to send.")
+                    Text("On the day a track turns a year older, the app sends a note with how much you have played it. When an artist from your library drops something — features too — one digest arrives; Friday drops come at midnight. iOS asks for permission the first time there is something to send.")
                 }
 
                 Section {
