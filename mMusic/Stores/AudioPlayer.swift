@@ -111,6 +111,18 @@ class AudioPlayer: NSObject {
 
         setupRemoteCommands()
         observeAudioSession()
+
+        // Музыка играет и в фоне, а там систему ничто не держит от выгрузки приложения.
+        // Секунды текущего трека отдаём базе на выходе, чтобы они не пропали вместе с ним.
+        sessionObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: UIApplication.willResignActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.recordListening()
+            }
+        )
     }
 
     deinit {
@@ -147,7 +159,11 @@ class AudioPlayer: NSObject {
     
     private func playCurrent() {
         guard let track = currentTrack else { return }
-        
+
+        // Прежний трек дослушан или пропущен — его событию пора узнать итог.
+        // Строго до загрузки нового: потом `currentTime` уже про него.
+        recordListening()
+
         let url = AudioFileStore.url(for: track.filename)
 
         // До попытки открыть файл: обложка есть и у трека, который не удалось прочитать,
@@ -191,6 +207,7 @@ class AudioPlayer: NSObject {
     func pause() {
         engine.pause()
         isPlaying = false
+        recordListening()
         stopProgressTimer()
         stopMeterTimer()
         updateNowPlayingInfo()
@@ -217,6 +234,7 @@ class AudioPlayer: NSObject {
     func stop() {
         engine.stop()
         isPlaying = false
+        recordListening()
         currentTime = 0
         duration = 0
         stopProgressTimer()
@@ -357,6 +375,7 @@ class AudioPlayer: NSObject {
     private func finishPlayback() {
         engine.stop()
         isPlaying = false
+        recordListening()
         stopProgressTimer()
         stopMeterTimer()
         currentIndex = 0
@@ -379,14 +398,8 @@ class AudioPlayer: NSObject {
 
     /// Прослушиванием считается полминуты звука (или половина трека, если он короче),
     /// а не факт запуска: иначе перебор очереди накрутил бы счётчик всем подряд.
+    /// Дальше засчитанный трек продолжает копить секунды — их записывает `recordListening`.
     private func countPlayIfNeeded() {
-        // Уже засчитанный трек продолжает копить секунды: событие закрывается не по
-        // порогу, а когда с трека уходят.
-        if let currentEvent {
-            currentEvent.seconds = currentTime
-            return
-        }
-
         guard !didCountCurrentPlay, let track = currentTrack else { return }
 
         let threshold = duration > 0 ? min(30, duration / 2) : 30
@@ -398,6 +411,21 @@ class AudioPlayer: NSObject {
         let event = PlayEvent(track: track, seconds: currentTime)
         modelContext?.insert(event)
         currentEvent = event
+    }
+
+    /// Секунды текущего прослушивания — в его событие.
+    ///
+    /// Раньше они писались на каждом такте таймера, пять раз в секунду. Но любая
+    /// запись в базу заставляет каждый `@Query` приложения перечитать данные и
+    /// пересчитать свой экран — даже те, что ищут треки, а не события. Под музыкой
+    /// интерфейс пересчитывался без передышки: лист выбора треков, например,
+    /// заново сортировал всю библиотеку десять раз в секунду и тормозил на каждом тапе.
+    ///
+    /// Поэтому секунды записываются, только когда с трека уходят: следующий трек,
+    /// пауза, стоп, выход из приложения.
+    private func recordListening() {
+        guard let currentEvent, currentEvent.seconds != currentTime else { return }
+        currentEvent.seconds = currentTime
     }
 
     private func stopProgressTimer() {

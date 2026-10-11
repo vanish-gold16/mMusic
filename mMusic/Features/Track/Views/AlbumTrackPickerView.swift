@@ -10,7 +10,9 @@ struct AlbumTrackPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AudioPlayer.self) private var audioPlayer
 
-    @Query private var tracks: [Track]
+    /// Свежие сверху. Сортирует сама база: сортировка всей библиотеки в `body`
+    /// обходилась в 10 мс на каждый пересчёт листа, а он пересчитывается на каждый тап.
+    @Query(sort: \Track.addedAt, order: .reverse) private var tracks: [Track]
 
     @State private var selectedTab: TrackPickerTab = .recent
     @State private var searchText = ""
@@ -39,6 +41,9 @@ struct AlbumTrackPickerView: View {
     }
 
     var body: some View {
+        // Один раз на пересчёт: и проверка на пустоту, и сам список берут отсюда.
+        let visible = visibleTracks
+
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
@@ -51,10 +56,10 @@ struct AlbumTrackPickerView: View {
                     }
                     .padding(.bottom, 12)
 
-                    if visibleTracks.isEmpty {
+                    if visible.isEmpty {
                         LibraryEmptyState(text: emptyText)
                     } else {
-                        list
+                        list(visible)
                     }
                 }
                 .padding(.bottom, 24)
@@ -71,14 +76,14 @@ struct AlbumTrackPickerView: View {
     }
 
     @ViewBuilder
-    private var list: some View {
+    private func list(_ tracks: [Track]) -> some View {
         switch selectedTab {
         case .recent:
-            ForEach(recentTracks) { track in
+            ForEach(tracks) { track in
                 cell(for: track)
             }
         case .genre:
-            ForEach(genreGroups, id: \.genre) { group in
+            ForEach(genreGroups(of: tracks), id: \.genre) { group in
                 CrateDivider(title: group.genre.rawValue.uppercased(), detail: "\(group.tracks.count)", size: 22)
                     .padding(.horizontal)
                     .padding(.top, 8)
@@ -108,13 +113,11 @@ struct AlbumTrackPickerView: View {
 
     // MARK: - Что показываем
 
-    private var recentTracks: [Track] {
-        visibleTracks.sorted { $0.addedAt > $1.addedAt }
-    }
-
-    private var genreGroups: [(genre: Genre, tracks: [Track])] {
-        Dictionary(grouping: visibleTracks, by: \.genre)
-            .map { (genre: $0.key, tracks: $0.value.sorted { $0.addedAt > $1.addedAt }) }
+    /// Внутри жанра — тоже свежие сверху: `Dictionary(grouping:)` раскладывает
+    /// треки в том порядке, в каком они пришли из запроса.
+    private func genreGroups(of tracks: [Track]) -> [(genre: Genre, tracks: [Track])] {
+        Dictionary(grouping: tracks, by: \.genre)
+            .map { (genre: $0.key, tracks: $0.value) }
             .sorted { $0.genre.rawValue < $1.genre.rawValue }
     }
 
