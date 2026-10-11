@@ -5,11 +5,10 @@ struct PlaylistView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) var audioPlayer
-    @Environment(ToastCenter.self) private var toasts
-    
-    @State private var isShowingTrackPicker = false
-    @State private var editingPlaylist = false
-    @State private var showDeleteConfirmation = false
+    @Environment(\.dismiss) private var dismiss
+
+    /// Что открыто из меню «…» или слота «Add music».
+    @State private var action: PlaylistAction?
 
     /// Уменьшенные обложки для веера. Декодируются один раз в `.task`, а не в `body`:
     /// полноразмерная обложка весит мегабайты, а `body` пересчитывается на каждой
@@ -87,101 +86,14 @@ struct PlaylistView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    VStack {
-                        ControlGroup {
-                            Button {
-                                playlist.isFavourite.toggle()
-                            } label: {
-                                Label("Favourite", systemImage: playlist.isFavourite ? "star.fill" : "star")
-                            }
-                            ShareLink(items: playlist.orderedTracks.map { AudioFileStore.url(for: $0.filename) }) {
-                                Label("Share", systemImage: "square.and.arrow.up")
-                            }
-                        }
-                        Divider()
-                        
-                        Button {
-                            playlist.markPlayed()
-                            audioPlayer.play(playlist.orderedTracks)
-                        } label: {
-                            Label("Play", systemImage: "play")
-                        }
-                        Button {
-                            playlist.markPlayed()
-                            audioPlayer.playShuffled(playlist.orderedTracks)
-                        } label: {
-                            Label("Shuffle", systemImage: "shuffle")
-                        }
-                        
-                        Divider()
-                        
-                        Button {
-                            editingPlaylist = true
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
-                        }
-
-                        Menu {
-                            ForEach(PlaylistSort.allCases) { option in
-                                Button {
-                                    applySort(option)
-                                } label: {
-                                    Label(option.rawValue, systemImage: option.systemImage)
-                                }
-                            }
-                        } label: {
-                            Label("Sort", systemImage: "arrow.up.arrow.down")
-                        }
-                        
-                        Divider()
-                        
-                        Button {
-                            audioPlayer.enqueueNext(playlist.orderedTracks)
-                            toasts.enqueuedNext(playlist.orderedTracks.count)
-                        } label: {
-                            Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                        }
-                        Button {
-                            audioPlayer.enqueueLast(playlist.orderedTracks)
-                            toasts.enqueuedLast(playlist.orderedTracks.count)
-                        } label: {
-                            Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
-                        }
-                        
-                        Divider()
-                        
-                        Button(role: .destructive) {
-                            showDeleteConfirmation = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        .tint(.red)
-                    }
+                    PlaylistMenuItems(playlist: playlist, action: $action, isOnItsPage: true)
                 } label: {
                     Image(systemName: "ellipsis")
                 }
             }
         }
-        .sheet(isPresented: $isShowingTrackPicker) {
-            TrackPickerView(playlist: playlist)
-        }
-        .sheet(isPresented: $editingPlaylist) {
-            EditPlaylistView(playlist: playlist)
-        }
-        .confirmationDialog(
-            "Delete \"\(playlist.name)\"?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                let name = playlist.name
-                modelContext.delete(playlist)
-                toasts.removed("Deleted \(name)")
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This playlist will be permanently deleted.")
-        }
+        // Удалённый плейлист раньше так и оставался открытым на экране.
+        .playlistActions(playlist, action: $action, onLeave: { dismiss() })
     }
 
     // MARK: - Шапка
@@ -268,7 +180,7 @@ struct PlaylistView: View {
     /// кроме него на экране делать нечего.
     private var addMusicSlot: some View {
         DashedSlot(title: tracks.isEmpty ? "Add the first tracks" : "Add music", isLarge: tracks.isEmpty) {
-            isShowingTrackPicker = true
+            action = .addMusic
         }
         .padding(.horizontal)
         .padding(.top, 4)
@@ -347,13 +259,6 @@ struct PlaylistView: View {
         // и следующая перестановка съезжает.
         items.remove(atOffsets: offsets)
         for (index, item) in items.enumerated() {
-            item.position = index
-        }
-    }
-
-    /// Переписывает позиции раз и навсегда: дальше порядок снова ручной.
-    private func applySort(_ option: PlaylistSort) {
-        for (index, item) in option.sorted(playlist.items).enumerated() {
             item.position = index
         }
     }

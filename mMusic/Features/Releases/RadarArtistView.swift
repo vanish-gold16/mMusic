@@ -193,42 +193,26 @@ struct RadarCandidatesView: View {
     }
 }
 
-/// «…» на странице артиста: заглушить его одним касанием — или открыть
-/// радар целиком и посмотреть, кем он считается в каталогах.
-struct RadarArtistMenu: View {
+/// Пункты радара в меню артиста: заглушить его одним касанием — или открыть
+/// радар целиком и посмотреть, кем он считается в каталогах. Сам лист радара
+/// открывает владелец меню (`radarArtistSheet`): меню закрывается раньше,
+/// чем лист успевает открыться.
+struct RadarArtistMenuItems: View {
 
     @Environment(ReleaseRadar.self) private var radar
 
     let name: String
-
-    @State private var isPresented = false
+    let onOpen: () -> Void
 
     var body: some View {
-        Menu {
-            Toggle(isOn: mutedBinding(radar, name)) {
-                Label("Mute releases", systemImage: "bell.slash")
-            }
-
-            Button {
-                isPresented = true
-            } label: {
-                // Второй текст в пункте меню — его подпись мелким шрифтом.
-                Label("Release radar", systemImage: "dot.radiowaves.left.and.right")
-                Text(status)
-            }
-        } label: {
-            Image(systemName: "ellipsis")
+        Toggle(isOn: mutedBinding(radar, name)) {
+            Label("Mute releases", systemImage: "bell.slash")
         }
-        .accessibilityLabel("More")
-        .sheet(isPresented: $isPresented) {
-            NavigationStack {
-                RadarArtistView(name: name)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            SheetActionButton(.done) { isPresented = false }
-                        }
-                    }
-            }
+
+        Button(action: onOpen) {
+            // Второй текст в пункте меню — его подпись мелким шрифтом.
+            Label("Release radar", systemImage: "dot.radiowaves.left.and.right")
+            Text(status)
         }
     }
 
@@ -238,6 +222,23 @@ struct RadarArtistMenu: View {
         if entry.isMuted { return "Muted" }
         if entry.deezer?.isWatched == true || entry.apple?.isWatched == true { return "Watching" }
         return entry.needsReview ? "Needs a look" : "Not found"
+    }
+}
+
+extension View {
+
+    /// Лист радара одного артиста — его открывает пункт «Release radar».
+    func radarArtistSheet(name: String, isPresented: Binding<Bool>) -> some View {
+        sheet(isPresented: isPresented) {
+            NavigationStack {
+                RadarArtistView(name: name)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            SheetActionButton(.done) { isPresented.wrappedValue = false }
+                        }
+                    }
+            }
+        }
     }
 }
 

@@ -4,13 +4,9 @@ import SwiftUI
 struct TrackCell: View {
     
     @Environment(AudioPlayer.self) private var audioPlayer
-    @Environment(\.modelContext) private var modelContext
-    @Environment(ToastCenter.self) private var toasts
-    
-    @State private var showEditTrack: Bool = false
-    @State private var showDeleteConfirmation: Bool = false
-    @State private var albumToShow: Album?
-    @State private var showAddToPlaylist = false
+
+    /// Что открыто из меню строки: лист, вопрос об удалении или переход.
+    @State private var action: TrackAction?
 
     enum LeadingStyle {
         case number
@@ -37,6 +33,8 @@ struct TrackCell: View {
     /// На странице альбома авторы у всех треков одни и те же, и они уже
     /// написаны в шапке. Под именем остаются только приглашённые.
     var showsOnlyGuests = false
+    /// Страница, на которой стоит строка: её меню туда не ведёт.
+    var currentPage: MusicRoute? = nil
 
     /// Строка под именем трека. Пустая — строки нет совсем.
     private var subtitle: String {
@@ -128,82 +126,7 @@ struct TrackCell: View {
             }
 
             Menu {
-                ControlGroup {
-                    Button {
-                        track.isFavourite.toggle()
-                    } label: {
-                        Label("Favourite", systemImage: track.isFavourite ? "star.fill" : "star")
-                    }
-                    ShareLink(item: AudioFileStore.url(for: track.filename)) {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                    }
-                }
-
-                Divider()
-                
-                Button {
-                    showEditTrack = true
-                } label: {
-                    Label("Edit track", systemImage: "pencil")
-                }
-                
-                Button {
-                    showAddToPlaylist = true
-                } label: {
-                    Label("Add to a Playlist", systemImage: "text.badge.plus")
-                }
-                
-                Divider()
-
-                Button {
-                    audioPlayer.enqueueNext([track])
-                    toasts.enqueuedNext(1)
-                } label: {
-                    Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                }
-                Button {
-                    audioPlayer.enqueueLast([track])
-                    toasts.enqueuedLast(1)
-                } label: {
-                    Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
-                }
-
-                Divider()
-                
-                if track.album != nil {
-                    Button {
-                        albumToShow = track.album
-                    } label: {
-                        Label("Go to Album", systemImage: "music.note.square.stack")
-                    }
-                }
-                // Песня вышла ещё и синглом — до него тоже один шаг.
-                if let single = track.single {
-                    Button {
-                        albumToShow = single
-                    } label: {
-                        Label("Go to Single", systemImage: "record.circle")
-                    }
-                }
-                
-                Divider()
-
-                if let onRemoveFromPlaylist {
-                    Button(role: .destructive) {
-                        onRemoveFromPlaylist()
-                        toasts.removed("Removed from the playlist")
-                    } label: {
-                        Label("Remove from playlist", systemImage: "minus.circle")
-                    }
-                }
-
-                // Раньше здесь было просто «Remove», и рядом с удалением из плейлиста
-                // это читалось бы одинаково — а последствия разные.
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Label("Delete from library", systemImage: "trash")
-                }
+                menuItems
             } label: {
                 Image(systemName: "ellipsis")
                     .frame(width: 44, height: 44)
@@ -216,6 +139,14 @@ struct TrackCell: View {
         // Играющая строка красится стеклом, а не отдельной плашкой: видно сразу,
         // и цвет тот же, что у обложки.
         .glassEffect(isCurrent ? .regular.tint(audioPlayer.accent.opacity(0.28)) : .regular)
+        // Превью меню той же формы, что и стекло, — без него система
+        // вырезает прямоугольник с острыми углами.
+        .contentShape(.contextMenuPreview, Capsule())
+        // Долгое нажатие на строку — то же меню, что за «…»: искать маленькую
+        // кнопку в конце строки, чтобы дойти до альбома, незачем.
+        .contextMenu {
+            menuItems
+        }
         .padding(.horizontal)
         .onTapGesture {
             let list = queue.isEmpty ? [track] : queue  // ← подумай, не перепутал ли порядок
@@ -223,35 +154,15 @@ struct TrackCell: View {
             audioPlayer.play(list, startingAt: index)
             onPlay?()
         }
-        .sheet(isPresented: $showEditTrack) {
-            EditTrackView(track: track)
-        }
-        .sheet(isPresented: $showAddToPlaylist) {
-            AddToPlaylistView(tracks: [track])
-        }
-        .navigationDestination(item: $albumToShow) { album in
-            AlbumView(album: album)
-        }
-        .confirmationDialog(
-            "Delete \"\(track.name)\"?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                let name = track.name
-                // Номера в альбоме пересчитываются до удаления: после него ссылка
-                // на трек уже невалидна, а дыру в нумерации закрыть нужно.
-                track.album?.renumberTracks(excluding: track)
+        .trackActions(track, action: $action)
+    }
 
-                audioPlayer.forget(track)
-                AudioFileStore.remove(filename: track.filename)
-                modelContext.delete(track)
-
-                toasts.removed("Deleted \(name)")
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("The file is deleted from the library and from every playlist.")
-        }
+    private var menuItems: some View {
+        TrackMenuItems(
+            track: track,
+            action: $action,
+            onRemoveFromPlaylist: onRemoveFromPlaylist,
+            currentPage: currentPage
+        )
     }
 }

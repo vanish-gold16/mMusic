@@ -13,6 +13,7 @@ struct HomeTab: View {
     var body: some View {
         NavigationStack(path: $path) {
             HomeView()
+                .musicRoutes()
         }
     }
 }

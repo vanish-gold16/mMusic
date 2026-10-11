@@ -6,12 +6,10 @@ import SwiftUI
 /// но вместо веера карт — один конверт: альбом — это одна вещь, а не подборка.
 struct AlbumCell: View {
     
-    @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) var audioPlayer
-    @Environment(ToastCenter.self) private var toasts
 
-    @State private var showDeleteConfirmation = false
-    @State private var showAddToPlaylist = false
+    /// Что открыто из меню: лист правки, выбор плейлиста, вопрос или артист.
+    @State private var action: AlbumAction?
 
     /// Уменьшенная обложка — декодируется в `.task`, а не в `body`: полноразмерная
     /// весит мегабайты, а `body` пересчитывается на каждой смене трека.
@@ -27,11 +25,6 @@ struct AlbumCell: View {
     var guestTracks: [Track] = []
     /// Мелкая ячейка для сетки в три колонки — синглы на странице артиста.
     var isCompact = false
-
-    /// У сингла сюда входит и его песня, живущая в альбоме: см. `Album.tracklist`.
-    private var sortedTracks: [Track] {
-        album.tracklist
-    }
 
     /// Паспорт одной строкой: «LP  ·  2024», у двойного — «2×LP  ·  2024».
     /// Год — если дата выхода известна.
@@ -71,76 +64,13 @@ struct AlbumCell: View {
             label
         }
         .contextMenu {
-            VStack {
-                Button {
-                    album.isFavourite.toggle()
-                } label: {
-                    Label("Favorite", systemImage: album.isFavourite ? "star.fill" : "star")
-                }
-                
-                Divider()
-                
-                Button {
-                    audioPlayer.play(sortedTracks)
-                } label: {
-                    Label("Play", systemImage: "play")
-                }
-                Button {
-                    audioPlayer.playShuffled(sortedTracks)
-                } label: {
-                    Label("Shuffle", systemImage: "shuffle")
-                }
-                
-                Divider()
-                
-                Button {
-                    showAddToPlaylist = true
-                } label: {
-                    Label("Add to playlist", systemImage: "text.badge.plus")
-                }
-                
-                Divider()
-                
-                Button {
-                    audioPlayer.enqueueNext(sortedTracks)
-                    toasts.enqueuedNext(sortedTracks.count)
-                } label: {
-                    Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                }
-                
-                Button {
-                    audioPlayer.enqueueLast(sortedTracks)
-                    toasts.enqueuedLast(sortedTracks.count)
-                } label: {
-                    Label("Play After", systemImage: "text.line.last.and.arrowtriangle.forward")
-                }
-                
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Label("Delete album", systemImage: "trash")
-                }
-            }
+            AlbumMenuItems(album: album, action: $action)
         }
         .buttonStyle(.plain)
         .task(id: album.artwork?.count) {
             await loadCover()
         }
-        .sheet(isPresented: $showAddToPlaylist) {
-            AddToPlaylistView(tracks: sortedTracks)
-        }
-        .confirmationDialog(
-            "Delete \"\(album.name)\"?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                deleteAlbum()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This album and all its tracks will be permanently deleted.")
-        }
+        .albumActions(album, action: $action)
     }
     
     private var label: some View {
@@ -219,19 +149,4 @@ struct AlbumCell: View {
         guard !Task.isCancelled else { return }
         cover = image
     }
-
-    private func deleteAlbum() {
-        // Каскад в SwiftData уберёт строки треков, но не mp3 — их мы копировали руками.
-        // Песни, вышедшие ещё и синглом, не уходят: они возвращаются на свои синглы.
-        // А песни с альбома, которые показывал этот сингл, остаются в альбоме.
-        for track in album.sendSinglesHome() {
-            audioPlayer.forget(track)
-            AudioFileStore.remove(filename: track.filename)
-        }
-
-        let name = album.name
-        modelContext.delete(album)
-        toasts.removed("Deleted \(name)")
-    }
-    
 }

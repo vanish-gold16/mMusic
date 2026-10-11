@@ -7,13 +7,10 @@ import SwiftUI
 /// пляшут полоски, как у играющей пластинки в стопке на главной.
 struct ArtistsTabArtistCell: View {
 
-    @Environment(\.modelContext) private var modelContext
     @Environment(AudioPlayer.self) private var audioPlayer
-    @Environment(ToastCenter.self) private var toasts
 
-    @State private var showDeleteConfirmation = false
-    @State private var showRename = false
-    @State private var newName = ""
+    /// Что открыто из меню: переименование, фотография, радар или вопрос.
+    @State private var action: ArtistAction?
 
     /// Уменьшенная фотография и цвет бумажного яблока. Считаются в `.task`,
     /// а не в `body`: фотография и обложка весят мегабайты.
@@ -65,74 +62,12 @@ struct ArtistsTabArtistCell: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            menu(tracks: discography.tracks)
+            ArtistMenuItems(artist: artist, tracks: discography.tracks, action: $action)
         }
         .task(id: [artist.artwork?.count, discography.newestCover?.count]) {
             await loadLabel(cover: discography.newestCover)
         }
-        .alert("Rename artist", isPresented: $showRename) {
-            TextField("Name", text: $newName)
-            Button("Cancel", role: .cancel) { }
-            Button("Save") { rename() }
-        }
-        .confirmationDialog(
-            "Remove \"\(artist.name)\"?",
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Remove", role: .destructive) {
-                modelContext.delete(artist)
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This artist will be permanently deleted.")
-        }
-    }
-
-    @ViewBuilder
-    private func menu(tracks: [Track]) -> some View {
-        if !tracks.isEmpty {
-            Button {
-                audioPlayer.play(tracks)
-            } label: {
-                Label("Play", systemImage: "play")
-            }
-            Button {
-                audioPlayer.playShuffled(tracks)
-            } label: {
-                Label("Shuffle", systemImage: "shuffle")
-            }
-
-            Divider()
-
-            Button {
-                audioPlayer.enqueueNext(tracks)
-                toasts.enqueuedNext(tracks.count)
-            } label: {
-                Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
-            }
-            Button {
-                audioPlayer.enqueueLast(tracks)
-                toasts.enqueuedLast(tracks.count)
-            } label: {
-                Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
-            }
-
-            Divider()
-        }
-
-        Button {
-            newName = artist.name
-            showRename = true
-        } label: {
-            Label("Rename", systemImage: "pencil")
-        }
-
-        Button(role: .destructive) {
-            showDeleteConfirmation = true
-        } label: {
-            Label("Remove", systemImage: "trash")
-        }
+        .artistActions(artist, tracks: discography.tracks, action: $action)
     }
 
     /// Яблоко здесь около 30 pt — 90 px на экране @3x. Без фотографии
@@ -151,26 +86,6 @@ struct ArtistsTabArtistCell: View {
 
         photo = image
         labelPaper = palette?.accent
-    }
-
-    /// Переименование с оглядкой на дубли: если артист с таким именем уже есть,
-    /// вместо второй строки с тем же именем его credits переезжают к существующему.
-    private func rename() {
-        let trimmed = newName.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, trimmed != artist.name else { return }
-
-        let descriptor = FetchDescriptor<Artist>(predicate: #Predicate { $0.name == trimmed })
-        if let existing = try? modelContext.fetch(descriptor).first,
-           existing.persistentModelID != artist.persistentModelID {
-            // Копия массива: переназначение credit.artist меняет artist.credits по ходу перебора.
-            for credit in Array(artist.credits) {
-                credit.artist = existing
-            }
-            modelContext.delete(artist)
-            return
-        }
-
-        artist.name = trimmed
     }
 }
 

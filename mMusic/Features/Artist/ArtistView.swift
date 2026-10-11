@@ -14,8 +14,12 @@ struct ArtistView: View {
     @Environment(\.modelContext) private var modelContext
     /// Открыты изнутри плеера — значит, и фон продолжаем его.
     @Environment(\.isInsidePlayer) private var isInsidePlayer
+    @Environment(\.dismiss) private var dismiss
 
     @Bindable var artist: Artist
+
+    /// Что открыто из меню «…»: переименование, фотография, радар или вопрос.
+    @State private var action: ArtistAction?
 
     @State private var sortOption: SortOption = .mostPlayed
     /// Время с артистом — снимок, а не живой запрос: пока трек играет, история
@@ -156,9 +160,15 @@ struct ArtistView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                RadarArtistMenu(name: artist.name)
+                Menu {
+                    ArtistMenuItems(artist: artist, tracks: tracks, action: $action, isOnItsPage: true)
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .accessibilityLabel("More")
             }
         }
+        .artistActions(artist, tracks: tracks, action: $action, onLeave: { dismiss() })
         // `containerBackground`, а не `background`: у вложенного экрана своя
         // непрозрачная подложка, и закрасить её можно только фоном контейнера —
         // зато он ложится и под панель навигации.
@@ -364,7 +374,13 @@ struct ArtistView: View {
             .padding(.bottom, 6)
 
             ForEach(tracks) { track in
-                TrackCell(track: track, queue: tracks, leadingStyle: .artwork, showPlayCount: true)
+                TrackCell(
+                    track: track,
+                    queue: tracks,
+                    leadingStyle: .artwork,
+                    showPlayCount: true,
+                    currentPage: .artist(artist)
+                )
             }
         }
     }

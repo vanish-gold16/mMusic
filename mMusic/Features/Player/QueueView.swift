@@ -9,6 +9,9 @@ import SwiftUI
 struct QueueView: View {
 
     let audioPlayer: AudioPlayer
+    /// Переход к альбому или артисту из меню строки. Своей стопки у листа
+    /// нет — экран открывает плеер.
+    let onOpen: (MusicRoute) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ToastCenter.self) private var toasts
@@ -99,7 +102,7 @@ struct QueueView: View {
         ScrollViewReader { proxy in
             List {
                 ForEach(Array(audioPlayer.queue.enumerated()), id: \.offset) { index, track in
-                    row(for: track, at: index)
+                    QueueRow(audioPlayer: audioPlayer, track: track, index: index, onOpen: onOpen)
                         .id(index)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -122,14 +125,27 @@ struct QueueView: View {
             }
         }
     }
+}
 
-    private func row(for track: Track, at index: Int) -> some View {
+/// Строка очереди. Отдельный вид ради своего меню: у каждой строки свои
+/// листы и вопрос об удалении (`trackActions`), а `@State` живёт только у вида.
+private struct QueueRow: View {
+
+    let audioPlayer: AudioPlayer
+    let track: Track
+    /// Место в очереди, а не сам трек: один и тот же трек может стоять дважды.
+    let index: Int
+    let onOpen: (MusicRoute) -> Void
+
+    @State private var action: TrackAction?
+
+    var body: some View {
         let isCurrent = index == audioPlayer.currentIndex
         // Сыгранное не прячем — к нему возвращаются, — но и внимание на себя
         // тянуть оно не должно.
         let isPlayed = index < audioPlayer.currentIndex
 
-        return HStack(spacing: 12) {
+        HStack(spacing: 12) {
             PickCover(track: track, side: 46)
                 .overlay {
                     if isCurrent {
@@ -169,13 +185,44 @@ struct QueueView: View {
         // как в списках библиотеки.
         .glassEffect(isCurrent ? .regular.tint(audioPlayer.accent.opacity(0.28)) : .identity)
         .opacity(isPlayed ? 0.45 : 1)
+        .contextMenu {
+            menu(isCurrent: isCurrent)
+        }
+        .trackActions(track, action: $action, onNavigate: onOpen)
+    }
+
+    /// Сверху — то, что делают именно в очереди: переставить трек следующим
+    /// или убрать. Ниже — обычное меню трека, без «Play next / Play after»:
+    /// здесь они ставили бы в очередь второй экземпляр того же трека.
+    @ViewBuilder
+    private func menu(isCurrent: Bool) -> some View {
+        if !isCurrent {
+            if index != audioPlayer.currentIndex + 1 {
+                Button {
+                    audioPlayer.moveInQueue(from: IndexSet(integer: index), to: audioPlayer.currentIndex + 1)
+                } label: {
+                    Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                }
+            }
+
+            // Играющий трек отсюда не убирается: музыка бы встала посреди песни.
+            // Для этого есть смахивание строки.
+            Button(role: .destructive) {
+                audioPlayer.removeFromQueue(at: IndexSet(integer: index))
+            } label: {
+                Label("Remove from queue", systemImage: "minus.circle")
+            }
+
+            Divider()
+        }
+
+        TrackMenuItems(track: track, action: $action, showsEnqueue: false)
     }
 
     private func timeString(_ time: TimeInterval) -> String {
         let total = Int(max(0, time.rounded()))
         return String(format: "%d:%02d", total / 60, total % 60)
     }
-
 }
 
 /// «12 TRACKS NEXT  ·  47 MIN LEFT». Время читается здесь, а не в самой

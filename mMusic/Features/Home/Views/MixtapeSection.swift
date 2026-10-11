@@ -6,6 +6,9 @@ import SwiftUI
 struct MixtapeSection: View {
 
     @Environment(AudioPlayer.self) private var audioPlayer
+    @Environment(ToastCenter.self) private var toasts
+
+    @State private var showAddToPlaylist = false
 
     let mix: [Track]
     let number: Int
@@ -59,12 +62,39 @@ struct MixtapeSection: View {
                 } label: {
                     Label("Shuffle", systemImage: "shuffle")
                 }
+
+                Divider()
+
+                Button {
+                    audioPlayer.enqueueNext(mix)
+                    toasts.enqueuedNext(mix.count)
+                } label: {
+                    Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                }
+                Button {
+                    audioPlayer.enqueueLast(mix)
+                    toasts.enqueuedLast(mix.count)
+                } label: {
+                    Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
+                }
+
+                Divider()
+
                 Button(action: onKeep) {
                     Label("Keep as playlist", systemImage: "text.badge.plus")
+                }
+                // Удачный микс можно не только оставить целиком, но и долить в свой плейлист.
+                Button {
+                    showAddToPlaylist = true
+                } label: {
+                    Label("Add to a Playlist", systemImage: "text.badge.plus")
                 }
                 Button(action: onReroll) {
                     Label("Record a new one", systemImage: "arrow.clockwise")
                 }
+            }
+            .sheet(isPresented: $showAddToPlaylist) {
+                AddToPlaylistView(tracks: mix)
             }
 
             HStack(spacing: 12) {
@@ -135,6 +165,9 @@ struct MixtapeSection: View {
 private struct MixtapeCassette: View {
 
     @Environment(AudioPlayer.self) private var audioPlayer
+    @Environment(ToastCenter.self) private var toasts
+
+    @State private var showAddToPlaylist = false
 
     let mix: [Track]
     let number: Int

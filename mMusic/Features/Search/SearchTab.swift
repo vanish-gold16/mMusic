@@ -6,6 +6,7 @@ struct SearchTab: View {
     var body: some View {
         NavigationStack (path: $path) {
             SearchView()
+                .musicRoutes()
         }
     }
 }

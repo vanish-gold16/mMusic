@@ -19,12 +19,12 @@ import SwiftUI
 struct AlbumView: View {
 
     @Environment(AudioPlayer.self) var audioPlayer
-    @Environment(ToastCenter.self) private var toasts
+    @Environment(\.dismiss) private var dismiss
 
     var album: Album
 
-    @State private var editingAlbum = false
-    @State private var showAddToPlaylist = false
+    /// Что открыто из меню «…»: правка, выбор плейлиста или вопрос об удалении.
+    @State private var action: AlbumAction?
 
     /// Уменьшенная обложка и её цвета. Считаются один раз в `.task`, а не в `body`:
     /// полноразмерная обложка весит мегабайты, а `body` пересчитывается на каждой
@@ -130,51 +130,15 @@ struct AlbumView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button {
-                        editingAlbum = true
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-
-                    // Треки уходят в порядке альбома: sortedTracks уже упорядочен
-                    // по position, а плейлист раздаёт позиции подряд.
-                    Button {
-                        showAddToPlaylist = true
-                    } label: {
-                        Label("Add to a Playlist", systemImage: "text.badge.plus")
-                    }
-
-                    Divider()
-
-                    Button {
-                        audioPlayer.enqueueNext(sortedTracks)
-                        toasts.enqueuedNext(sortedTracks.count)
-                    } label: {
-                        Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
-                    }
-                    Button {
-                        audioPlayer.enqueueLast(sortedTracks)
-                        toasts.enqueuedLast(sortedTracks.count)
-                    } label: {
-                        Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
-                    }
-
-                    Divider()
-
-                    ShareLink(items: sortedTracks.map { AudioFileStore.url(for: $0.filename) }) {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                    }
+                    AlbumMenuItems(album: album, action: $action, isOnItsPage: true)
                 } label: {
                     Image(systemName: "ellipsis")
                 }
             }
         }
-        .sheet(isPresented: $editingAlbum) {
-            EditAlbumView(album: album)
-        }
-        .sheet(isPresented: $showAddToPlaylist) {
-            AddToPlaylistView(tracks: sortedTracks)
-        }
+        .albumActions(album, action: $action, onLeave: { dismiss() })
+        // Открыт изнутри плеера — продолжаем его фон.
+        .insidePlayerBackground()
         .task(id: album.artwork?.count) {
             await loadCover()
         }
@@ -359,7 +323,8 @@ struct AlbumView: View {
                         // Номер — место на этой пластинке, а не `track.position`:
                         // у песни, которую сингл показывает у себя, тот номер из её альбома.
                         number: lettered ? "\(letter)\(position + 1)" : "\(position + 1)",
-                        showsOnlyGuests: true
+                        showsOnlyGuests: true,
+                        currentPage: .album(album)
                     )
                 }
             }

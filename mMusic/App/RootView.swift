@@ -146,7 +146,8 @@ struct RootView: View {
             MiniPlayerView(
                 audioPlayer: audioPlayer,
                 namespace: playerNamespace,
-                isPlayerPresented: $isPlayerPresented
+                isPlayerPresented: $isPlayerPresented,
+                onOpen: open
             )
         }
     }
@@ -173,6 +174,15 @@ struct RootView: View {
         )
 
         await BirthdayNotifications.refresh(with: upcoming, enabled: birthdayNotifications)
+    }
+
+    /// Переход из мини-плеера — в стопку той вкладки, что сейчас открыта.
+    private func open(_ route: MusicRoute) {
+        switch selected {
+        case .home: homePath.append(route)
+        case .library: libraryPath.append(route)
+        case .search: searchPath.append(route)
+        }
     }
 
     private func resetNav(for tab: Tab) {

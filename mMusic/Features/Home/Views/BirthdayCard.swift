@@ -7,6 +7,9 @@ struct BirthdayCard: View {
     let birthday: TrackBirthday
     let onPlay: () -> Void
 
+    /// Что открыто из меню по долгому нажатию.
+    @State private var action: TrackAction?
+
     private var track: Track { birthday.track }
 
     var body: some View {
@@ -42,6 +45,11 @@ struct BirthdayCard: View {
             .glassEffect()
         }
         .buttonStyle(.plain)
+        // Именинника можно не только запустить: долгое нажатие — меню трека.
+        .contextMenu {
+            TrackMenuItems(track: track, action: $action)
+        }
+        .trackActions(track, action: $action)
     }
 
     /// Обложка со свечкой в углу: без неё плашка неотличима от обычной строки трека.

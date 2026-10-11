@@ -254,17 +254,13 @@ struct WrappedView: View {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 let track = tracksByFilename[entry.key]
 
-                Button {
+                TopTrackRow(rank: index + 1, entry: entry, peak: peak, track: track) {
                     guard let track,
                           let start = available.firstIndex(where: { $0.persistentModelID == track.persistentModelID })
                     else { return }
 
                     audioPlayer.play(available, startingAt: start)
-                } label: {
-                    ChartRow(rank: index + 1, entry: entry, peak: peak, track: track)
                 }
-                .buttonStyle(.plain)
-                .disabled(track == nil)
             }
         }
         .padding(.horizontal)
@@ -312,6 +308,38 @@ struct WrappedView: View {
 
         guard !Task.isCancelled else { return }
         self.palette = palette
+    }
+}
+
+/// Строка топа треков: нажатие запускает топ с неё, долгое нажатие — меню
+/// трека, как у строки в списке. Отдельный вид ради `@State` меню.
+private struct TopTrackRow: View {
+
+    let rank: Int
+    let entry: WrappedSummary.Entry
+    let peak: TimeInterval
+    /// nil — трека уже нет в библиотеке: история его помнит, а играть нечего.
+    let track: Track?
+    let onPlay: () -> Void
+
+    @State private var action: TrackAction?
+
+    var body: some View {
+        let button = Button(action: onPlay) {
+            ChartRow(rank: rank, entry: entry, peak: peak, track: track)
+        }
+        .buttonStyle(.plain)
+        .disabled(track == nil)
+
+        if let track {
+            button
+                .contextMenu {
+                    TrackMenuItems(track: track, action: $action)
+                }
+                .trackActions(track, action: $action)
+        } else {
+            button
+        }
     }
 }
 

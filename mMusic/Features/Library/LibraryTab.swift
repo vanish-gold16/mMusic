@@ -13,6 +13,7 @@ struct LibraryTab: View {
     var body: some View {
         NavigationStack(path: $path) {
             LibraryView()
+                .musicRoutes()
         }
     }
 }

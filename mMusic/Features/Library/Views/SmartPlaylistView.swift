@@ -21,6 +21,7 @@ struct SmartPlaylistView: View {
 
     /// Имя плейлиста, в который подборку уже оставили. nil — ещё не оставляли.
     @State private var keptAs: String?
+    @State private var showAddToPlaylist = false
 
     /// Уменьшенные обложки для веера и цвета передней. Считаются в `.task`:
     /// полноразмерная обложка весит мегабайты.
@@ -70,6 +71,56 @@ struct SmartPlaylistView: View {
         .task(id: tracks.fanCovers().map(\.count)) {
             await loadCovers(tracks.fanCovers())
         }
+        .toolbar {
+            if !tracks.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        menu(tracks)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showAddToPlaylist) {
+            AddToPlaylistView(tracks: tracks)
+        }
+    }
+
+    /// То же, что у подборки в библиотеке по долгому нажатию, — запуск
+    /// здесь уже на пульте. Плюс «в плейлист»: подборку можно не только
+    /// оставить целиком, но и долить в уже существующий.
+    @ViewBuilder
+    private func menu(_ tracks: [Track]) -> some View {
+        Button {
+            showAddToPlaylist = true
+        } label: {
+            Label("Add to a Playlist", systemImage: "text.badge.plus")
+        }
+
+        Divider()
+
+        Button {
+            audioPlayer.enqueueNext(tracks)
+            toasts.enqueuedNext(tracks.count)
+        } label: {
+            Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+        }
+        Button {
+            audioPlayer.enqueueLast(tracks)
+            toasts.enqueuedLast(tracks.count)
+        } label: {
+            Label("Play after", systemImage: "text.line.last.and.arrowtriangle.forward")
+        }
+
+        Divider()
+
+        Button {
+            keep(tracks)
+        } label: {
+            Label(keptAs.map { "Kept as \($0)" } ?? "Keep as playlist", systemImage: "text.badge.plus")
+        }
+        .disabled(keptAs != nil)
     }
 
     // MARK: - Шапка
@@ -171,13 +222,17 @@ struct SmartPlaylistView: View {
             title: keptAs.map { "Kept as \($0)" } ?? "Keep as playlist",
             systemImage: keptAs == nil ? "text.badge.plus" : "checkmark"
         ) {
-            let kept = playlist.keep(tracks, in: modelContext)
-            keptAs = kept.name
-            toasts.show("Kept as \(kept.name)", systemImage: "text.badge.plus")
+            keep(tracks)
         }
         .disabled(keptAs != nil)
         .padding(.horizontal)
         .padding(.top, 4)
+    }
+
+    private func keep(_ tracks: [Track]) {
+        let kept = playlist.keep(tracks, in: modelContext)
+        keptAs = kept.name
+        toasts.show("Kept as \(kept.name)", systemImage: "text.badge.plus")
     }
 
     // MARK: - Обложки

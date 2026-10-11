@@ -233,12 +233,7 @@ struct SearchView: View {
             shelf("PLAYLISTS", count: results.playlists.count) {
                 VStack(spacing: 10) {
                     ForEach(results.playlists) { playlist in
-                        NavigationLink {
-                            PlaylistView(playlist: playlist)
-                        } label: {
-                            PlaylistCell(playlist: playlist)
-                        }
-                        .buttonStyle(.plain)
+                        PlaylistLink(playlist: playlist)
                     }
                 }
                 .padding(.horizontal)

@@ -34,11 +34,15 @@ struct PlayerView: View {
 
     @State private var artworkWidth: CGFloat = 0
 
+    /// Стопка внутри плеера: альбом и артисты открываются здесь же, поверх
+    /// деки, и закрытие плеера уносит их вместе с ним.
+    @State private var path = NavigationPath()
+
     private var accent: Color { audioPlayer.accent }
 
     var body: some View {
-        // Стек нужен ради перехода на артиста.
-        NavigationStack {
+        // Стек нужен ради перехода на альбом и артиста.
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 grabber
                 content
@@ -49,6 +53,7 @@ struct PlayerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background { PlayerBackground(audioPlayer: audioPlayer).ignoresSafeArea() }
             .toolbar(.hidden, for: .navigationBar)
+            .musicRoutes()
         }
         // Экраны, открытые отсюда вглубь, продолжают фон плеера, а не встают
         // чёрным прямоугольником. Флаг доезжает и до них: environment проходит
@@ -59,7 +64,12 @@ struct PlayerView: View {
         // листа — там своя иерархия, и обложке не с чем сопоставляться.
         .gesture(dismissGesture)
         .sheet(isPresented: $isQueuePresented) {
-            QueueView(audioPlayer: audioPlayer)
+            // Из очереди тоже можно дойти до альбома и артиста — лист
+            // уступает место, а экран открывается в стопке плеера.
+            QueueView(audioPlayer: audioPlayer) { route in
+                isQueuePresented = false
+                path.append(route)
+            }
         }
         .sheet(isPresented: $isAddingToPlaylist) {
             if let track = audioPlayer.currentTrack {
@@ -82,6 +92,14 @@ struct PlayerView: View {
         // Ставится последним, поэтому накрывает и контент, и фон шторки: на светлой
         // обложке вуаль становится светлой, а `.primary` / `.secondary` — тёмными.
         .environment(\.colorScheme, isLightBackground ? .light : .dark)
+        .onChange(of: audioPlayer.currentTrack == nil) { _, isEmpty in
+            // Всё, что играло, удалили — из меню альбома или трека прямо
+            // отсюда. Показывать в плеере больше нечего.
+            guard isEmpty else { return }
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                isPresented = false
+            }
+        }
         .task(id: audioPlayer.currentTrack?.filename) {
             // Фоновый проход идёт по всей библиотеке подряд; тот трек, что открыт
             // прямо сейчас, ждать своей очереди не должен — по его волне лента
@@ -272,12 +290,7 @@ struct PlayerView: View {
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: showsLyrics ? 4 : 6) {
             if !showsLyrics, let passport {
-                Text(passport)
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .tracking(1.2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                passportLink(passport)
             }
 
             HStack(alignment: .center, spacing: 8) {
@@ -319,6 +332,30 @@ struct PlayerView: View {
         }
 
         return parts.joined(separator: "  ·  ").uppercased()
+    }
+
+    /// Паспорт ведёт на пластинку, где лежит трек, — как имя трека
+    /// на главной. Стрелка говорит, что строка нажимается.
+    private func passportLink(_ passport: String) -> some View {
+        Button {
+            if let album = audioPlayer.currentTrack?.album {
+                path.append(MusicRoute.album(album))
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(passport)
+                    .lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .tracking(1.2)
+            .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the album")
     }
 
     private var favouriteButton: some View {
@@ -421,6 +458,28 @@ struct PlayerView: View {
                     isEditingLyrics = true
                 } label: {
                     Label(track.hasLyrics ? "Edit text" : "Add text", systemImage: "quote.bubble")
+                }
+
+                Divider()
+
+                // Куда ведёт трек — как в меню строки списка. Экраны
+                // открываются здесь же, в стопке плеера.
+                if let album = track.album {
+                    Button {
+                        path.append(MusicRoute.album(album))
+                    } label: {
+                        Label("Go to Album", systemImage: "music.note.square.stack")
+                    }
+                }
+                if let single = track.single {
+                    Button {
+                        path.append(MusicRoute.album(single))
+                    } label: {
+                        Label("Go to Single", systemImage: "record.circle")
+                    }
+                }
+                GoToArtistItems(artists: track.artists) { artist in
+                    path.append(MusicRoute.artist(artist))
                 }
 
                 Divider()

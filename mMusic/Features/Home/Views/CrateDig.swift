@@ -14,6 +14,8 @@ struct CrateDig: View {
     let onDigAgain: () -> Void
 
     @State private var cover: UIImage?
+    /// Что открыто из меню по долгому нажатию на конверт.
+    @State private var action: AlbumAction?
 
     private var sortedTracks: [Track] {
         album.tracklist
@@ -48,6 +50,9 @@ struct CrateDig: View {
                 .frame(width: 168)
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                AlbumMenuItems(album: album, action: $action)
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(album.name)
@@ -93,6 +98,7 @@ struct CrateDig: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal)
+        .albumActions(album, action: $action)
         .task(id: album.persistentModelID) {
             await loadCover()
         }

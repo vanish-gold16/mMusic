@@ -9,11 +9,15 @@ import SwiftUI
 /// Справа клавиши; у «пуска» лампа, как на деке: горит — играет.
 ///
 /// Нажатие на конверт или имя открывает плеер: обложка вырастает в его обложку.
+/// Долгое нажатие — меню трека.
 struct MiniPlayerView: View {
     let audioPlayer: AudioPlayer
     let namespace: Namespace.ID
 
     @Binding var isPlayerPresented: Bool
+    /// «Go to Album» и «Go to Artist» из меню: экран открывается в стопке
+    /// открытой вкладки — своей стопки у мини-плеера нет.
+    let onOpen: (MusicRoute) -> Void
 
     /// Свёрнутые вкладки оставляют мини-плееру узкую полоску — тогда только
     /// конверт, имя и «пуск».
@@ -22,6 +26,8 @@ struct MiniPlayerView: View {
     /// Уменьшенная обложка — декодируется в `.task`, а не в `body`:
     /// полноразмерная весит мегабайты.
     @State private var cover: UIImage?
+    /// Что открыто из меню по долгому нажатию.
+    @State private var action: TrackAction?
 
     private var isInline: Bool { placement == .inline }
 
@@ -48,6 +54,12 @@ struct MiniPlayerView: View {
             .padding(.leading, 10)
             .padding(.trailing, 14)
             .frame(maxHeight: .infinity)
+            // Долгое нажатие — меню играющего трека, не открывая плеер:
+            // добавить в плейлист или дойти до альбома.
+            .contextMenu {
+                TrackMenuItems(track: track, action: $action, showsEnqueue: false)
+            }
+            .trackActions(track, action: $action, onNavigate: onOpen)
             .task(id: track.displayArtwork?.count) {
                 await loadCover(track.displayArtwork)
             }

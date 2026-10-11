@@ -13,6 +13,8 @@ struct NowSpinning: View {
     let track: Track
 
     @State private var cover: UIImage?
+    /// Что открыто из меню по долгому нажатию на имя.
+    @State private var action: TrackAction?
 
     /// Пластинка, на которой лежит трек. У трека без альбома она из него одного.
     private var discTracks: [Track] {
@@ -63,14 +65,23 @@ struct NowSpinning: View {
                 .monospacedDigit()
         }
         .padding(.horizontal)
+        .trackActions(track, action: $action)
         .task(id: track.id) {
             await loadCover()
         }
     }
 
     /// Имя трека ведёт на страницу его альбома — там вся пластинка целиком.
-    @ViewBuilder
+    /// Долгое нажатие — меню трека, как у строки в списке.
     private var titleBlock: some View {
+        titleLink
+            .contextMenu {
+                TrackMenuItems(track: track, action: $action, showsEnqueue: false)
+            }
+    }
+
+    @ViewBuilder
+    private var titleLink: some View {
         let label = VStack(alignment: .leading, spacing: 2) {
             Text(track.name)
                 .font(.system(size: 30, weight: .heavy).width(.compressed))

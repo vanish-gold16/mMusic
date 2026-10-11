@@ -78,3 +78,31 @@ extension EnvironmentValues {
     /// объявлять отдельный тип с `defaultValue`.
     @Entry var isInsidePlayer: Bool = false
 }
+
+extension View {
+
+    /// Экран, открытый изнутри плеера, продолжает его фон, а не встаёт
+    /// непрозрачным прямоугольником. В библиотеке и поиске фон не трогается.
+    func insidePlayerBackground() -> some View {
+        modifier(InsidePlayerBackground())
+    }
+}
+
+private struct InsidePlayerBackground: ViewModifier {
+
+    @Environment(\.isInsidePlayer) private var isInsidePlayer
+    @Environment(AudioPlayer.self) private var audioPlayer
+
+    func body(content: Content) -> some View {
+        // `containerBackground`, а не `background`: у вложенного экрана своя
+        // непрозрачная подложка, и закрасить её можно только фоном контейнера.
+        if isInsidePlayer {
+            content
+                .containerBackground(for: .navigation) {
+                    PlayerBackground(audioPlayer: audioPlayer)
+                }
+        } else {
+            content
+        }
+    }
+}

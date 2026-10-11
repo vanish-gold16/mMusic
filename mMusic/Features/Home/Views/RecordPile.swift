@@ -38,10 +38,8 @@ private struct RecordSpine: View {
 
     @State private var cover: UIImage?
     @State private var palette: CoverPalette?
-
-    private var sortedTracks: [Track] {
-        album.tracklist
-    }
+    /// Что открыто из меню по долгому нажатию.
+    @State private var action: AlbumAction?
 
     /// Небольшой разброс, свой у каждого альбома и одинаковый от запуска
     /// к запуску: `hashValue` в Swift меняется при каждом запуске, и стопка
@@ -71,18 +69,12 @@ private struct RecordSpine: View {
         .padding(.trailing, 28)
         .offset(x: isCurrent ? 28 : jitter.shift)
         .animation(.spring(duration: 0.5, bounce: 0.2), value: isCurrent)
+        // То же меню, что у конверта в библиотеке: со стопки на главной
+        // альбом можно не только запустить, но и поправить или удалить.
         .contextMenu {
-            Button {
-                audioPlayer.play(sortedTracks)
-            } label: {
-                Label("Play", systemImage: "play")
-            }
-            Button {
-                audioPlayer.playShuffled(sortedTracks)
-            } label: {
-                Label("Shuffle", systemImage: "shuffle")
-            }
+            AlbumMenuItems(album: album, action: $action)
         }
+        .albumActions(album, action: $action)
         .task(id: album.artwork?.count) {
             await loadCover()
         }
