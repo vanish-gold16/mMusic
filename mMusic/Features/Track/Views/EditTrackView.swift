@@ -214,7 +214,8 @@ struct EditTrackView: View {
                 showLyricsEditor = true
             } label: {
                 HStack(alignment: .top, spacing: 12) {
-                    Text(lyrics.split(separator: "\n").prefix(3).joined(separator: "\n"))
+                    // Таймкоды LRC в превью не нужны — по ним не узнать песню.
+                    Text(Lyrics.plain(lyrics).split(separator: "\n").prefix(3).joined(separator: "\n"))
                         .font(.subheadline)
                         .foregroundStyle(Color.secondary)
                         .lineLimit(3)

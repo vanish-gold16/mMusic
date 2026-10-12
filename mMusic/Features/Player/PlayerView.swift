@@ -173,10 +173,7 @@ struct PlayerView: View {
             .padding(.horizontal, 24)
 
             if showsLyrics {
-                LyricsPanel(
-                    text: audioPlayer.currentTrack?.lyrics ?? "",
-                    accent: accent
-                ) {
+                LyricsPanel(audioPlayer: audioPlayer) {
                     isEditingLyrics = true
                 }
                 .padding(.horizontal, 24)
