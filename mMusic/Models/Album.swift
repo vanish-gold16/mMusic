@@ -21,16 +21,10 @@ class Album {
     var artistNames: [String] {
         artists.map(\.name)
     }
+    /// Жанры треков, самый частый первым. Тот же порядок показывает
+    /// «Mixed» в форме альбома — см. `AlbumGenre`.
     var genres: [Genre] {
-        let counts = tracklist.reduce(into: [Genre: Int]()) { counts, track in
-            counts[track.genre, default: 0] += 1
-        }
-        return counts.keys.sorted {
-            if counts[$0]! != counts[$1]! {
-                return counts[$0]! > counts[$1]!
-            }
-            return $0.rawValue < $1.rawValue
-        }
+        Genre.byFrequency(tracklist.map(\.genre))
     }
     var release: Date?
     var isFavourite: Bool = false
@@ -283,5 +277,69 @@ extension Track {
         guard let single else { return false }
         single.append([self])
         return true
+    }
+}
+
+// MARK: - Жанр альбома
+
+/// Жанр альбома в форме альбома. Своего жанра у альбома в базе нет и не
+/// нужно: жанр есть у каждого трека, а «жанр альбома» — это сводка по ним.
+/// Поэтому ему нечем разойтись с треками: поменяли один трек — сводка честно
+/// стала «разными жанрами», вернули — снова один.
+///
+/// Поставить жанр альбому значит поставить его всем трекам разом — см.
+/// `Album.setGenre(_:)` и `[TrackDraft].setGenre(_:)`. После этого каждый трек
+/// по-прежнему правится сам по себе.
+struct AlbumGenre: Equatable {
+
+    /// Жанры треков, самый частый первым, — как на странице альбома.
+    let genres: [Genre]
+    /// Сколько треков посчитано.
+    let trackCount: Int
+
+    init(_ trackGenres: [Genre]) {
+        genres = Genre.byFrequency(trackGenres)
+        trackCount = trackGenres.count
+    }
+
+    /// Один жанр на все треки. nil — жанры разные или треков ещё нет.
+    var common: Genre? {
+        genres.count == 1 ? genres[0] : nil
+    }
+
+    /// У треков разные жанры: в форме вместо жанра — «Mixed».
+    var isMixed: Bool {
+        genres.count > 1
+    }
+
+    /// Жанр трека, который приходит в альбом файлом. В файле жанра мы не
+    /// читаем, и раньше такой трек всегда становился «Pop» — даже в альбоме,
+    /// где все треки рок, и форма тут же показывала бы «Mixed». Теперь он берёт
+    /// жанр альбома, когда тот один на всех; иначе остаётся прежний «Pop».
+    var forNewTrack: Genre {
+        common ?? .pop
+    }
+}
+
+extension Album {
+
+    /// Жанр альбома для формы — по его собственным трекам. Песни сингла,
+    /// живущие в другом альбоме (`linkedTracks`), сюда не входят: в форме
+    /// их не правят, их место и жанр — в их альбоме.
+    var tracksGenre: AlbumGenre {
+        AlbumGenre(tracks.map(\.genre))
+    }
+
+    /// Ставит жанр всем собственным трекам альбома. Трек, у которого жанр уже
+    /// такой, не трогаем: каждая запись в базу будит все `@Query` приложения.
+    /// Возвращает, сколько треков поменялось.
+    @discardableResult
+    func setGenre(_ genre: Genre) -> Int {
+        var changed = 0
+        for track in tracks where track.genre != genre {
+            track.genre = genre
+            changed += 1
+        }
+        return changed
     }
 }

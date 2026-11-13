@@ -85,3 +85,21 @@ enum Genre: String, CaseIterable, Codable {
 
     case other = "Other"
 }
+
+extension Genre {
+
+    /// Жанры по частоте: самый частый первым, при равенстве — по алфавиту,
+    /// чтобы порядок не прыгал от раза к разу. Каждый жанр — один раз.
+    /// Так их показывает страница альбома и «Mixed» в форме альбома.
+    static func byFrequency(_ genres: [Genre]) -> [Genre] {
+        let counts = genres.reduce(into: [Genre: Int]()) { counts, genre in
+            counts[genre, default: 0] += 1
+        }
+        return counts.keys.sorted {
+            if counts[$0]! != counts[$1]! {
+                return counts[$0]! > counts[$1]!
+            }
+            return $0.rawValue < $1.rawValue
+        }
+    }
+}

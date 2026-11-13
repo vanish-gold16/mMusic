@@ -111,20 +111,121 @@ struct GenreMenu: View {
                 }
             }
         } label: {
-            HStack(spacing: 10) {
-                Text(genre.rawValue)
-                    .font(.system(size: 26, weight: .heavy).width(.compressed))
-                    .foregroundStyle(Color.primary)
-
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 20)
-            .frame(height: 50)
-            .glassEffect()
+            GenreCapsule(title: genre.rawValue)
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Жанр альбома — та же капсула, что у трека, только выбор в ней ставит жанр
+/// сразу всем трекам. Своего жанра у альбома нет (см. `AlbumGenre`): капсула
+/// показывает жанр треков, а когда он у них разный — приглушённое «Mixed»,
+/// и в меню тогда ничего не отмечено.
+///
+/// Разные жанры — чья-то ручная работа, и одним нажатием её потом не вернуть,
+/// поэтому поверх них жанр ставится только после вопроса. Один жанр на всех
+/// меняется сразу: вернуть прежний можно тем же меню.
+struct AlbumGenreMenu: View {
+
+    let genre: AlbumGenre
+    /// Поставить жанр всем трекам. Как именно — решает форма: правка альбома
+    /// пишет в базу сразу, сборка нового — в черновики.
+    let onSet: (Genre) -> Void
+
+    /// Жанр, выбранный поверх разных, — ждёт ответа на вопрос.
+    @State private var pending: Genre?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Menu {
+                Picker("Genre", selection: selection) {
+                    // Метки — опциональные, как и выбор: при разных жанрах
+                    // выбор nil, и галочки нет ни у одного пункта.
+                    ForEach(Genre.allCases, id: \.self) { genre in
+                        Text(genre.rawValue).tag(Optional(genre))
+                    }
+                }
+            } label: {
+                GenreCapsule(title: genre.common?.rawValue ?? "Mixed", isMixed: genre.isMixed)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Genre of all tracks")
+            .accessibilityValue(genre.common?.rawValue ?? "Mixed: \(genreList)")
+
+            if let hint {
+                RecordHint(hint)
+            }
+        }
+        .confirmationDialog(
+            "Set all \(genre.trackCount) tracks to \(pending?.rawValue ?? "")?",
+            isPresented: Binding(
+                get: { pending != nil },
+                set: { if !$0 { pending = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pending
+        ) { chosen in
+            Button("Set to \(chosen.rawValue)") {
+                onSet(chosen)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("Now they are \(genre.genres.map(\.rawValue).joined(separator: ", ")). Any track can still be changed on its own afterwards.")
+        }
+    }
+
+    /// Выбор в меню. Тот же жанр, что уже у всех, ничего не пишет; жанр поверх
+    /// разных сначала спрашивает.
+    private var selection: Binding<Genre?> {
+        Binding(
+            get: { genre.common },
+            set: { chosen in
+                guard let chosen, chosen != genre.common else { return }
+
+                if genre.isMixed {
+                    pending = chosen
+                } else {
+                    onSet(chosen)
+                }
+            }
+        )
+    }
+
+    private var genreList: String {
+        genre.genres.map(\.rawValue).joined(separator: " · ")
+    }
+
+    /// Что сделает выбор. У единственного трека пояснять нечего: жанр альбома
+    /// и есть его жанр.
+    private var hint: String? {
+        if genre.isMixed {
+            return "Now \(genreList) — pick one for all \(genre.trackCount) tracks"
+        }
+        guard genre.trackCount > 1 else { return nil }
+        return "Sets all \(genre.trackCount) tracks at once — any one can still be changed later"
+    }
+}
+
+/// Капсула жанра: крупное сжатое слово и стрелки меню. «Mixed» в ней тише
+/// настоящего жанра — это не жанр, а то, что жанра одного нет.
+private struct GenreCapsule: View {
+
+    let title: String
+    var isMixed = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 26, weight: .heavy).width(.compressed))
+                .foregroundStyle(isMixed ? Color.secondary : Color.primary)
+
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 20)
+        .frame(height: 50)
+        .glassEffect()
     }
 }
 

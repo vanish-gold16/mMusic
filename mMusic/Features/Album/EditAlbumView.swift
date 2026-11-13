@@ -55,6 +55,19 @@ struct EditAlbumView: View {
                 .padding(.top, 16)
                 .bareRow()
 
+                // Жанр альбома — сводка по его трекам, поэтому у пустого альбома
+                // его нет. Выбор пишется в треки сразу, как и всё в этой форме.
+                if !album.tracks.isEmpty {
+                    RecordFormSection("Genre") {
+                        AlbumGenreMenu(genre: album.tracksGenre) { genre in
+                            album.setGenre(genre)
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.top, 16)
+                    .bareRow()
+                }
+
                 // Раздел показывается и у пустого альбома: раньше кнопка «Add Music»
                 // пряталась вместе со списком, и положить в него первый трек
                 // из библиотеки было нечем.
@@ -347,6 +360,9 @@ struct EditAlbumView: View {
         switch result {
         case .success(let urls):
             var imported: [Track] = []
+            // Жанра из файла мы не читаем — новые треки берут жанр альбома,
+            // если он один на всех. См. `AlbumGenre.forNewTrack`.
+            let genre = album.tracksGenre.forNewTrack
 
             for url in urls {
                 let filename: String
@@ -357,7 +373,7 @@ struct EditAlbumView: View {
                     continue
                 }
 
-                let track = Track(name: url.parseMusic().name, credits: [], genre: .pop, filename: filename)
+                let track = Track(name: url.parseMusic().name, credits: [], genre: genre, filename: filename)
 
                 modelContext.insert(track)
                 // Альбом ставит `append`: он же выдаёт номер и пластинку.
@@ -406,7 +422,7 @@ struct EditAlbumView: View {
         let track = Track(
             name: metadata.title ?? file.url.parseMusic().name,
             credits: [],
-            genre: .pop,
+            genre: album.tracksGenre.forNewTrack,
             filename: filename,
             artwork: metadata.artwork
         )

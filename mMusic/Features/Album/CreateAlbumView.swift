@@ -72,6 +72,19 @@ struct CreateAlbumView: View {
                 .padding(.top, 16)
                 .bareRow()
 
+                // Жанр альбома — сводка по трекам, поэтому появляется вместе
+                // с первыми треками. Выбор ложится в черновики, в базу — при «Create album».
+                if !trackDrafts.isEmpty {
+                    RecordFormSection("Genre") {
+                        AlbumGenreMenu(genre: trackDrafts.tracksGenre) { genre in
+                            trackDrafts.setGenre(genre)
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.top, 16)
+                    .bareRow()
+                }
+
                 RecordFormSection("Tracks", detail: tracksDetail) {
                     if !trackDrafts.isEmpty || discCount > 1 {
                         EditButton()
@@ -460,15 +473,18 @@ struct CreateAlbumView: View {
             let parsedNames = metadata.artistNames.isEmpty ? url.parsedArtistNames() : metadata.artistNames
             let names = parsedNames.filter { !isAlbumArtist($0) }
             let title = metadata.title ?? url.parseMusic().name
+            let single = existingSingle(titled: title, by: parsedNames)
+            let duration = await TrackDurationLoader.duration(of: stagedURL) ?? 0
 
             trackDrafts.append(
                 TrackDraft(
                     name: title,
+                    genre: genreOfNewDraft(matching: single),
                     artists: names.map { ArtistDraft(name: $0, role: .featured) },
                     stagedURL: stagedURL,
                     originalURL: url,
-                    existingTrack: existingSingle(titled: title, by: parsedNames),
-                    duration: await TrackDurationLoader.duration(of: stagedURL) ?? 0
+                    existingTrack: single,
+                    duration: duration
                 )
             )
 
@@ -482,12 +498,14 @@ struct CreateAlbumView: View {
     private func addDraft(from file: PickedFile, metadata: AudioMetadata) {
         let names = metadata.artistNames.filter { !isAlbumArtist($0) }
         let title = metadata.title ?? file.url.parseMusic().name
+        let single = existingSingle(titled: title, by: metadata.artistNames)
 
         let draft = TrackDraft(
             name: title,
+            genre: genreOfNewDraft(matching: single),
             artists: names.map { ArtistDraft(name: $0, role: .featured) },
             stagedURL: file.url,
-            existingTrack: existingSingle(titled: title, by: metadata.artistNames)
+            existingTrack: single
         )
         trackDrafts.append(draft)
 
@@ -531,6 +549,18 @@ struct CreateAlbumView: View {
                 == URL.temporaryDirectory.standardizedFileURL.path else { return }
 
         try? FileManager.default.removeItem(at: folder)
+    }
+
+    /// Жанр черновика, пришедшего файлом. Жанр черновика — это жанр, с которым
+    /// трек ляжет в альбом, поэтому узнанный сингл начинает со своего жанра:
+    /// в альбом переедет он сам. Поменять его жанр может только жанр альбома —
+    /// остальные поля такого черновика закрыты. Новый файл берёт жанр альбома,
+    /// если тот один на все треки, — см. `AlbumGenre.forNewTrack`.
+    private func genreOfNewDraft(matching single: PersistentIdentifier?) -> Genre {
+        if let single, let track = modelContext.model(for: single) as? Track {
+            return track.genre
+        }
+        return trackDrafts.tracksGenre.forNewTrack
     }
 
     private func isAlbumArtist(_ name: String) -> Bool {
@@ -581,13 +611,17 @@ struct CreateAlbumView: View {
                 track.position = index
                 track.disc = disc
 
-                // Имя, жанр и авторов выбранного в библиотеке трека правят прямо
+                // Жанр черновика — жанр трека в альбоме, и у узнанного сингла тоже:
+                // его черновик начинает с жанра самого сингла (`genreOfNewDraft`),
+                // и отличаться он может, только если жанр поставили всему альбому.
+                if draft.genre != track.genre { track.genre = draft.genre }
+
+                // Имя и авторов выбранного в библиотеке трека правят прямо
                 // в форме альбома — раньше правка тихо терялась. У узнанного сингла
-                // поля закрыты: в черновике там всё из файла, а не его.
+                // эти поля закрыты: в черновике там всё из файла, а не его.
                 if draft.sourceTrack != nil {
                     let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
                     if !name.isEmpty, name != track.name { track.name = name }
-                    if draft.genre != track.genre { track.genre = draft.genre }
 
                     // Авторы — как в редакторе черновика: что там видно, то и будет.
                     // Начинался он с авторов трека (`Track.artistDrafts`), поэтому

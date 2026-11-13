@@ -23,3 +23,20 @@ struct TrackDraft: Identifiable {
     /// берут из самого трека.
     var duration: TimeInterval = 0
 }
+
+extension [TrackDraft] {
+
+    /// Жанр будущего альбома в форме сборки — по жанрам черновиков. Жанр
+    /// черновика — это жанр, с которым трек ляжет в альбом (см. `CreateAlbumView.save`).
+    var tracksGenre: AlbumGenre {
+        AlbumGenre(map(\.genre))
+    }
+
+    /// Ставит жанр всем черновикам. В базу пока ничего не пишется — только
+    /// при «Create album».
+    mutating func setGenre(_ genre: Genre) {
+        for index in indices where self[index].genre != genre {
+            self[index].genre = genre
+        }
+    }
+}
