@@ -24,7 +24,7 @@ struct LyricsPanel: View {
     var body: some View {
         Group {
             if let lines = Lyrics.synced(text) {
-                SyncedLyricsView(lines: lines, audioPlayer: audioPlayer, accent: accent)
+                SyncedLyricsView(lines: Lyrics.withIntro(lines), audioPlayer: audioPlayer, accent: accent)
                     // У каждого трека своя подсвеченная строка и своя прокрутка:
                     // новый трек начинает панель заново, а не с места прошлого.
                     .id(track?.filename)
@@ -140,9 +140,15 @@ private struct SyncedLyricsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(lines.indices, id: \.self) { index in
-                        row(index) {
+                        LyricRow(
+                            lines: lines,
+                            index: index,
+                            phase: phase(of: index),
+                            audioPlayer: audioPlayer,
+                            accent: accent
+                        ) {
                             seek(to: index, proxy: proxy)
                         }
                         .id(index)
@@ -181,38 +187,10 @@ private struct SyncedLyricsView: View {
     /// ниже — что будет, и глазу не приходится прыгать к краю.
     private static let readingLine = UnitPoint(x: 0.5, y: 0.3)
 
-    private func row(_ index: Int, action: @escaping () -> Void) -> some View {
-        let line = lines[index]
-        let isActive = index == active
-        let isPast = active.map { index < $0 } ?? false
-
-        return Button(action: action) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                // Лампа, как на клавишах деки: горит у строки, которая звучит.
-                DeckLamp(isOn: isActive, accent: accent)
-                    .rotationEffect(.degrees(90))
-                    .frame(width: 3)
-                    .opacity(isActive ? 1 : 0)
-                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
-
-                // Проигрыш — точки, чтобы было видно, что слова ещё будут.
-                Text(line.text.isEmpty ? "•  •  •" : line.text)
-                    .font(.title2.weight(.bold))
-                    .lineSpacing(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(isActive ? Color.primary : Color.secondary)
-                    // Спетое гаснет сильнее того, что впереди: глаз ищет,
-                    // куда читать дальше, а не что уже было.
-                    .opacity(isActive ? 1 : (isPast ? 0.45 : 0.75))
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .animation(.easeOut(duration: 0.25), value: isActive)
-        .accessibilityLabel(line.text.isEmpty ? "Instrumental break" : line.text)
-        .accessibilityHint("Plays from this line")
-        .accessibilityAddTraits(isActive ? .isSelected : [])
+    private func phase(of index: Int) -> LyricRow.Phase {
+        guard let active else { return .upcoming }
+        if index == active { return .active }
+        return index < active ? .past : .upcoming
     }
 
     /// Нажатая строка — это и «играй отсюда», и «веди текст снова сам».
@@ -231,6 +209,120 @@ private struct SyncedLyricsView: View {
     }
 }
 
+/// Одна строка текста — или проигрыш, если слов в ней нет.
+///
+/// Строка со словами загорается целиком, как только зазвучала, — без
+/// бегущей по буквам заливки. Время плеера читает только идущий проигрыш:
+/// его точки отсчитывают, сколько осталось до слов. Observation следит лишь
+/// за тем, что прочитано, поэтому остальные строки на тики не отзываются.
+private struct LyricRow: View {
+
+    enum Phase {
+        case past, active, upcoming
+    }
+
+    let lines: [Lyrics.Line]
+    let index: Int
+    let phase: Phase
+    let audioPlayer: AudioPlayer
+    let accent: Color
+    let action: () -> Void
+
+    private var line: Lyrics.Line { lines[index] }
+    private var isActive: Bool { phase == .active }
+    private var isBreak: Bool { line.text.isEmpty }
+
+    /// Сколько проигрыша уже прошло. У всего остального — ноль, и время
+    /// оно не читает.
+    private var breakProgress: Double {
+        guard isActive, isBreak else { return 0 }
+        return Lyrics.progress(
+            of: index,
+            in: lines,
+            at: audioPlayer.currentTime + LyricsClock.lead,
+            trackDuration: audioPlayer.duration
+        )
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: isBreak ? .center : .firstTextBaseline, spacing: 10) {
+                // Лампа, как на клавишах деки: горит у строки, которая звучит.
+                DeckLamp(isOn: isActive, accent: accent)
+                    .rotationEffect(.degrees(90))
+                    .frame(width: 3)
+                    .opacity(isActive ? 1 : 0)
+                    // Середина лампы — на середине заглавных букв.
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 12 }
+
+                if isBreak {
+                    BreakDots(progress: breakProgress, isActive: isActive, audioPlayer: audioPlayer, accent: accent)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    words
+                }
+            }
+            // Спетое гаснет сильнее того, что впереди: глаз ищет,
+            // куда читать дальше, а не что уже было.
+            .opacity(isActive ? 1 : (phase == .past ? 0.4 : 0.7))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.25), value: isActive)
+        .accessibilityLabel(isBreak ? "Instrumental break" : line.text)
+        .accessibilityHint("Plays from this line")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+    /// Сжатый heavy — тот же голос, что у имени трека над текстом и у всех
+    /// заголовков приложения. Длинная строка в нём реже переносится.
+    private var words: some View {
+        Text(line.text)
+            .font(.largeTitle.weight(.heavy).width(.compressed))
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(isActive ? Color.primary : Color.secondary)
+    }
+}
+
+/// Проигрыш — три точки обратного отсчёта: зажигаются по одной, и когда
+/// горят все три, начинаются слова. Горящие точки дышат вместе с музыкой,
+/// как фон плеера.
+private struct BreakDots: View {
+
+    let progress: Double
+    let isActive: Bool
+    let audioPlayer: AudioPlayer
+    let accent: Color
+
+    /// Сколько точек горит. Первая — сразу: проигрыш уже идёт.
+    private var lit: Int {
+        guard isActive else { return 0 }
+        return min(Int(progress * 3) + 1, 3)
+    }
+
+    var body: some View {
+        let lit = lit
+        // Громкость читается только у идущего проигрыша: она меняется
+        // много раз в секунду, а остальным точкам дышать незачем.
+        let punch = isActive ? audioPlayer.punch : 0
+
+        HStack(spacing: 12) {
+            ForEach(0..<3, id: \.self) { dot in
+                let isLit = dot < lit
+
+                Circle()
+                    .fill(isLit ? AnyShapeStyle(accent) : AnyShapeStyle(Color.secondary))
+                    .frame(width: 10, height: 10)
+                    .scaleEffect(isLit ? 1 + punch * 0.45 : 1)
+                    .shadow(color: isLit ? accent.opacity(0.8) : .clear, radius: 5)
+            }
+        }
+        .frame(height: 36)
+        .animation(.easeOut(duration: 0.3), value: lit)
+    }
+}
+
 /// Следит за временем плеера и сообщает, какая строка звучит.
 private struct LyricsClock: View {
 
@@ -240,7 +332,7 @@ private struct LyricsClock: View {
 
     /// Время плеера обновляется раз в 0,2 секунды, и строка загоралась бы
     /// уже после первого слова. Небольшое опережение возвращает её к началу.
-    private static let lead: TimeInterval = 0.2
+    static let lead: TimeInterval = 0.2
 
     var body: some View {
         let index = Lyrics.activeIndex(in: lines, at: audioPlayer.currentTime + Self.lead)

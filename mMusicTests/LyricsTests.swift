@@ -148,3 +148,43 @@ struct SyncedLyricsTests {
         #expect(Lyrics.activeIndex(in: lines, at: 300) == 2)
     }
 }
+
+/// Тесты на то, как синхронный текст идёт за временем: вступление и отсчёт проигрыша.
+struct LyricsTimingTests {
+
+    /// Слова начинаются не сразу — в начало встаёт проигрыш с нулевой секунды.
+    @Test func addsIntroBeforeLateFirstLine() {
+        let lines = [Lyrics.Line(time: 24, text: "first")]
+
+        #expect(Lyrics.withIntro(lines) == [Lyrics.Line(time: 0, text: ""), Lyrics.Line(time: 24, text: "first")])
+    }
+
+    /// Полсекунды тишины перед словами — не вступление.
+    @Test func noIntroWhenWordsStartRightAway() {
+        let lines = [Lyrics.Line(time: 0.5, text: "first")]
+
+        #expect(Lyrics.withIntro(lines) == lines)
+    }
+
+    /// Текст сам начинается с проигрыша — второй не нужен.
+    @Test func noSecondIntroOverABreak() {
+        let lines = [Lyrics.Line(time: 5, text: ""), Lyrics.Line(time: 20, text: "first")]
+
+        #expect(Lyrics.withIntro(lines) == lines)
+    }
+
+    /// Проигрыш тянется до самых слов: его точки — обратный отсчёт.
+    @Test func breakCountsDownToTheWords() {
+        let lines = [Lyrics.Line(time: 0, text: ""), Lyrics.Line(time: 20, text: "first")]
+
+        #expect(Lyrics.progress(of: 0, in: lines, at: 5, trackDuration: 100) == 0.25)
+        #expect(Lyrics.progress(of: 0, in: lines, at: 19, trackDuration: 100) == 0.95)
+    }
+
+    /// Проигрыш в самом конце идёт до конца трека.
+    @Test func outroRunsToTheEndOfTrack() {
+        let lines = [Lyrics.Line(time: 10, text: "last"), Lyrics.Line(time: 60, text: "")]
+
+        #expect(Lyrics.progress(of: 1, in: lines, at: 80, trackDuration: 100) == 0.5)
+    }
+}

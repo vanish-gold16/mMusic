@@ -150,6 +150,37 @@ nonisolated extension Lyrics {
         lines.lastIndex { $0.time <= time }
     }
 
+    /// С какой секунды вступление считается вступлением. Полсекунды тишины
+    /// перед первым словом — это не проигрыш, отсчитывать там нечего.
+    static let introThreshold: TimeInterval = 3
+
+    /// Строки со вступлением: если слова начинаются не сразу, в начало встаёт
+    /// проигрыш с нулевой секунды. Иначе первые полминуты трека панель стояла бы
+    /// мёртвой — ни одной горящей строки, и непонятно, идёт ли вообще текст.
+    static func withIntro(_ lines: [Line]) -> [Line] {
+        guard let first = lines.first, first.time >= introThreshold, !first.text.isEmpty else { return lines }
+        return [Line(time: 0, text: "")] + lines
+    }
+
+    /// Какая доля строки уже прозвучала, от 0 до 1 — по ней проигрыш
+    /// зажигает точки. Строка тянется до самой следующей: точки проигрыша —
+    /// обратный отсчёт до слов.
+    static func progress(of index: Int, in lines: [Line], at time: TimeInterval, trackDuration: TimeInterval) -> Double {
+        guard lines.indices.contains(index) else { return 0 }
+        let line = lines[index]
+
+        let end: TimeInterval
+        if lines.indices.contains(index + 1) {
+            end = lines[index + 1].time
+        } else {
+            // После последней строки ждать больше нечего — до конца трека.
+            end = trackDuration > line.time ? trackDuration : line.time + 4
+        }
+
+        let length = max(end - line.time, 0.1)
+        return min(max((time - line.time) / length, 0), 1)
+    }
+
     // MARK: Разбор метки
 
     /// Метки времени в начале строки и всё, что после них.

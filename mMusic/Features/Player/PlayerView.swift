@@ -27,8 +27,13 @@ struct PlayerView: View {
     @State private var isQueuePresented = false
     @State private var isAddingToPlaylist = false
     @State private var isEditingTrack = false
-    /// Обложка уступила место тексту трека.
-    @State private var showsLyrics = false
+    /// Обложка уступила место тексту трека. Плеер открывается таким, каким
+    /// его закрыли: начальное значение — из `AppSettings.playerShowsLyrics`,
+    /// а `setLyrics` записывает туда каждое переключение.
+    ///
+    /// Не `@AppStorage`: её запись не подхватывает `withAnimation`, и обложка
+    /// прыгала бы в угол без пружины.
+    @State private var showsLyrics = UserDefaults.standard.bool(forKey: AppSettings.playerShowsLyrics)
     @State private var isEditingLyrics = false
     @State private var isRemixPresented = false
 
@@ -417,6 +422,7 @@ struct PlayerView: View {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             showsLyrics = shown
         }
+        UserDefaults.standard.set(shown, forKey: AppSettings.playerShowsLyrics)
     }
 
     /// Параметры играющего трека — то же, что в меню строки списка,
