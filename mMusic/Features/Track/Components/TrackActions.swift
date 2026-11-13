@@ -15,6 +15,36 @@ enum TrackAction: Hashable, Identifiable {
 
     var id: Self { self }
 
+    /// Сравнение и хеш — руками, по той же причине, что у `MusicRoute`:
+    /// выведенные компилятором ломали сборку из-за моделей в `.album` и `.artist`.
+    /// Модели сравниваются как в SwiftData — тот же ли это объект.
+    static func == (lhs: TrackAction, rhs: TrackAction) -> Bool {
+        switch (lhs, rhs) {
+        case (.edit, .edit), (.lyrics, .lyrics), (.addToPlaylist, .addToPlaylist), (.delete, .delete):
+            true
+        case (.album(let a), .album(let b)): a === b
+        case (.artist(let a), .artist(let b)): a === b
+        // Все пункты перечислены без `default`: новый не соберётся, пока его
+        // не впишут и сюда. Иначе он молча не был бы равен даже самому себе —
+        // и его лист никогда бы не открылся (`isShowing` сравнивает через `==`).
+        case (.edit, _), (.lyrics, _), (.addToPlaylist, _), (.delete, _), (.album, _), (.artist, _):
+            false
+        }
+    }
+
+    /// Пунктам без модели хватает своего номера; у модели — её `persistentModelID`,
+    /// как в хеше самой SwiftData.
+    func hash(into hasher: inout Hasher) {
+        switch self {
+        case .edit: hasher.combine(0)
+        case .lyrics: hasher.combine(1)
+        case .addToPlaylist: hasher.combine(2)
+        case .delete: hasher.combine(3)
+        case .album(let album): hasher.combine(album.persistentModelID)
+        case .artist(let artist): hasher.combine(artist.persistentModelID)
+        }
+    }
+
     /// Переход, если это переход.
     var route: MusicRoute? {
         switch self {

@@ -10,6 +10,30 @@ enum AlbumAction: Hashable, Identifiable {
     case artist(Artist)
 
     var id: Self { self }
+
+    /// Сравнение и хеш — руками, по той же причине, что у `MusicRoute`:
+    /// выведенные компилятором ломали сборку из-за модели в `.artist`.
+    /// Артисты сравниваются как в SwiftData — тот же ли это объект.
+    static func == (lhs: AlbumAction, rhs: AlbumAction) -> Bool {
+        switch (lhs, rhs) {
+        case (.edit, .edit), (.addToPlaylist, .addToPlaylist), (.delete, .delete):
+            true
+        case (.artist(let a), .artist(let b)): a === b
+        // Без `default`, как у `TrackAction`: новый пункт не соберётся,
+        // пока его не впишут и сюда.
+        case (.edit, _), (.addToPlaylist, _), (.delete, _), (.artist, _):
+            false
+        }
+    }
+
+    func hash(into hasher: inout Hasher) {
+        switch self {
+        case .edit: hasher.combine(0)
+        case .addToPlaylist: hasher.combine(1)
+        case .delete: hasher.combine(2)
+        case .artist(let artist): hasher.combine(artist.persistentModelID)
+        }
+    }
 }
 
 /// Пункты меню альбома — одни и те же в сетке, в стопке на главной,

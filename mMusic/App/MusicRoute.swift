@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Куда ведут «Go to Album» и «Go to Artist», когда переход делает не сама
@@ -11,6 +12,34 @@ import SwiftUI
 nonisolated enum MusicRoute: Hashable {
     case album(Album)
     case artist(Artist)
+
+    /// Сравнение и хеш написаны руками, хотя компилятор умеет выводить их сам.
+    /// Выведенные ломали сборку: Swift 6.4 (Xcode 27.2) иногда «не видит»,
+    /// что `Album` и `Artist` сравнимы. Сравнимыми их делает макрос `@Model`,
+    /// и успел ли он раскрыться к этому моменту, зависит от того, как сборка
+    /// разложила файлы по заданиям компилятора. Хватало добавить в проект
+    /// один любой файл — и всё падало с «'Artist' does not conform to 'Equatable'».
+    /// Руками написанному сравнению это не грозит: ему не нужно, чтобы компилятор
+    /// заранее знал о сравнимости моделей.
+    ///
+    /// Модели сравниваются ровно так, как их сравнивает сама SwiftData:
+    /// равны, только если это один и тот же объект (`===`), а хеш берётся
+    /// от `persistentModelID`. Поведение то же, что было у выведенных.
+    static func == (lhs: MusicRoute, rhs: MusicRoute) -> Bool {
+        switch (lhs, rhs) {
+        case (.album(let a), .album(let b)): a === b
+        case (.artist(let a), .artist(let b)): a === b
+        // Без `default`: новый case не соберётся, пока его не впишут и сюда.
+        case (.album, _), (.artist, _): false
+        }
+    }
+
+    func hash(into hasher: inout Hasher) {
+        switch self {
+        case .album(let album): hasher.combine(album.persistentModelID)
+        case .artist(let artist): hasher.combine(artist.persistentModelID)
+        }
+    }
 
     /// Экран, который открывается по этому значению.
     @MainActor @ViewBuilder
