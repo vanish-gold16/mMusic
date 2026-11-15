@@ -37,8 +37,6 @@ struct PlayerView: View {
     @State private var isEditingLyrics = false
     @State private var isRemixPresented = false
 
-    @State private var artworkWidth: CGFloat = 0
-
     /// Стопка внутри плеера: альбом и артисты открываются здесь же, поверх
     /// деки, и закрытие плеера уносит их вместе с ним.
     @State private var path = NavigationPath()
@@ -124,9 +122,8 @@ struct PlayerView: View {
             .padding(.bottom, 4)
     }
 
-    /// Горизонтальные протяжки принадлежат обложке (следующий и предыдущий трек)
-    /// и ленте (перемотка), поэтому закрытие реагирует только на явно вертикальное
-    /// движение.
+    /// Горизонтальные протяжки принадлежат ленте (перемотка), поэтому закрытие
+    /// реагирует только на явно вертикальное движение.
     private var dismissGesture: some Gesture {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
@@ -237,22 +234,16 @@ struct PlayerView: View {
             .frame(maxWidth: showsLyrics ? 64 : .infinity)
             // Обложка лежит на фоне, а не нарисована на нём.
             .shadow(color: .black.opacity(showsLyrics ? 0 : 0.28), radius: 24, y: 12)
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.width
-            } action: { newWidth in
-                artworkWidth = newWidth
-            }
             .contentShape(Rectangle())
-            .onTapGesture(count: 2) { location in
-                if location.x < artworkWidth / 2 {
-                    audioPlayer.playPrevious()
-                } else {
-                    audioPlayer.playNext()
-                }
-            }
+            // Ужатая под текстом обложка — дорога назад: нажатие возвращает её
+            // в полный рост. Музыкой обложка не управляет: пауза и соседние
+            // треки — на клавишах деки.
             .onTapGesture {
-                audioPlayer.togglePlayPause()
+                if showsLyrics { setLyrics(false) }
             }
+            .accessibilityLabel("Cover")
+            .accessibilityAddTraits(showsLyrics ? .isButton : [])
+            .accessibilityHint(showsLyrics ? "Shows the cover instead of the text" : "")
             .gesture(
                 DragGesture(minimumDistance: 12)
                     .onChanged { value in
@@ -266,22 +257,12 @@ struct PlayerView: View {
                         let dy = value.translation.height
 
                         // Протяжка вверх по обложке поднимает текст — то же
-                        // движение, что «поднять шторку».
-                        guard abs(dx) > abs(dy) else {
-                            if dy < 0 {
-                                setLyrics(true)
-                            } else {
-                                dismissDragEnded(value.translation)
-                            }
-                            return
-                        }
-
-                        dismissDragEnded(value.translation)
-
-                        if dx < 0 {
-                            audioPlayer.playNext()
+                        // движение, что «поднять шторку». Всё остальное решает
+                        // закрытие: вниз — закрыться, вбок — вернуться на место.
+                        if dy < 0, abs(dy) > abs(dx) {
+                            setLyrics(true)
                         } else {
-                            audioPlayer.playPrevious()
+                            dismissDragEnded(value.translation)
                         }
                     }
             )
