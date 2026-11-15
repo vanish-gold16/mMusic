@@ -19,6 +19,7 @@ enum Genre: String, CaseIterable, Codable {
     case rock = "Rock"
     case uarock = "Ukrainian Rock"
     case rurock = "Russian Rock"
+    case jrock = "J-Rock"
     case indie = "Indie"
     case grunge = "Grunge"
     case shoegaze = "Shoegaze"
