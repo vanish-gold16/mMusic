@@ -95,7 +95,15 @@ struct SearchView: View {
             CoverAura(palette: audioPlayer.currentTrack == nil ? nil : audioPlayer.palette, breathes: false)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Artists, records, tracks, genres")
+        // Поле прибито под шапкой. На iOS 26 вкладка `role: .search` сама
+        // превращалась в поле внизу; iOS 27 так больше не делает — вкладка
+        // стоит в общей капсуле, а поле по умолчанию уезжает в панель
+        // навигации и прячется, пока не потянешь список вниз.
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Artists, records, tracks, genres"
+        )
     }
 
     // MARK: - Шапка

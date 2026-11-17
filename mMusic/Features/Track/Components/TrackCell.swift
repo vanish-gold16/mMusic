@@ -61,8 +61,11 @@ struct TrackCell: View {
             switch leadingStyle {
             case .number:
                 if isCurrent {
+                    // Не `.tint`: на странице альбома tint — цвет обложки,
+                    // и стекло играющей строки окрашено им же. Начиная с iOS 27
+                    // плотное стекло съедает такой значок целиком.
                     EqualizerView(level: audioPlayer.level)
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(.primary)
                         .frame(width: 40, height: 40)
                 } else {
                     Text(number ?? "\(track.position + 1)")
@@ -128,7 +131,10 @@ struct TrackCell: View {
             Menu {
                 menuItems
             } label: {
+                // Серым, как длительность рядом, — по той же причине, что и
+                // эквалайзер: цвет обложки на стекле цвета обложки не видно.
                 Image(systemName: "ellipsis")
+                    .foregroundStyle(.secondary)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
