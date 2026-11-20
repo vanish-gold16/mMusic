@@ -44,7 +44,8 @@ struct QueueView: View {
     /// Свой заголовок вместо навигационной панели: строка состояния очереди
     /// («сколько ещё играть») здесь полезнее, чем слово «Queue» по центру.
     private var header: some View {
-        let accent = audioPlayer.accent
+        // Лист из полупрозрачного материала поверх плеера: под ним главный цвет.
+        let accent = audioPlayer.onBase
 
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
@@ -160,7 +161,9 @@ private struct QueueRow: View {
                 Text(track.name)
                     .font(.subheadline.weight(isCurrent ? .semibold : .regular))
                     .lineLimit(1)
-                    .foregroundStyle(isCurrent ? audioPlayer.accent : Color.primary)
+                    // Не цветом: строка и так подсвечена стеклом того же цвета,
+                    // и буквы в нём пропадали бы.
+                    .foregroundStyle(Color.primary)
 
                 if !track.artistNames.isEmpty {
                     Text(track.artistNames.joined(separator: ", "))
@@ -183,7 +186,7 @@ private struct QueueRow: View {
         .padding(.vertical, 8)
         // Играющая строка подсвечивается стеклом с цветом обложки — так же,
         // как в списках библиотеки.
-        .glassEffect(isCurrent ? .regular.tint(audioPlayer.accent.opacity(0.28)) : .identity)
+        .glassEffect(isCurrent ? .regular.tint(audioPlayer.onBase.opacity(0.28)) : .identity)
         .opacity(isPlayed ? 0.45 : 1)
         .contextMenu {
             menu(isCurrent: isCurrent)

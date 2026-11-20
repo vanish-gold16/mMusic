@@ -19,7 +19,7 @@ struct LyricsPanel: View {
 
     private var track: Track? { audioPlayer.currentTrack }
     private var text: String { track?.lyrics ?? "" }
-    private var accent: Color { audioPlayer.accent }
+    private var accent: Color { audioPlayer.onBase }
 
     var body: some View {
         Group {

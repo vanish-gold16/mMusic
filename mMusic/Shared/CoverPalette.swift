@@ -5,17 +5,25 @@ import UIKit
 /// Цвета, которыми нарисована обложка. Не «подобранные под неё», а её собственные:
 /// тёмная обложка даёт тёмный фон, блёклая — блёклый.
 ///
-/// Единственное исключение — `accent`: им красятся кнопки и tint всего приложения,
-/// поэтому совсем невидимый цвет подтягивается до различимого. Подтягивается только
-/// вверх: яркая обложка отдаёт свой цвет как есть.
+/// Исключения — два цвета для кнопок, `accent` и `onBase`: кнопка должна быть
+/// видна, поэтому их цвет подтягивается до различимого. Только вверх: яркая
+/// обложка отдаёт свой цвет как есть.
 struct CoverPalette: Equatable, Sendable {
 
     /// Главный цвет обложки — тот, которого на ней больше всего. Им залит фон.
     let base: Color
     /// Второй по заметности цвет другого оттенка. Им фон «дышит» поверх первого.
     let secondary: Color
-    /// Самый выразительный цвет: кнопки, волна, tint приложения.
+    /// Tint приложения: тот же главный цвет, доведённый до читаемого на фоне
+    /// экрана — в тёмной теме он светлее, в светлой темнее. Раньше здесь
+    /// был самый яркий цвет обложки, и маленький кислотный логотип на тёмном
+    /// конверте красил собой всё приложение.
     let accent: Color
+    /// Цвет кнопок поверх `base` — в плеере и на всём, что открыто из него.
+    /// Там `accent` того же оттенка, что и фон, слился бы с ним, поэтому берётся
+    /// самый выразительный цвет обложки, который на этом фоне различим. Если
+    /// такого нет — например, обложка вся одного цвета, — цвет текста.
+    let onBase: Color
     /// Фон из этих цветов светлый — значит, текст поверх него должен быть тёмным.
     let isLight: Bool
     /// Светлота основного цвета, 0...1. По ней решают, нужна ли фону вуаль:
@@ -27,6 +35,7 @@ struct CoverPalette: Equatable, Sendable {
         base: Color(white: 0.12),
         secondary: Color(red: 0.35, green: 0.2, blue: 0.5),
         accent: .orange,
+        onBase: .orange,
         isLight: false,
         baseLuminance: 0.12
     )
@@ -54,7 +63,7 @@ extension UIImage {
         // Почти чёрные и почти белые пятна не должны решать за всю обложку: иначе
         // тёмное фото даёт чёрный экран, хотя цвет на нём есть. Но если цветного
         // на обложке правда нет, берём то, что есть.
-        let colourful = swatches.filter { $0.saturation > 0.18 && $0.brightness > 0.12 && $0.share > 0.08 }
+        let colourful = swatches.filter { Self.isColourful($0) && $0.share > 0.08 }
         guard let base = (colourful + swatches).max(by: { left, right in
             Self.weight(left, amongColourful: !colourful.isEmpty) < Self.weight(right, amongColourful: !colourful.isEmpty)
         }) else { return nil }
@@ -68,25 +77,55 @@ extension UIImage {
                 left.share * (0.35 + left.saturation) < right.share * (0.35 + right.saturation)
             }
 
-        // Акцент — самый выразительный цвет, но не одинокий пиксель: доля площади
-        // входит в оценку корнем, чтобы крупное пятно перевешивало точку.
-        let accent = swatches.max { left, right in
-            Self.vividness(left) < Self.vividness(right)
-        } ?? base
+        // Самые выразительные цвета по убыванию, но не одинокие пиксели: доля
+        // площади входит в оценку корнем, чтобы крупное пятно перевешивало точку.
+        // Серые не в счёт: подтянутая до «различимой» насыщенность выдумала бы
+        // им цвет, которого на обложке нет.
+        let vivid = swatches
+            .filter { Self.isColourful($0) && $0.share > 0.01 }
+            .sorted { Self.vividness($0) > Self.vividness($1) }
 
         let baseColor = Self.floored(base, minimumBrightness: 0.16)
         // Одноцветная обложка второго цвета не даёт — берём соседний по кругу:
         // противоположный смотрелся бы наклейкой, соседний — переливом.
         let secondaryColor = secondary.map { Self.floored($0, minimumBrightness: 0.28) }
             ?? Self.shifted(baseColor, byHue: 0.1)
+        let isLight = Self.isLight(base: baseColor, secondary: secondaryColor)
+
+        // Tint — главный цвет. Если он серый (чёрно-белое фото с красной
+        // надписью), оттенок даёт самое яркое пятно; совсем бесцветной обложке
+        // остаётся цвет приложения.
+        let accent: UIColor
+        if Self.isColourful(base) {
+            accent = Self.legible(base)
+        } else if let brightest = vivid.first {
+            accent = Self.legible(brightest)
+        } else {
+            accent = UIColor(Color.orange)
+        }
+
+        // Поверх главного цвета — первый выразительный, который на нём читается.
+        // 3:1 — порог WCAG для значков и линий: текстом эти цвета не бывают.
+        let text: UIColor = isLight ? .black : .white
+        let onBase = vivid
+            .lazy
+            .map { Self.legible($0) }
+            .first { Self.contrast($0, baseColor) >= 3 }
+            ?? text
 
         return CoverPalette(
             base: Color(baseColor),
             secondary: Color(secondaryColor),
-            accent: Color(Self.legible(accent)),
-            isLight: Self.isLight(base: baseColor, secondary: secondaryColor),
+            accent: Color(Self.readable(accent)),
+            onBase: Color(onBase),
+            isLight: isLight,
             baseLuminance: Self.luminance(baseColor)
         )
+    }
+
+    /// Пятно — цвет, а не серое и не почти чёрное: у тех оттенок случайный.
+    nonisolated private static func isColourful(_ swatch: Swatch) -> Bool {
+        swatch.saturation > 0.18 && swatch.brightness > 0.12
     }
 
     /// Обложка, сжатая до сетки 32×32 и схлопнутая в «корзины»: соседние оттенки
@@ -175,8 +214,7 @@ extension UIImage {
     nonisolated private static func weight(_ swatch: Swatch, amongColourful: Bool) -> Double {
         guard amongColourful else { return swatch.share }
 
-        let isColourful = swatch.saturation > 0.18 && swatch.brightness > 0.12 && swatch.share > 0.08
-        return isColourful ? swatch.share : 0
+        return isColourful(swatch) && swatch.share > 0.08 ? swatch.share : 0
     }
 
     /// Насколько цвет «звучит»: насыщенность в первую очередь, площадь — корнем,
@@ -228,6 +266,66 @@ extension UIImage {
     /// Веса неравные: глаз сильнее всего реагирует на зелёный, слабее всего на синий.
     nonisolated private static func isLight(base: UIColor, secondary: UIColor) -> Bool {
         0.8 * luminance(base) + 0.2 * luminance(secondary) > 0.55
+    }
+
+    /// Tint лежит на обычном фоне экрана — чёрном в тёмной теме, белом в светлой.
+    /// Синий с той же яркостью по HSB, что и оранжевый, на чёрном почти не виден,
+    /// а жёлтый не виден на белом, поэтому цвет подстраивается под тему: в тёмной
+    /// светлеет, в светлой темнеет, пока не наберёт контраст 3.5:1. Оттенок
+    /// остаётся обложкиным, меняется только светлота.
+    nonisolated private static func readable(_ color: UIColor) -> UIColor {
+        let onDark = reaching(3.5, from: color, against: .black, mixing: .white)
+        let onLight = reaching(3.5, from: color, against: .white, mixing: .black)
+        return UIColor { traits in
+            traits.userInterfaceStyle == .dark ? onDark : onLight
+        }
+    }
+
+    /// Подмешивает `mixing` шагами по 5%, пока контраст с фоном не дойдёт до нужного.
+    nonisolated private static func reaching(
+        _ target: Double,
+        from color: UIColor,
+        against background: UIColor,
+        mixing other: UIColor
+    ) -> UIColor {
+        var from = (red: CGFloat(0), green: CGFloat(0), blue: CGFloat(0), alpha: CGFloat(0))
+        var to = from
+        color.getRed(&from.red, green: &from.green, blue: &from.blue, alpha: &from.alpha)
+        other.getRed(&to.red, green: &to.green, blue: &to.blue, alpha: &to.alpha)
+
+        var result = color
+        var amount: CGFloat = 0
+        while contrast(result, background) < target, amount < 1 {
+            amount = min(amount + 0.05, 1)
+            result = UIColor(
+                red: from.red + (to.red - from.red) * amount,
+                green: from.green + (to.green - from.green) * amount,
+                blue: from.blue + (to.blue - from.blue) * amount,
+                alpha: 1
+            )
+        }
+        return result
+    }
+
+    /// Контраст двух цветов по WCAG: 1 — неразличимы, 21 — чёрный на белом.
+    /// Светлота здесь честная, с линеаризацией sRGB: `luminance` ниже — быстрая
+    /// оценка «светлый или тёмный», для порогов контраста она врёт.
+    nonisolated private static func contrast(_ one: UIColor, _ other: UIColor) -> Double {
+        let first = relativeLuminance(one)
+        let second = relativeLuminance(other)
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
+
+    nonisolated private static func relativeLuminance(_ color: UIColor) -> Double {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+
+        func linear(_ channel: CGFloat) -> Double {
+            let value = Double(min(max(channel, 0), 1))
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+
+        return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
     }
 
     nonisolated private static func luminance(_ color: UIColor) -> Double {

@@ -4,6 +4,7 @@ import SwiftUI
 struct TrackCell: View {
     
     @Environment(AudioPlayer.self) private var audioPlayer
+    @Environment(\.isInsidePlayer) private var isInsidePlayer
 
     /// Что открыто из меню строки: лист, вопрос об удалении или переход.
     @State private var action: TrackAction?
@@ -144,7 +145,7 @@ struct TrackCell: View {
         .contentShape(Rectangle())
         // Играющая строка красится стеклом, а не отдельной плашкой: видно сразу,
         // и цвет тот же, что у обложки.
-        .glassEffect(isCurrent ? .regular.tint(audioPlayer.accent.opacity(0.28)) : .regular)
+        .glassEffect(isCurrent ? .regular.tint(audioPlayer.accent(insidePlayer: isInsidePlayer).opacity(0.28)) : .regular)
         // Превью меню той же формы, что и стекло, — без него система
         // вырезает прямоугольник с острыми углами.
         .contentShape(.contextMenuPreview, Capsule())

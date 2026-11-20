@@ -37,6 +37,14 @@ class AudioPlayer: NSObject {
     /// Короткие имена для самых частых мест — читаются как раньше.
     var accent: Color { palette.accent }
     var secondaryAccent: Color { palette.secondary }
+    /// Кнопки поверх фона плеера: в самом плеере и на экранах, открытых из него.
+    var onBase: Color { palette.onBase }
+
+    /// Цвет подсветки для экрана, который может стоять и в приложении, и внутри
+    /// плеера: там под ним главный цвет обложки, и `accent` с ним сливается.
+    func accent(insidePlayer: Bool) -> Color {
+        insidePlayer ? onBase : accent
+    }
 
     var level: Double = 0
     private let meterFloor: Double = -50

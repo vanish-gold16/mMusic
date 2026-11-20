@@ -41,7 +41,9 @@ struct PlayerView: View {
     /// деки, и закрытие плеера уносит их вместе с ним.
     @State private var path = NavigationPath()
 
-    private var accent: Color { audioPlayer.accent }
+    /// Всё в плеере лежит на главном цвете обложки — значит, и красится
+    /// цветом, который на нём виден.
+    private var accent: Color { audioPlayer.onBase }
 
     var body: some View {
         // Стек нужен ради перехода на альбом и артиста.
@@ -62,6 +64,9 @@ struct PlayerView: View {
         // чёрным прямоугольником. Флаг доезжает и до них: environment проходит
         // сквозь границу NavigationStack.
         .environment(\.isInsidePlayer, true)
+        // Системные кнопки и меню внутри плеера тоже на главном цвете. Строго
+        // до `.sheet`: листы правки остаются в цвете всего приложения.
+        .tint(accent)
         .offset(y: dragOffset)
         // Лист заменён оверлеем: matchedGeometryEffect не работает через границу
         // листа — там своя иерархия, и обложке не с чем сопоставляться.

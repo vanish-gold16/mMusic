@@ -172,7 +172,7 @@ struct PlayheadTape: View {
                 duration: duration,
                 reels: reels,
                 isScrubbing: scrub != nil,
-                accent: audioPlayer.accent,
+                accent: audioPlayer.onBase,
                 captions: captions
             )
         }

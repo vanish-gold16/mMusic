@@ -119,10 +119,10 @@ private struct RecordSpine: View {
             shape.fill(palette?.base ?? Color(.systemGray5))
         }
         .overlay {
-            // Играющий корешок обведён акцентом — тем же цветом, что и всё,
-            // что сейчас звучит.
+            // Играющий корешок обведён цветом, который виден на его заливке:
+            // tint приложения — тот же главный цвет и слился бы с ней.
             if isCurrent {
-                shape.strokeBorder(.tint, lineWidth: 2)
+                shape.strokeBorder(palette.map { AnyShapeStyle($0.onBase) } ?? AnyShapeStyle(.tint), lineWidth: 2)
             } else {
                 shape.strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
             }

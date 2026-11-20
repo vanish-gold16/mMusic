@@ -11,7 +11,7 @@ struct DeckKeys: View {
     let audioPlayer: AudioPlayer
 
     var body: some View {
-        let accent = audioPlayer.accent
+        let accent = audioPlayer.onBase
 
         // Клавиши стоят тесно, но не сливаются: зазор чуть больше дистанции,
         // на которой стекло соседей перетекает друг в друга.

@@ -19,7 +19,8 @@ struct RemixView: View {
     @State private var contentHeight: CGFloat = 560
 
     private var remix: RemixSettings { audioPlayer.currentRemix }
-    private var accent: Color { audioPlayer.accent }
+    // Лист из полупрозрачного материала поверх плеера: под ним главный цвет.
+    private var accent: Color { audioPlayer.onBase }
 
     var body: some View {
         VStack(spacing: 18) {

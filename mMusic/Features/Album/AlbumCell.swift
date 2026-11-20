@@ -7,6 +7,7 @@ import SwiftUI
 struct AlbumCell: View {
     
     @Environment(AudioPlayer.self) var audioPlayer
+    @Environment(\.isInsidePlayer) private var isInsidePlayer
 
     /// Что открыто из меню: лист правки, выбор плейлиста, вопрос или артист.
     @State private var action: AlbumAction?
@@ -89,7 +90,7 @@ struct AlbumCell: View {
                 outDisc: playing?.disc,
                 playing: playing,
                 isPlaying: isCurrent && audioPlayer.isPlaying,
-                accent: isCurrent ? audioPlayer.accent : .clear,
+                accent: isCurrent ? audioPlayer.accent(insidePlayer: isInsidePlayer) : .clear,
                 marked: markedRings
             )
 

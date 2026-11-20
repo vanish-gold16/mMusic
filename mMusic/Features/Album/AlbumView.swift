@@ -20,6 +20,8 @@ struct AlbumView: View {
 
     @Environment(AudioPlayer.self) var audioPlayer
     @Environment(\.dismiss) private var dismiss
+    /// Открыт изнутри плеера — фон его, и кнопки красятся под этот фон.
+    @Environment(\.isInsidePlayer) private var isInsidePlayer
 
     var album: Album
 
@@ -61,8 +63,10 @@ struct AlbumView: View {
         playing != nil ? audioPlayer.palette : coverPalette
     }
 
+    /// Внутри плеера страница лежит на главном цвете играющего трека, а не
+    /// на своём, — и кнопки должны быть видны на нём.
     private var accent: Color {
-        pagePalette?.accent ?? audioPlayer.accent
+        isInsidePlayer ? audioPlayer.onBase : pagePalette?.accent ?? audioPlayer.accent
     }
 
     /// Что на экране и что играют кнопки: у открытой пластинки — она,

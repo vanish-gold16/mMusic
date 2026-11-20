@@ -91,8 +91,10 @@ struct ArtistView: View {
         isPlayingArtist ? audioPlayer.palette : photoPalette
     }
 
+    /// Внутри плеера страница лежит на главном цвете играющего трека, а не
+    /// на своём, — и кнопки должны быть видны на нём.
     private var accent: Color {
-        pagePalette?.accent ?? audioPlayer.accent
+        isInsidePlayer ? audioPlayer.onBase : pagePalette?.accent ?? audioPlayer.accent
     }
 
     var body: some View {
